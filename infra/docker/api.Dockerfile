@@ -1,7 +1,7 @@
+# syntax=docker/dockerfile:1
 # apps/api — FastAPI, built from the repo root as build context so the
 # uv-managed venv only ever contains this service's own dependencies.
 # Build with: docker build -f infra/docker/api.Dockerfile --target dev .
-syntax=docker/dockerfile:1
 
 FROM python:3.12-slim AS base
 ENV PYTHONDONTWRITEBYTECODE=1 \

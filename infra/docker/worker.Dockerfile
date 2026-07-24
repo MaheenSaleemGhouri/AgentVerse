@@ -1,7 +1,7 @@
+# syntax=docker/dockerfile:1
 # apps/worker — background agent-runtime fleet. Same pattern as
 # infra/docker/api.Dockerfile; see that file for the dev/non-root rationale.
 # Build with: docker build -f infra/docker/worker.Dockerfile --target dev .
-syntax=docker/dockerfile:1
 
 FROM python:3.12-slim AS base
 ENV PYTHONDONTWRITEBYTECODE=1 \

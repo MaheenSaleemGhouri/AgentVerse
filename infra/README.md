@@ -26,9 +26,11 @@ Once healthy:
 
 `api` and `worker` both wait on `postgres`/`redis` reporting `service_healthy` before starting; `web` waits on `api`. This is the health-check-gated startup order this phase's acceptance criteria require.
 
-## Known limitation
+## Verified
 
-This sandbox's Docker Engine is unreachable (Docker Desktop WSL integration not enabled in the CI/build environment used to author this stack), so `docker compose up` itself could not be executed end-to-end here. Each Dockerfile and `docker-compose.yml` was written against well-established, documented patterns (Astral's official `uv` Docker image layering, Next.js's official pnpm-monorepo standalone-output recipe) and validated for YAML/structural correctness, but a clean-machine `docker compose up --build` run is the outstanding verification step — do this first when Docker is available, before starting Phase 1.
+`docker compose up --build` has been run end-to-end (Docker Desktop 4.61.0, Engine 29.2.1). All 5 containers (`postgres`, `redis`, `api`, `worker`, `web`) reach `healthy`, in the correct dependency order. Confirmed live: `pgvector` extension creates successfully on the `postgres` container (`CREATE EXTENSION vector` → v0.8.2); `redis-cli PING` → `PONG`; all `/health`/`/ready` routes return `200 {"status":"ok"}` through the mapped host ports; `docker compose down` cleanly stops and removes all containers/network.
+
+**Dev-mode hot reload note:** the `web` service's dev target needs `WATCHPACK_POLLING=true` (already set in `docker/web.Dockerfile`) — webpack's native filesystem watcher does not see host-side edits through a Docker Desktop bind mount on Windows; confirmed broken without the polling env var, confirmed working with it (~1s detection). `api`/`worker`'s `uvicorn --reload` (via `watchfiles`) did not need this — it detected bind-mounted changes correctly out of the box.
 
 ## Dependencies
 

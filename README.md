@@ -29,7 +29,7 @@ Each service owns its own `README.md`, `.env.example`, and (for the Python servi
 
 ## Bootstrap (local development)
 
-**Prerequisites:** Node.js ≥20.9 (`.nvmrc` pins `20.18.0`), `pnpm` (via Corepack: `corepack enable`), Python 3.12, [`uv`](https://docs.astral.sh/uv/), and Docker with Compose v2.
+**Prerequisites:** Node.js ≥20.19 (`.nvmrc` pins `20.20.2`), `pnpm` (via Corepack: `corepack enable`), Python 3.12, [`uv`](https://docs.astral.sh/uv/), and Docker with Compose v2.
 
 > **WSL note:** clone into the Linux filesystem (e.g. `~/code/AgentVerse`), not `/mnt/c/...`. Installs and `next build` are dramatically slower across the 9P filesystem bridge — this was the dominant cost observed while building Phase 0 (a `next build` took ~60s from `/mnt/c` for a near-empty app).
 
