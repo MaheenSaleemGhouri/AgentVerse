@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Nightly dependency-vulnerability sweep (CLAUDE.md §10: dependency
+    # security checks run on every PR touching manifests *and* nightly).
+    - cron: "17 3 * * *"
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PNPM_VERSION: "9.15.9"
+  NODE_VERSION: "20.18.0"
+  UV_VERSION: "0.11.32"
+
+jobs:
+  # Cheapest-first ordering (CLAUDE.md §11): lint/type-check before test,
+  # node and python tracks run in parallel since neither depends on the
+  # other's output in Phase 0. No integration/E2E stage yet — nothing to
+  # integration-test until Phase 1 introduces Postgres-backed logic.
+  node-checks:
+    name: node / ${{ matrix.package }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ["@agentverse/contracts", "@agentverse/web"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter '${{ matrix.package }}' run lint
+      - run: pnpm --filter '${{ matrix.package }}' run typecheck
+      - run: pnpm --filter '${{ matrix.package }}' run build
+
+  python-checks:
+    name: python / apps/${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, worker]
+    defaults:
+      run:
+        working-directory: apps/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: apps/${{ matrix.service }}/uv.lock
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy src
+      - run: uv run pytest -q
+
+  # Dependency-vulnerability scan (CLAUDE.md §10): pnpm's built-in audit
+  # for the JS side, pip-audit for each Python service. Findings are
+  # triaged, not ignored — this job is required, not advisory.
+  dependency-audit:
+    name: dependency audit / ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [node, api, worker]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: matrix.target == 'node'
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - if: matrix.target == 'node'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - if: matrix.target == 'node'
+        run: pnpm install --frozen-lockfile
+      - if: matrix.target == 'node'
+        run: pnpm audit
+      - if: matrix.target != 'node'
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+      - if: matrix.target != 'node'
+        working-directory: apps/${{ matrix.target }}
+        run: uv sync --frozen
+      - if: matrix.target != 'node'
+        working-directory: apps/${{ matrix.target }}
+        run: uvx pip-audit --local
+
+  # Single required status check for branch protection, so adding a new
+  # matrix leg later never silently drops out of what's enforced.
+  ci-gate:
+    name: CI gate
+    if: always()
+    needs: [node-checks, python-checks, dependency-audit]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any dependency job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+/*
+ * Primitive-tier design tokens only (Phase 0 — docs/roadmap.md).
+ *
+ * Tailwind v4 already ships full neutral-color ramps, a 4px-base
+ * spacing scale, a type scale, and radius primitives as built-in
+ * defaults — redefining them here would be duplication, not reuse
+ * (CLAUDE.md §16). The one primitive genuinely specific to AgentVerse
+ * is its brand hue, so that's the only ramp added below.
+ *
+ * No semantic tier (`--color-bg-*`, `--color-fg-*`, status colors)
+ * exists yet — CLAUDE.md §15 layers semantic tokens on top of this
+ * primitive tier once real UI consumes them, starting when shadcn/ui
+ * is introduced in Phase 4. Guessing the semantic mapping now, with
+ * no component to validate it against, is the exact risk flagged in
+ * this phase's roadmap entry.
+ */
+@theme {
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
+  --color-brand-950: #1e1b4b;
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}

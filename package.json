@@ -1,0 +1,25 @@
+{
+  "name": "agentverse",
+  "private": true,
+  "version": "0.1.0-alpha",
+  "description": "AgentVerse — enterprise platform for building, deploying, and orchestrating AI agents.",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter=./apps/web --filter=./packages/contracts run build",
+    "lint": "pnpm -r --filter=./apps/web --filter=./packages/contracts run lint",
+    "typecheck": "pnpm -r --filter=./apps/web --filter=./packages/contracts run typecheck",
+    "dev:web": "pnpm --filter=./apps/web run dev"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "sharp": ">=0.35.0",
+      "postcss": ">=8.5.12"
+    }
+  }
+}

@@ -1,0 +1,34 @@
+# Applies to every Dockerfile in infra/docker/ — all three use the repo
+# root as build context (see infra/README.md for why), so this file is
+# what keeps node_modules, venvs, and local caches out of every image's
+# build context and layers.
+
+.git/
+.github/
+
+**/node_modules/
+**/.next/
+**/.turbo/
+**/dist/
+
+**/.venv/
+**/__pycache__/
+**/*.py[cod]
+**/.mypy_cache/
+**/.pytest_cache/
+**/.ruff_cache/
+
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+**/*.log
+.DS_Store
+
+.claude/
+docs/
+*.md
+!apps/**/*.md
+
+.vscode/

@@ -1,0 +1,141 @@
+# AgentVerse local development stack (Phase 0).
+#
+# Run from this directory: `cd infra && cp .env.example .env && docker compose up --build`
+# (docker compose auto-loads `.env` from its own working directory —
+# running from `infra/` is what makes `${POSTGRES_USER}` etc. resolve).
+#
+# Every app service's own config has working defaults (see each
+# service's infrastructure/config.py) — infra/.env only supplies the
+# datastore credentials and host port mappings below.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-agentverse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agentverse_dev_only}
+      POSTGRES_DB: ${POSTGRES_DB:-agentverse}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentverse} -d ${POSTGRES_DB:-agentverse}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/docker/api.Dockerfile
+      target: dev
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ../apps/api:/app
+      - api_venv:/app/.venv
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  worker:
+    build:
+      context: ..
+      dockerfile: infra/docker/worker.Dockerfile
+      target: dev
+    ports:
+      - "${WORKER_PORT:-8001}:8001"
+    volumes:
+      - ../apps/worker:/app
+      - worker_venv:/app/.venv
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  web:
+    build:
+      context: ..
+      dockerfile: infra/docker/web.Dockerfile
+      target: dev
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    # The whole repo is mounted (not just apps/web) because this is a
+    # pnpm workspace: apps/web depends on packages/contracts by
+    # workspace reference. node_modules at every level is shadowed by
+    # a named volume so container-native installs are never clobbered
+    # by the host's bind-mounted (and possibly different-platform)
+    # node_modules.
+    volumes:
+      - ..:/repo
+      - web_root_node_modules:/repo/node_modules
+      - web_app_node_modules:/repo/apps/web/node_modules
+      - contracts_node_modules:/repo/packages/contracts/node_modules
+      - web_next_cache:/repo/apps/web/.next
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/api/health",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  postgres_data:
+  api_venv:
+  worker_venv:
+  web_root_node_modules:
+  web_app_node_modules:
+  contracts_node_modules:
+  web_next_cache:

@@ -1,0 +1,44 @@
+# CODEOWNERS
+#
+# Maps repository paths to their owning discipline per CLAUDE.md §18.1's
+# ownership map. GitHub only recognizes real user/team handles, and
+# AgentVerse currently has one engineer — every rule below resolves to
+# the repo owner. The path grouping and comments encode the *intended*
+# discipline ownership so this file only needs new handles (not a
+# restructure) once the team grows past one person.
+
+# Global fallback
+*                                   @MaheenSaleemGhouri
+
+# Frontend — senior-frontend-engineer
+/apps/web/                         @MaheenSaleemGhouri
+
+# Backend / control-plane API — senior-backend-engineer
+/apps/api/                         @MaheenSaleemGhouri
+
+# Agent-runtime worker fleet — senior-backend-engineer, ai-architect
+/apps/worker/                      @MaheenSaleemGhouri
+
+# Shared API contracts — api-designer, typescript-expert
+/packages/contracts/               @MaheenSaleemGhouri
+
+# Infra, containers, CI — devops-engineer, docker-expert, ci-cd-expert, cloud-architect
+/infra/                            @MaheenSaleemGhouri
+/.github/                          @MaheenSaleemGhouri
+
+# Architecture decision records — principal-software-architect, architecture-reviewer
+/docs/adr/                         @MaheenSaleemGhouri
+
+# Engineering constitution & organizational memory — agentverse-master-ai-engineering-team
+/CLAUDE.md                         @MaheenSaleemGhouri
+/docs/project-memory.md            @MaheenSaleemGhouri
+/docs/decision-log.md              @MaheenSaleemGhouri
+/docs/ai-playbook.md               @MaheenSaleemGhouri
+/docs/roadmap.md                   @MaheenSaleemGhouri
+
+# Skill library — claude-code-expert
+/.claude/                          @MaheenSaleemGhouri
+
+# Security-sensitive paths get an *additional* required reviewer
+# (CLAUDE.md §14/§20 Rule 2) once they exist — auth, authorization, and
+# billing code all land in later phases; no such paths exist in Phase 0.
