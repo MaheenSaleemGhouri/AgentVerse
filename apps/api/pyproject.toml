@@ -8,6 +8,10 @@ dependencies = [
     "uvicorn[standard]>=0.34,<0.35",
     "pydantic>=2.10,<3",
     "pydantic-settings>=2.7,<3",
+    "sqlalchemy[asyncio]>=2.0.51,<3",
+    "asyncpg>=0.31,<0.32",
+    "alembic>=1.18,<2",
+    "pyjwt[crypto]>=2.13,<3",
 ]
 
 [dependency-groups]
@@ -38,12 +42,28 @@ ignore = []
 [tool.ruff.lint.isort]
 known-first-party = ["agentverse_api"]
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection pattern requires `Depends(...)` as an
+# argument default — that's the framework's documented usage, not the
+# mutable-default-argument bug B008 exists to catch.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Path", "fastapi.Query", "fastapi.Header"]
+
+[tool.ruff.lint.per-file-ignores]
+# Alembic-generated migrations: machine-generated, reviewed for
+# correctness (not hand-formatted), regenerating on every schema change
+# — holding them to line-length/import-sort style is churn without value.
+"src/agentverse_api/infrastructure/migrations/versions/*.py" = ["E501", "I001", "UP007", "UP035"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
 mypy_path = "src"
 explicit_package_bases = true
+plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "integration: requires a real Postgres (DATABASE_URL) — CLAUDE.md §11, never mocked",
+]

@@ -2,7 +2,7 @@
 # apps/web — Next.js 15, built from the pnpm workspace root as build context.
 # Build with: docker build -f infra/docker/web.Dockerfile --target dev .
 
-FROM node:20.20.2-alpine AS base
+FROM node:22.23.1-alpine AS base
 # The Corepack build bundled with this Node image ships a stale signing-key
 # set and fails to verify current npm registry signatures ("Cannot find
 # matching keyid") — update Corepack itself first rather than disabling
@@ -38,7 +38,7 @@ RUN pnpm --filter @agentverse/contracts run build
 RUN pnpm --filter @agentverse/web run build
 
 # ---- runtime: minimal final image, no build toolchain, non-root ----
-FROM node:20.20.2-alpine AS runtime
+FROM node:22.23.1-alpine AS runtime
 RUN addgroup -S agentverse && adduser -S agentverse -G agentverse
 WORKDIR /repo
 ENV NODE_ENV=production

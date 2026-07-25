@@ -1,12 +1,14 @@
-# AgentVerse local development stack (Phase 0).
+# AgentVerse local development stack (Phase 1).
 #
 # Run from this directory: `cd infra && cp .env.example .env && docker compose up --build`
 # (docker compose auto-loads `.env` from its own working directory —
 # running from `infra/` is what makes `${POSTGRES_USER}` etc. resolve).
 #
-# Every app service's own config has working defaults (see each
-# service's infrastructure/config.py) — infra/.env only supplies the
-# datastore credentials and host port mappings below.
+# apps/web and apps/api both require real config as of Phase 1 (Postgres
+# credentials, Better Auth secrets) — unlike Phase 0's health-only
+# stubs, these have no safe defaults, so `infra/.env` now supplies them
+# via the `environment:` blocks below rather than each service falling
+# back on its own.
 
 services:
   postgres:
@@ -45,6 +47,14 @@ services:
       target: dev
     ports:
       - "${API_PORT:-8000}:8000"
+    environment:
+      AGENTVERSE_API_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-agentverse}:${POSTGRES_PASSWORD:-agentverse_dev_only}@postgres:5432/${POSTGRES_DB:-agentverse}
+      # Genuinely different values (see apps/api/.env.example for why):
+      # internal = Docker-network hostname apps/api uses to fetch JWKS;
+      # public = the browser-facing origin that ends up in JWT iss/aud.
+      AGENTVERSE_API_AUTH_INTERNAL_URL: http://web:3000
+      AGENTVERSE_API_AUTH_PUBLIC_URL: http://localhost:${WEB_PORT:-3000}
+      AGENTVERSE_API_INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?Set INTERNAL_API_SECRET in infra/.env — see infra/.env.example}
     volumes:
       - ../apps/api:/app
       - api_venv:/app/.venv
@@ -101,6 +111,15 @@ services:
       target: dev
     ports:
       - "${WEB_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-agentverse}:${POSTGRES_PASSWORD:-agentverse_dev_only}@postgres:5432/${POSTGRES_DB:-agentverse}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in infra/.env — see infra/.env.example}
+      BETTER_AUTH_URL: http://localhost:${WEB_PORT:-3000}
+      NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:${WEB_PORT:-3000}
+      API_INTERNAL_URL: http://api:8000
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?Set INTERNAL_API_SECRET in infra/.env — see infra/.env.example}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
     # The whole repo is mounted (not just apps/web) because this is a
     # pnpm workspace: apps/web depends on packages/contracts by
     # workspace reference. node_modules at every level is shadowed by

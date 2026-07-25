@@ -25,6 +25,40 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"  # noqa: S104 - container-internal bind address, not internet-exposed directly
     port: int = 8000
 
+    # Required, no default: Postgres is this service's system of record
+    # (CLAUDE.md §8) — a missing value fails startup loudly rather than
+    # surfacing as a runtime connection error on the first request.
+    database_url: str
+
+    # Two distinct URLs for Better Auth (ADR-0005) — deliberately NOT one
+    # setting, because they answer different questions and are genuinely
+    # different values under Docker Compose:
+    #
+    # - auth_internal_url: where apps/api reaches apps/web server-to-server
+    #   to fetch the JWKS document (e.g. "http://web:3000", the Docker
+    #   network hostname).
+    # - auth_public_url: the browser-facing origin Better Auth was
+    #   configured with (its own `baseURL`) — this is what actually ends
+    #   up in every JWT's `iss`/`aud` claims (e.g. "http://localhost:3000").
+    #
+    # Collapsing these into one value would make JWKS fetches fail in
+    # dev (apps/api's "localhost" is its own container, not apps/web's)
+    # or make issuer/audience validation fail (a container-internal
+    # hostname the browser never used to authenticate would never match
+    # the claims Better Auth actually signed).
+    auth_internal_url: str
+    auth_public_url: str
+
+    # Required, no default: shared secret validating server-to-server calls
+    # from apps/web's Better Auth hooks (e.g. /internal/auth-events) — zero
+    # trust means the internal network boundary alone is not sufficient
+    # authorization (CLAUDE.md §10).
+    internal_api_secret: str
+
+    @property
+    def auth_jwks_url(self) -> str:
+        return f"{self.auth_internal_url}/api/auth/jwks"
+
 
 @lru_cache
 def get_settings() -> Settings:

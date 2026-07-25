@@ -15,14 +15,16 @@ concurrency:
 
 env:
   PNPM_VERSION: "9.15.9"
-  NODE_VERSION: "20.20.2"
+  NODE_VERSION: "22.23.1"
   UV_VERSION: "0.11.32"
 
 jobs:
   # Cheapest-first ordering (CLAUDE.md §11): lint/type-check before test,
   # node and python tracks run in parallel since neither depends on the
-  # other's output in Phase 0. No integration/E2E stage yet — nothing to
-  # integration-test until Phase 1 introduces Postgres-backed logic.
+  # other's output. python-checks now includes real-Postgres integration
+  # tests (Phase 1) via the `postgres` service container below — CLAUDE.md
+  # §11: "an integration test that mocks the database gives false
+  # confidence."
   node-checks:
     name: node / ${{ matrix.package }}
     runs-on: ubuntu-latest
@@ -54,6 +56,32 @@ jobs:
     defaults:
       run:
         working-directory: apps/${{ matrix.service }}
+    # Present for both matrix legs (harmless, unused by worker — Phase 1
+    # introduces no worker-owned schema) rather than conditioning the
+    # service block itself, which GitHub Actions doesn't support per-matrix-value.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: agentverse
+          POSTGRES_PASSWORD: agentverse_ci_only
+          POSTGRES_DB: agentverse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agentverse -d agentverse"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      AGENTVERSE_API_DATABASE_URL: postgresql+asyncpg://agentverse:agentverse_ci_only@localhost:5432/agentverse
+      # Both point at the same runner-local nothing-is-listening address —
+      # fine for ruff/mypy/unit tests (nothing calls out) and for the
+      # integration suite (get_current_identity is dependency-overridden,
+      # never exercising a real JWKS fetch; see tests/auth_service/integration/test_rbac_routes.py).
+      AGENTVERSE_API_AUTH_INTERNAL_URL: http://localhost:3000
+      AGENTVERSE_API_AUTH_PUBLIC_URL: http://localhost:3000
+      AGENTVERSE_API_INTERNAL_API_SECRET: ci-only-secret-not-for-production
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
@@ -65,6 +93,8 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy src
+      - if: matrix.service == 'api'
+        run: uv run alembic upgrade head
       - run: uv run pytest -q
 
   # Dependency-vulnerability scan (CLAUDE.md §10): pnpm's built-in audit

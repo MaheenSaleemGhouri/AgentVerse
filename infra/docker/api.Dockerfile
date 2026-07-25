@@ -19,7 +19,12 @@ COPY apps/api/pyproject.toml apps/api/uv.lock ./
 RUN uv sync --frozen
 COPY apps/api/ .
 EXPOSE 8000
-CMD ["uv", "run", "uvicorn", "agentverse_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Migrations run automatically here because this is a single-instance
+# local dev stack. Production/staging never does this on container
+# start — with multiple replicas, simultaneous `alembic upgrade` runs
+# race each other; migrations there are a separate one-shot deploy
+# step before new replicas roll out (CLAUDE.md §12).
+CMD ["sh", "-c", "uv run alembic upgrade head && uv run uvicorn agentverse_api.main:app --host 0.0.0.0 --port 8000 --reload"]
 
 # ---- builder: production dependency set, no dev tools ----
 FROM base AS builder

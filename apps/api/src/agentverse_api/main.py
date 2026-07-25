@@ -2,6 +2,11 @@
 
 from fastapi import FastAPI
 
+from agentverse_api.auth_service.interface.routes.api_keys import router as api_keys_router
+from agentverse_api.auth_service.interface.routes.internal_auth_events import (
+    router as internal_auth_events_router,
+)
+from agentverse_api.auth_service.interface.routes.workspaces import router as workspaces_router
 from agentverse_api.infrastructure.config import get_settings
 from agentverse_api.infrastructure.logging import configure_logging
 from agentverse_api.interface.middleware import request_id_middleware
@@ -15,12 +20,13 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="AgentVerse API",
         version="0.1.0-alpha",
-        # No public docs surface yet — this is a health-only stub.
-        # Revisit when /api/v1 ships its first real resource (Phase 1).
         openapi_url="/openapi.json" if settings.environment != "production" else None,
     )
     app.middleware("http")(request_id_middleware)
     app.include_router(health_router)
+    app.include_router(workspaces_router)
+    app.include_router(api_keys_router)
+    app.include_router(internal_auth_events_router)
     return app
 
 
