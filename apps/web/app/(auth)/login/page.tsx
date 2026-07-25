@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { LoginForm } from "./login-form";
 
@@ -9,5 +10,11 @@ export default function LoginPage(): React.JSX.Element {
   // variable needed just to know whether GitHub OAuth is configured.
   const githubEnabled = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET);
 
-  return <LoginForm githubEnabled={githubEnabled} />;
+  // LoginForm's useSearchParams() (reading ?redirect=) requires a
+  // Suspense boundary for this otherwise-static page to prerender.
+  return (
+    <Suspense>
+      <LoginForm githubEnabled={githubEnabled} />
+    </Suspense>
+  );
 }

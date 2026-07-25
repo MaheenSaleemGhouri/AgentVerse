@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { createWorkspace } from "@/lib/api/workspaces";
+import { createWorkspaceAction } from "@/lib/api/actions";
 
 export function CreateWorkspaceForm(): React.JSX.Element {
   const router = useRouter();
@@ -16,7 +16,7 @@ export function CreateWorkspaceForm(): React.JSX.Element {
     setError(null);
     setIsSubmitting(true);
     try {
-      const workspace = await createWorkspace(name);
+      const workspace = await createWorkspaceAction(name);
       router.push(`/dashboard/${workspace.id}`);
       router.refresh();
     } catch {

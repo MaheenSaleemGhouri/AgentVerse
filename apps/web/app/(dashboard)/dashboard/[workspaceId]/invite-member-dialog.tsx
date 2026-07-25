@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 
-import { inviteMember, type Role } from "@/lib/api/workspaces";
+import { inviteMemberAction } from "@/lib/api/actions";
+import type { Role } from "@/lib/api/workspaces";
 
 import { ALL_ROLES } from "./role-order";
 
@@ -41,7 +42,7 @@ export function InviteMemberDialog({
     setError(null);
     setIsSubmitting(true);
     try {
-      await inviteMember(workspaceId, userId, role);
+      await inviteMemberAction(workspaceId, userId, role);
       close();
       onInvited();
     } catch {

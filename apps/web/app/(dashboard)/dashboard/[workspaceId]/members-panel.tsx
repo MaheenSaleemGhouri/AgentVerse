@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { changeMemberRole, removeMember, type Member, type Role } from "@/lib/api/workspaces";
+import { changeMemberRoleAction, removeMemberAction } from "@/lib/api/actions";
+import type { Member, Role } from "@/lib/api/workspaces";
 
 import { InviteMemberDialog } from "./invite-member-dialog";
 import { ALL_ROLES, roleSatisfies } from "./role-order";
@@ -30,7 +31,7 @@ export function MembersPanel({
   async function handleRoleChange(userId: string, role: Role): Promise<void> {
     setError(null);
     try {
-      await changeMemberRole(workspaceId, userId, role);
+      await changeMemberRoleAction(workspaceId, userId, role);
       refresh();
     } catch {
       setError("Could not change this member's role.");
@@ -40,7 +41,7 @@ export function MembersPanel({
   async function handleRemove(userId: string): Promise<void> {
     setError(null);
     try {
-      await removeMember(workspaceId, userId);
+      await removeMemberAction(workspaceId, userId);
       refresh();
     } catch {
       setError("Could not remove this member — a workspace must always have an owner.");
