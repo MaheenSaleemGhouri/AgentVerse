@@ -11,6 +11,7 @@ name = "agentverse-api"
 version = "0.1.0a0"
 source = { editable = "." }
 dependencies = [
+    { name = "agentverse-shared" },
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "fastapi" },
@@ -35,6 +36,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "agentverse-shared", editable = "../../packages/python-shared" },
     { name = "alembic", specifier = ">=1.18,<2" },
     { name = "asyncpg", specifier = ">=0.31,<0.32" },
     { name = "fastapi", specifier = ">=0.115,<0.116" },
@@ -51,6 +53,26 @@ requires-dist = [
 dev = [
     { name = "fakeredis", specifier = ">=2.26,<3" },
     { name = "httpx", specifier = ">=0.28,<0.29" },
+    { name = "mypy", specifier = ">=1.14,<2" },
+    { name = "pytest", specifier = ">=8.3,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.25,<0.26" },
+    { name = "ruff", specifier = ">=0.9,<0.10" },
+]
+
+[[package]]
+name = "agentverse-shared"
+version = "0.1.0a0"
+source = { editable = "../../packages/python-shared" }
+dependencies = [
+    { name = "redis" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "redis", specifier = ">=5.2,<6" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "fakeredis", specifier = ">=2.26,<3" },
     { name = "mypy", specifier = ">=1.14,<2" },
     { name = "pytest", specifier = ">=8.3,<9" },
     { name = "pytest-asyncio", specifier = ">=0.25,<0.26" },

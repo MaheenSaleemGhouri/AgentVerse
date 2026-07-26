@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from agentverse_api.orchestration_service.application.cost_accounting import (
+from agentverse_shared.cost_accounting import (
+    TokenUsage,
     UnknownModelPricingError,
     calculate_cost_micro_usd,
     micro_usd_to_cents,
 )
-from agentverse_api.orchestration_service.domain.entities import TokenUsage
 
 
 def test_calculate_cost_micro_usd_known_model() -> None:

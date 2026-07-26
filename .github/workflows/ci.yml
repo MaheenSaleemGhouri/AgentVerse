@@ -44,6 +44,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter '${{ matrix.package }}' run lint
       - run: pnpm --filter '${{ matrix.package }}' run typecheck
+      - if: matrix.package == '@agentverse/web'
+        run: pnpm --filter '@agentverse/web' run test
       - run: pnpm --filter '${{ matrix.package }}' run build
 
   python-checks:

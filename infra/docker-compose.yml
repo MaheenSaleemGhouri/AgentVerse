@@ -93,6 +93,10 @@ services:
       # hostname, not the "localhost" default that's only correct when
       # running apps/worker directly on the host.
       AGENTVERSE_WORKER_REDIS_URL: redis://redis:6379/0
+      # Phase 4: same Postgres schema apps/api owns (see
+      # infrastructure/config.py's Settings.database_url docstring).
+      AGENTVERSE_WORKER_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-agentverse}:${POSTGRES_PASSWORD:-agentverse_dev_only}@postgres:5432/${POSTGRES_DB:-agentverse}
+      AGENTVERSE_WORKER_OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in infra/.env — see infra/.env.example}
     # Phase 3 (docs/roadmap.md acceptance criterion): a runaway job must
     # be killed by *this* container's own limit, not by starving the
     # host or co-located services. `mem_limit`/`cpus`/`pids_limit` are

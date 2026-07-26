@@ -10,7 +10,7 @@ import asyncio
 
 from fakeredis.aioredis import FakeRedis
 
-from agentverse_worker.locks.distributed_lock import DistributedLock, LockAcquisitionError
+from agentverse_shared.locks.distributed_lock import DistributedLock, LockAcquisitionError
 
 KEY = "lock:job:abc123"
 

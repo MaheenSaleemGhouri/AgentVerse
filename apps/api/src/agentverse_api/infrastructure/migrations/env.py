@@ -12,6 +12,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from agentverse_api.auth_service.infrastructure import models as auth_models  # noqa: F401
 from agentverse_api.infrastructure.config import get_settings
 from agentverse_api.infrastructure.orm_base import Base
+from agentverse_api.orchestration_service.infrastructure import (  # noqa: F401
+    models as orchestration_models,
+)
 
 config = context.config
 if config.config_file_name is not None:

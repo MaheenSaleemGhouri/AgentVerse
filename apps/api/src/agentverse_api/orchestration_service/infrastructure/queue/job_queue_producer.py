@@ -22,8 +22,8 @@ class JobQueueProducer:
         self._redis = redis
         self._stream = stream
 
-    async def enqueue_echo_job(
-        self, payload: dict[str, Any], *, max_attempts: int = 3
+    async def enqueue(
+        self, job_type: str, payload: dict[str, Any], *, max_attempts: int = 3
     ) -> tuple[str, str]:
         job_id = str(uuid.uuid4())
         # `xadd`'s stub is invariant over its dict value/key union, so a
@@ -32,10 +32,18 @@ class JobQueueProducer:
         # single SDK boundary rather than scattering `type: ignore`s.
         fields: dict[Any, Any] = {
             "job_id": job_id,
-            "job_type": "echo",
+            "job_type": job_type,
             "payload": json.dumps(payload),
             "attempt": "0",
             "max_attempts": str(max_attempts),
         }
         stream_id = await self._redis.xadd(self._stream, fields)
         return job_id, str(stream_id)
+
+    async def enqueue_echo_job(
+        self, payload: dict[str, Any], *, max_attempts: int = 3
+    ) -> tuple[str, str]:
+        return await self.enqueue("echo", payload, max_attempts=max_attempts)
+
+    async def enqueue_agent_run(self, *, run_id: str, max_attempts: int = 3) -> tuple[str, str]:
+        return await self.enqueue("agent_run", {"run_id": run_id}, max_attempts=max_attempts)

@@ -1,7 +1,10 @@
-"""Token usage -> cost. The single source every later consumer (Phase 4's
-run-cost display, Phase 7's billing aggregation) must import — never
-recompute inline, per this phase's roadmap risk note and CLAUDE.md Rule 3
-(DRY: one source of truth, never duplicated business logic).
+"""Token usage -> cost. The single source every consumer across every
+service (apps/api's run-cost display, apps/worker's run executor,
+Phase 7's billing aggregation) must import — never recompute inline
+(CLAUDE.md Rule 3: DRY, one source of truth). Originally built in
+apps/api's Phase 2; moved here in Phase 4 once apps/worker's own
+executor needed the identical calculation, not just a compatible one —
+the same "shared internal package" reasoning as `locks.distributed_lock`.
 
 Pure functions, zero I/O: CLAUDE.md §11 requires cost calculation be
 unit-testable without touching a provider or a database.
@@ -25,7 +28,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from agentverse_api.orchestration_service.domain.entities import TokenUsage
+
+@dataclass(frozen=True, slots=True)
+class TokenUsage:
+    prompt_tokens: int
+    completion_tokens: int
+
+    @property
+    def total_tokens(self) -> int:
+        return self.prompt_tokens + self.completion_tokens
 
 
 @dataclass(frozen=True, slots=True)

@@ -14,6 +14,7 @@ dependencies = [
     "pyjwt[crypto]>=2.13,<3",
     "openai>=1.59,<2",
     "redis>=5.2,<6",
+    "agentverse-shared",
 ]
 
 [dependency-groups]
@@ -70,3 +71,6 @@ testpaths = ["tests"]
 markers = [
     "integration: requires a real Postgres (DATABASE_URL) — CLAUDE.md §11, never mocked",
 ]
+
+[tool.uv.sources]
+agentverse-shared = { path = "../../packages/python-shared", editable = true }

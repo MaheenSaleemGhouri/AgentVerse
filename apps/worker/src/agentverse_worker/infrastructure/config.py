@@ -30,6 +30,32 @@ class Settings(BaseSettings):
     queue_block_ms: int = 5_000
     queue_batch_size: int = 10
 
+    # Phase 4: same Postgres instance apps/api owns the schema of — this
+    # service reads agent_versions and reads/writes agent_runs/
+    # agent_run_steps as the orchestration_service's execution tier, not
+    # as a separate bounded context with its own schema (CLAUDE.md §5's
+    # "no service accesses another service's database" targets genuinely
+    # independent contexts; a worker fleet executing its owning
+    # service's background jobs against the same schema is the
+    # accepted, common exception — same reasoning as any API+worker
+    # split over one database).
+    database_url: str
+
+    # Required, no default (CLAUDE.md Rule 1): the Agents SDK call in
+    # jobs/agent_run_job.py is the only place this key is read.
+    openai_api_key: str
+    openai_base_url: str | None = None
+
+    # CLAUDE.md Rule 17: every reasoning loop needs step, cost, AND time
+    # bounds — the SDK's own `max_turns` gives the step bound; the other
+    # two are AgentVerse-specific (a generic SDK has no notion of our
+    # pricing or our latency budget), so they're enforced in
+    # jobs/agent_run_job.py, not delegated to the SDK. Documented
+    # starting defaults, not asserted production-tuned values.
+    run_max_turns: int = 10
+    run_timeout_seconds: float = 120.0
+    run_cost_ceiling_micro_usd: int = 2_000_000  # $2.00
+
 
 @lru_cache
 def get_settings() -> Settings:

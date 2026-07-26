@@ -10,7 +10,31 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
+# Re-exported, not redefined: apps/worker's executor needs the identical
+# TokenUsage/cost calculation apps/api uses (Phase 4), so it now lives in
+# the shared package (CLAUDE.md §7) — every existing import of
+# `agentverse_api...domain.entities.TokenUsage` keeps working unchanged.
+from agentverse_shared.cost_accounting import TokenUsage
+
 Role = Literal["system", "user", "assistant", "tool"]
+
+__all__ = [
+    "ChatMessage",
+    "ChatRequest",
+    "ChatResult",
+    "RequestedToolCall",
+    "Role",
+    "StreamDelta",
+    "StreamDone",
+    "StreamError",
+    "StreamEvent",
+    "StructuredOutputRequest",
+    "StructuredOutputResult",
+    "TokenUsage",
+    "ToolCallRequestSpec",
+    "ToolCallResult",
+    "ToolSchema",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,16 +49,6 @@ class ChatRequest:
     messages: list[ChatMessage]
     max_output_tokens: int | None = None
     temperature: float | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class TokenUsage:
-    prompt_tokens: int
-    completion_tokens: int
-
-    @property
-    def total_tokens(self) -> int:
-        return self.prompt_tokens + self.completion_tokens
 
 
 @dataclass(frozen=True, slots=True)

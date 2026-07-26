@@ -1,8 +1,12 @@
 """Redis-backed distributed lock (`SET NX PX` + a token-checked
 optimistic-transaction release) preventing two duplicate submissions of
-the same logical job from both executing — the exact primitive Phase
-4's idempotent run-submission endpoint builds on (docs/roadmap.md
-Phase 3).
+the same logical operation from both executing. Originally built in
+Phase 3 (`apps/worker`) to prove the mechanism against duplicate job
+submission; extracted here in Phase 4 because `apps/api`'s idempotent
+run-submission endpoint needs the *identical* implementation, not a
+compatible one — that's exactly the "shared internal package" case
+CLAUDE.md §7 describes, not the "share a wire contract, not code" case
+Phase 3's queue producer/consumer split deliberately chose.
 
 The release is a `WATCH`/`MULTI`/`EXEC` transaction, not a plain
 `GET`-then-`DEL`, because that pair isn't atomic: this lock's TTL could

@@ -53,10 +53,11 @@ def require_role(
     return _dependency
 
 
-# Pre-built for the three role floors every current route needs — routes
-# depend on these singletons (`Depends(require_viewer)`) rather than
-# calling `require_role(Role.X)` inline, so the factory call happens
-# once at import time, not on every request.
+# Pre-built for the role floors current routes need — routes depend on
+# these singletons (`Depends(require_viewer)`) rather than calling
+# `require_role(Role.X)` inline, so the factory call happens once at
+# import time, not on every request.
 require_viewer = require_role(Role.VIEWER)
+require_member = require_role(Role.MEMBER)
 require_admin = require_role(Role.ADMIN)
 require_owner = require_role(Role.OWNER)

@@ -8,18 +8,30 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from agentverse_shared.locks.distributed_lock import DistributedLock
+from fastapi import Depends
+from redis.asyncio import Redis
 from redis.asyncio import from_url as redis_from_url
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentverse_api.infrastructure.config import get_settings
+from agentverse_api.infrastructure.db import get_db_session
 from agentverse_api.orchestration_service.application.provider_test_service import (
     ProviderTestService,
 )
+from agentverse_api.orchestration_service.application.run_agent import LockFactory
+from agentverse_api.orchestration_service.domain.ports.agent_repository import AgentRepository
 from agentverse_api.orchestration_service.domain.ports.provider_adapter import ProviderAdapter
+from agentverse_api.orchestration_service.domain.ports.run_repository import AgentRunRepository
 from agentverse_api.orchestration_service.infrastructure.providers.openai_adapter import (
     OpenAIProviderAdapter,
 )
 from agentverse_api.orchestration_service.infrastructure.queue.job_queue_producer import (
     JobQueueProducer,
+)
+from agentverse_api.orchestration_service.infrastructure.repositories import (
+    SqlAgentRepository,
+    SqlAgentRunRepository,
 )
 
 
@@ -41,12 +53,41 @@ def get_provider_test_service() -> ProviderTestService:
 
 
 @lru_cache
-def get_job_queue_producer() -> JobQueueProducer:
-    """Process-wide singleton — the Redis client owns its own connection
-    pool, same rationale as `get_provider_adapter`.
+def get_redis_client() -> Redis:
+    """Process-wide singleton — shared by the job-queue producer and the
+    distributed-lock factory, so there is exactly one connection pool
+    per process, not one per consumer (same rationale as apps/worker's
+    `interface.dependencies.get_redis_client`).
     """
     settings = get_settings()
-    redis_client = redis_from_url(  # type: ignore[no-untyped-call]  # redis-py's own stub is untyped here
+    return redis_from_url(  # type: ignore[no-untyped-call,no-any-return]  # redis-py's own stub is untyped here
         settings.redis_url, decode_responses=True
     )
-    return JobQueueProducer(redis_client, stream=settings.queue_stream)
+
+
+@lru_cache
+def get_job_queue_producer() -> JobQueueProducer:
+    settings = get_settings()
+    return JobQueueProducer(get_redis_client(), stream=settings.queue_stream)
+
+
+def get_lock_factory() -> LockFactory:
+    """Returns a factory, not a single lock: `run_agent` needs a fresh
+    `DistributedLock` per idempotency key, not one shared instance.
+    """
+    redis_client = get_redis_client()
+
+    def _factory(key: str) -> DistributedLock:
+        return DistributedLock(redis_client, key, ttl_ms=30_000)
+
+    return _factory
+
+
+def get_agent_repository(session: AsyncSession = Depends(get_db_session)) -> AgentRepository:
+    return SqlAgentRepository(session)
+
+
+def get_agent_run_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> AgentRunRepository:
+    return SqlAgentRunRepository(session)

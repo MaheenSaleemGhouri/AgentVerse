@@ -1,34 +1,191 @@
 @import "tailwindcss";
 
 /*
- * Primitive-tier design tokens only (Phase 0 — docs/roadmap.md).
+ * AVDS — AgentVerse Design System (Phase 4).
  *
- * Tailwind v4 already ships full neutral-color ramps, a 4px-base
- * spacing scale, a type scale, and radius primitives as built-in
- * defaults — redefining them here would be duplication, not reuse
- * (CLAUDE.md §16). The one primitive genuinely specific to AgentVerse
- * is its brand hue, so that's the only ramp added below.
+ * Structure follows shadcn/ui's own Tailwind v4 convention deliberately
+ * (`--background`/`--foreground`/`--primary`/etc. in `:root`/`.dark`,
+ * mapped into Tailwind color utilities via `@theme inline`) rather than
+ * a from-scratch naming scheme: shadcn-ui-expert's rule is "theme via
+ * CSS variables, never fork component source" — components installed
+ * via the CLI already reference these exact variable names, so keeping
+ * them means every future `shadcn add <component>` stays mergeable
+ * against upstream. The *values* below are AgentVerse's own approved
+ * palette (docs/adr's design-phase mockups), not shadcn's defaults.
  *
- * No semantic tier (`--color-bg-*`, `--color-fg-*`, status colors)
- * exists yet — CLAUDE.md §15 layers semantic tokens on top of this
- * primitive tier once real UI consumes them, starting when shadcn/ui
- * is introduced in Phase 4. Guessing the semantic mapping now, with
- * no component to validate it against, is the exact risk flagged in
- * this phase's roadmap entry.
+ * Extensions beyond shadcn's own set (`--success`, `--warning`,
+ * `--info`, the `--brand-*` primitive ramp) follow the same
+ * `--{purpose}` / `--{purpose}-foreground` pattern shadcn already
+ * uses, satisfying design-system-architect's "one consistent
+ * convention" rule without introducing a second, competing one.
  */
-@theme {
-  --color-brand-50: #eef2ff;
-  --color-brand-100: #e0e7ff;
-  --color-brand-200: #c7d2fe;
-  --color-brand-300: #a5b4fc;
-  --color-brand-400: #818cf8;
-  --color-brand-500: #6366f1;
-  --color-brand-600: #4f46e5;
-  --color-brand-700: #4338ca;
-  --color-brand-800: #3730a3;
-  --color-brand-900: #312e81;
-  --color-brand-950: #1e1b4b;
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.75rem;
+
+  /* Light theme (default) */
+  --background: #ffffff;
+  --foreground: #15131f;
+  --card: #ffffff;
+  --card-foreground: #15131f;
+  --popover: #ffffff;
+  --popover-foreground: #15131f;
+  --primary: #7c5cff;
+  --primary-foreground: #ffffff;
+  --secondary: #f7f8fb;
+  --secondary-foreground: #15131f;
+  --muted: #f7f8fb;
+  --muted-foreground: #6b677e;
+  --accent: #f1edff;
+  --accent-foreground: #7c5cff;
+  --destructive: #f04438;
+  --destructive-foreground: #ffffff;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #7c5cff;
+
+  /* Status extensions — not part of shadcn's default set */
+  --success: #17b26a;
+  --success-foreground: #ffffff;
+  --success-soft: #e7f9f0;
+  --warning: #f79009;
+  --warning-foreground: #ffffff;
+  --warning-soft: #fef3e2;
+  --info: #4c8dff;
+  --info-foreground: #ffffff;
+  --info-soft: #eaf1ff;
+  --destructive-soft: #fdecea;
+  --accent-2: #9b7bff;
+  --magenta: #d946a8;
+
+  /* Chart palette (shadcn's own `--chart-1..5` convention) */
+  --chart-1: #4c8dff;
+  --chart-2: #7c5cff;
+  --chart-3: #f2a6c9;
+  --chart-4: #17b26a;
+  --chart-5: #f79009;
+
+  /* Brand primitive ramp — the one primitive genuinely specific to
+     AgentVerse (Phase 0's own rationale, carried forward): every other
+     primitive (neutrals, spacing, radius steps, type scale) is
+     Tailwind v4's built-in default, reused rather than redefined
+     (CLAUDE.md §16). */
+  --brand-50: #f1edff;
+  --brand-100: #e4dbff;
+  --brand-200: #cbb8ff;
+  --brand-300: #ad8fff;
+  --brand-400: #9469ff;
+  --brand-500: #7c5cff;
+  --brand-600: #6a3ffc;
+  --brand-700: #5a2fe0;
+  --brand-800: #4a26b8;
+  --brand-900: #3d2296;
+  --brand-950: #241454;
+}
+
+.dark {
+  --background: #0b0b12;
+  --foreground: #f1effb;
+  --card: #171722;
+  --card-foreground: #f1effb;
+  --popover: #171722;
+  --popover-foreground: #f1effb;
+  --primary: #7c5cff;
+  --primary-foreground: #ffffff;
+  --secondary: #11111a;
+  --secondary-foreground: #f1effb;
+  --muted: #11111a;
+  --muted-foreground: #9c97b8;
+  --accent: #221c3b;
+  --accent-foreground: #9b7bff;
+  --destructive: #f04438;
+  --destructive-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.08);
+  --ring: #7c5cff;
+
+  --success: #17b26a;
+  --success-foreground: #ffffff;
+  --success-soft: #113321;
+  --warning: #f79009;
+  --warning-foreground: #ffffff;
+  --warning-soft: #332310;
+  --info: #4c8dff;
+  --info-foreground: #ffffff;
+  --info-soft: #16233f;
+  --destructive-soft: #341714;
+  --accent-2: #9b7bff;
+  --magenta: #d946a8;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-soft: var(--info-soft);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-accent-2: var(--accent-2);
+  --color-magenta: var(--magenta);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+  --color-brand-950: var(--brand-950);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }

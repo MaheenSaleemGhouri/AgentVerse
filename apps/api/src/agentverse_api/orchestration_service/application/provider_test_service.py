@@ -8,9 +8,8 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 
-from agentverse_api.orchestration_service.application.cost_accounting import (
-    calculate_cost_micro_usd,
-)
+from agentverse_shared.cost_accounting import calculate_cost_micro_usd
+
 from agentverse_api.orchestration_service.application.model_routing import DEFAULT_MODEL
 from agentverse_api.orchestration_service.domain.entities import (
     ChatMessage,

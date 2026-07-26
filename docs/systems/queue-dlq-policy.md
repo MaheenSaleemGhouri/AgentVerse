@@ -28,8 +28,8 @@ Every message on `queue:jobs` has exactly these string fields (the Redis client 
 | Field | Type | Meaning |
 |---|---|---|
 | `job_id` | UUID string | Logical job identity, stable across retries (the stream message ID changes on each republish; `job_id` does not). |
-| `job_type` | string | Dispatches to a handler. Phase 3 only defines `"echo"`. An unrecognized `job_type` is dead-lettered immediately (see below) — retrying it can never succeed. |
-| `payload` | JSON string | Arbitrary handler input. For `echo`, a `force_fail: true` key makes the handler always fail — the mechanism the internal test endpoint uses to exercise retry/DLQ on demand. |
+| `job_type` | string | Dispatches to a handler. Phase 3 defined `"echo"`; Phase 4 adds `"agent_run"`. An unrecognized `job_type` is dead-lettered immediately (see below) — retrying it can never succeed. |
+| `payload` | JSON string | Arbitrary handler input. For `echo`, a `force_fail: true` key makes the handler always fail — the mechanism the internal test endpoint uses to exercise retry/DLQ on demand. For `agent_run`, a single `run_id` key — the handler reads everything else (agent config, prompt) from Postgres via that ID, rather than duplicating it into the job payload. |
 | `attempt` | string int, 0-based | How many times this job has already been attempted. `0` on first delivery. |
 | `max_attempts` | string int | Bound on total attempts (not retries — `max_attempts=3` means 1 initial attempt + up to 2 retries). |
 

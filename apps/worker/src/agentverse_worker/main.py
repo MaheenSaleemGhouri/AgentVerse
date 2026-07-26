@@ -16,7 +16,9 @@ import contextlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from agents import set_default_openai_client, set_tracing_disabled
 from fastapi import FastAPI
+from openai import AsyncOpenAI
 
 from agentverse_worker.infrastructure.config import get_settings
 from agentverse_worker.infrastructure.logging import configure_logging
@@ -49,6 +51,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
+
+    # AgentVerse translates the SDK's own trace spans into its own
+    # trace-event schema (CLAUDE.md §9) — the frontend must never depend
+    # on SDK-internal trace formats, so the SDK's own OpenAI-platform
+    # tracing export is disabled outright, not merely left unauthenticated.
+    set_tracing_disabled(True)
+    set_default_openai_client(
+        AsyncOpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url),
+        use_for_tracing=False,
+    )
 
     app = FastAPI(
         title="AgentVerse Worker",

@@ -19,7 +19,7 @@ export class ApiError extends Error {
   }
 }
 
-async function getBearerToken(): Promise<string> {
+export async function getBearerToken(): Promise<string> {
   const result = await auth.api.getToken({ headers: await headers() });
   if (!result?.token) {
     throw new ApiError(401, "No active session");

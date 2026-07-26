@@ -4,6 +4,50 @@
  */
 
 export interface paths {
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Health
+         * @description Liveness: is the process up and serving requests at all.
+         */
+        get: operations["health_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ready
+         * @description Readiness: are hard dependencies reachable.
+         *
+         *     No dependency (Postgres/Redis/vector DB) is consumed by any code
+         *     path yet in Phase 0, so readiness currently reduces to liveness.
+         *     Phase 1 adds a real Postgres connectivity check here.
+         */
+        get: operations["ready_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces": {
         parameters: {
             query?: never;
@@ -31,6 +75,163 @@ export interface paths {
         };
         /** Get Workspace */
         get: operations["get_workspace_api_v1_workspaces__workspace_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Members */
+        get: operations["list_members_api_v1_workspaces__workspace_id__members_get"];
+        put?: never;
+        /** Invite Member */
+        post: operations["invite_member_api_v1_workspaces__workspace_id__members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/members/{target_user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Member */
+        delete: operations["remove_member_api_v1_workspaces__workspace_id__members__target_user_id__delete"];
+        options?: never;
+        head?: never;
+        /** Change Member Role */
+        patch: operations["change_member_role_api_v1_workspaces__workspace_id__members__target_user_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Agents Route */
+        get: operations["list_agents_route_api_v1_workspaces__workspace_id__agents_get"];
+        put?: never;
+        /** Create Agent Route */
+        post: operations["create_agent_route_api_v1_workspaces__workspace_id__agents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/agents/{agent_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Agent Route */
+        get: operations["get_agent_route_api_v1_workspaces__workspace_id__agents__agent_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Agent Route */
+        delete: operations["delete_agent_route_api_v1_workspaces__workspace_id__agents__agent_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/versions/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Latest Version Route */
+        get: operations["get_latest_version_route_api_v1_workspaces__workspace_id__agents__agent_id__versions_latest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Version Route */
+        post: operations["create_version_route_api_v1_workspaces__workspace_id__agents__agent_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish Agent Route */
+        post: operations["publish_agent_route_api_v1_workspaces__workspace_id__agents__agent_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Run Route */
+        post: operations["submit_run_route_api_v1_workspaces__workspace_id__agents__agent_id__runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/runs/{run_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream Run */
+        get: operations["stream_run_api_v1_workspaces__workspace_id__agents__agent_id__runs__run_id__stream_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -74,62 +275,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/workspaces/{workspace_id}/members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Members */
-        get: operations["list_members_api_v1_workspaces__workspace_id__members_get"];
-        put?: never;
-        /** Invite Member */
-        post: operations["invite_member_api_v1_workspaces__workspace_id__members_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workspaces/{workspace_id}/members/{target_user_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Remove Member */
-        delete: operations["remove_member_api_v1_workspaces__workspace_id__members__target_user_id__delete"];
-        options?: never;
-        head?: never;
-        /** Change Member Role */
-        patch: operations["change_member_role_api_v1_workspaces__workspace_id__members__target_user_id__patch"];
-        trace?: never;
-    };
-    "/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Health
-         * @description Liveness: is the process up and serving requests at all.
-         */
-        get: operations["health_health_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/internal/auth-events": {
         parameters: {
             query?: never;
@@ -147,24 +292,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/ready": {
+    "/internal/provider-test/stream": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Ready
-         * @description Readiness: are hard dependencies reachable.
-         *
-         *     No dependency (Postgres/Redis/vector DB) is consumed by any code
-         *     path yet in Phase 0, so readiness currently reduces to liveness.
-         *     Phase 1 adds a real Postgres connectivity check here.
-         */
-        get: operations["ready_ready_get"];
+        get?: never;
         put?: never;
-        post?: never;
+        /** Stream Provider Test */
+        post: operations["stream_provider_test_internal_provider_test_stream_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/job-test/enqueue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enqueue Echo Job */
+        post: operations["enqueue_echo_job_internal_job_test_enqueue_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -175,29 +330,98 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** ApiKeyResponse */
-        ApiKeyResponse: {
+        /** AgentResponse */
+        AgentResponse: {
+            /** Id */
+            id: string;
+            /** Workspace Id */
+            workspace_id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Status */
+            status: string;
+            /** Published Version Id */
+            published_version_id: string | null;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** AgentVersionResponse */
+        AgentVersionResponse: {
             /** Id */
             id: string;
-            /** Key Prefix */
-            key_prefix: string;
-            /** Last Used At */
-            last_used_at: string | null;
-            /** Name */
-            name: string;
-            /** Revoked At */
-            revoked_at: string | null;
+            /** Version Number */
+            version_number: number;
+            /** Model */
+            model: string;
+            /** System Instructions */
+            system_instructions: string;
+            /** Temperature */
+            temperature: number | null;
+            /** Max Output Tokens */
+            max_output_tokens: number | null;
+            /** Tools */
+            tools: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ApiKeyResponse */
+        ApiKeyResponse: {
+            /** Id */
+            id: string;
             /** Workspace Id */
             workspace_id: string;
+            /** Name */
+            name: string;
+            /** Key Prefix */
+            key_prefix: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Revoked At */
+            revoked_at: string | null;
         };
         /** ChangeMemberRoleRequest */
         ChangeMemberRoleRequest: {
             role: components["schemas"]["Role"];
+        };
+        /** CreateAgentRequest */
+        CreateAgentRequest: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Model */
+            model: string;
+            /** System Instructions */
+            system_instructions: string;
+            /** Temperature */
+            temperature?: number | null;
+            /** Max Output Tokens */
+            max_output_tokens?: number | null;
+            /** Tools */
+            tools?: string[];
+        };
+        /** CreateAgentResponse */
+        CreateAgentResponse: {
+            agent: components["schemas"]["AgentResponse"];
+            version: components["schemas"]["AgentVersionResponse"];
         };
         /** CreateWorkspaceRequest */
         CreateWorkspaceRequest: {
@@ -219,10 +443,10 @@ export interface components {
         };
         /** InviteMemberRequest */
         InviteMemberRequest: {
-            /** @default member */
-            role: components["schemas"]["Role"];
             /** User Id */
             user_id: string;
+            /** @default member */
+            role: components["schemas"]["Role"];
         };
         /** IssueApiKeyRequest */
         IssueApiKeyRequest: {
@@ -231,38 +455,73 @@ export interface components {
         };
         /** IssuedApiKeyResponse */
         IssuedApiKeyResponse: {
+            /** Id */
+            id: string;
+            /** Workspace Id */
+            workspace_id: string;
+            /** Name */
+            name: string;
+            /** Key Prefix */
+            key_prefix: string;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
-            /** Id */
-            id: string;
-            /** Key */
-            key: string;
-            /** Key Prefix */
-            key_prefix: string;
             /** Last Used At */
             last_used_at: string | null;
-            /** Name */
-            name: string;
             /** Revoked At */
             revoked_at: string | null;
-            /** Workspace Id */
-            workspace_id: string;
+            /** Key */
+            key: string;
+        };
+        /** JobTestRequest */
+        JobTestRequest: {
+            /**
+             * Payload
+             * @description Arbitrary payload the echo job reports back.
+             */
+            payload?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Force Fail
+             * @description If true, the echo job always fails — exercises retry/DLQ.
+             * @default false
+             */
+            force_fail: boolean;
+            /**
+             * Max Attempts
+             * @default 3
+             */
+            max_attempts: number;
+        };
+        /** JobTestResponse */
+        JobTestResponse: {
+            /** Job Id */
+            job_id: string;
+            /** Stream Id */
+            stream_id: string;
         };
         /** MemberResponse */
         MemberResponse: {
+            /** Workspace Id */
+            workspace_id: string;
+            /** User Id */
+            user_id: string;
+            role: components["schemas"]["Role"];
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
-            role: components["schemas"]["Role"];
-            /** User Id */
-            user_id: string;
-            /** Workspace Id */
-            workspace_id: string;
+        };
+        /** ProviderTestRequest */
+        ProviderTestRequest: {
+            /** Prompt */
+            prompt: string;
+            /** Model */
+            model?: string | null;
         };
         /** RecordAuthEventRequest */
         RecordAuthEventRequest: {
@@ -279,6 +538,46 @@ export interface components {
          * @enum {string}
          */
         Role: "owner" | "admin" | "member" | "viewer";
+        /** RunAgentRequest */
+        RunAgentRequest: {
+            /** Input */
+            input?: {
+                [key: string]: unknown;
+            };
+        };
+        /** RunResponse */
+        RunResponse: {
+            /** Id */
+            id: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Status */
+            status: string;
+            /** Idempotency Key */
+            idempotency_key: string | null;
+            /** Cost Micro Usd */
+            cost_micro_usd: number | null;
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** UpdateAgentVersionRequest */
+        UpdateAgentVersionRequest: {
+            /** Model */
+            model: string;
+            /** System Instructions */
+            system_instructions: string;
+            /** Temperature */
+            temperature?: number | null;
+            /** Max Output Tokens */
+            max_output_tokens?: number | null;
+            /** Tools */
+            tools?: string[];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -290,18 +589,18 @@ export interface components {
         };
         /** WorkspaceResponse */
         WorkspaceResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
-            /** Id */
-            id: string;
-            /** Name */
-            name: string;
             role: components["schemas"]["Role"];
-            /** Slug */
-            slug: string;
         };
     };
     responses: never;
@@ -312,6 +611,46 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    health_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    ready_ready_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
     list_my_workspaces_api_v1_workspaces_get: {
         parameters: {
             query?: never;
@@ -384,102 +723,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WorkspaceResponse"];
                 };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_api_keys_api_v1_workspaces__workspace_id__api_keys_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workspace_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiKeyResponse"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    issue_api_key_api_v1_workspaces__workspace_id__api_keys_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workspace_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IssueApiKeyRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IssuedApiKeyResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    revoke_api_key_api_v1_workspaces__workspace_id__api_keys__api_key_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                api_key_id: string;
-                workspace_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -624,11 +867,13 @@ export interface operations {
             };
         };
     };
-    health_health_get: {
+    list_agents_route_api_v1_workspaces__workspace_id__agents_get: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                workspace_id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -639,7 +884,380 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HealthResponse"];
+                    "application/json": components["schemas"]["AgentResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_agent_route_api_v1_workspaces__workspace_id__agents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAgentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateAgentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agent_route_api_v1_workspaces__workspace_id__agents__agent_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_agent_route_api_v1_workspaces__workspace_id__agents__agent_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_latest_version_route_api_v1_workspaces__workspace_id__agents__agent_id__versions_latest_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_version_route_api_v1_workspaces__workspace_id__agents__agent_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_agent_route_api_v1_workspaces__workspace_id__agents__agent_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_run_route_api_v1_workspaces__workspace_id__agents__agent_id__runs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                agent_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunAgentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_run_api_v1_workspaces__workspace_id__agents__agent_id__runs__run_id__stream_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+                run_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_api_keys_api_v1_workspaces__workspace_id__api_keys_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_api_key_api_v1_workspaces__workspace_id__api_keys_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueApiKeyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuedApiKeyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_api_key_api_v1_workspaces__workspace_id__api_keys__api_key_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                api_key_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -677,14 +1295,20 @@ export interface operations {
             };
         };
     };
-    ready_ready_get: {
+    stream_provider_test_internal_provider_test_stream_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Internal-Secret"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderTestRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -692,7 +1316,51 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HealthResponse"];
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enqueue_echo_job_internal_job_test_enqueue_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Internal-Secret"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobTestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobTestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

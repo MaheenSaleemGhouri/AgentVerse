@@ -9,6 +9,11 @@ dependencies = [
     "pydantic>=2.10,<3",
     "pydantic-settings>=2.7,<3",
     "redis>=5.2,<6",
+    "agentverse-shared",
+    "openai-agents>=0.18.3",
+    "sqlalchemy[asyncio]>=2.0.51,<3",
+    "asyncpg>=0.31,<0.32",
+    "openai>=2.45,<3",
 ]
 
 [dependency-groups]
@@ -51,7 +56,11 @@ python_version = "3.12"
 strict = true
 mypy_path = "src"
 explicit_package_bases = true
+plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.uv.sources]
+agentverse-shared = { path = "../../packages/python-shared", editable = true }
