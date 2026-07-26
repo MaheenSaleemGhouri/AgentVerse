@@ -11,6 +11,9 @@ from agentverse_api.infrastructure.config import get_settings
 from agentverse_api.infrastructure.logging import configure_logging
 from agentverse_api.interface.middleware import request_id_middleware
 from agentverse_api.interface.routes.health import router as health_router
+from agentverse_api.orchestration_service.interface.routers.internal_job_test import (
+    router as internal_job_test_router,
+)
 from agentverse_api.orchestration_service.interface.routers.internal_provider_test import (
     router as internal_provider_test_router,
 )
@@ -31,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(api_keys_router)
     app.include_router(internal_auth_events_router)
     app.include_router(internal_provider_test_router)
+    app.include_router(internal_job_test_router)
     return app
 
 

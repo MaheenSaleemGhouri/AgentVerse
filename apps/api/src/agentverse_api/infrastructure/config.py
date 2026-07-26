@@ -68,6 +68,13 @@ class Settings(BaseSettings):
     # `None` means the SDK's own default (https://api.openai.com/v1).
     openai_base_url: str | None = None
 
+    # Phase 3: producer side of apps/worker's Redis Streams queue. The
+    # two services share only this wire contract (stream key + field
+    # schema, documented in docs/systems/queue-dlq-policy.md) — never
+    # code, per CLAUDE.md's service-boundary rule.
+    redis_url: str = "redis://localhost:6379/0"
+    queue_stream: str = "queue:jobs"
+
 
 @lru_cache
 def get_settings() -> Settings:

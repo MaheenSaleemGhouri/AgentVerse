@@ -20,6 +20,16 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"  # noqa: S104 - container-internal bind address, not internet-exposed directly
     port: int = 8001
 
+    redis_url: str = "redis://localhost:6379/0"
+    queue_stream: str = "queue:jobs"
+    queue_dlq_stream: str = "queue:jobs.dlq"
+    queue_group: str = "workers"
+    queue_visibility_timeout_ms: int = 30_000
+    queue_base_delay_seconds: float = 0.5
+    queue_max_delay_seconds: float = 8.0
+    queue_block_ms: int = 5_000
+    queue_batch_size: int = 10
+
 
 @lru_cache
 def get_settings() -> Settings:

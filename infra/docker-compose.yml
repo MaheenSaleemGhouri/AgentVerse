@@ -56,6 +56,10 @@ services:
       AGENTVERSE_API_AUTH_PUBLIC_URL: http://localhost:${WEB_PORT:-3000}
       AGENTVERSE_API_INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?Set INTERNAL_API_SECRET in infra/.env — see infra/.env.example}
       AGENTVERSE_API_OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in infra/.env — see infra/.env.example}
+      # Phase 3: producer side of apps/worker's job queue — same Redis
+      # instance, container-network hostname (not the "localhost" default
+      # that's only correct when running apps/api directly on the host).
+      AGENTVERSE_API_REDIS_URL: redis://redis:6379/0
     volumes:
       - ../apps/api:/app
       - api_venv:/app/.venv
@@ -84,6 +88,22 @@ services:
       target: dev
     ports:
       - "${WORKER_PORT:-8001}:8001"
+    environment:
+      # Phase 3: the queue this worker consumes — container-network
+      # hostname, not the "localhost" default that's only correct when
+      # running apps/worker directly on the host.
+      AGENTVERSE_WORKER_REDIS_URL: redis://redis:6379/0
+    # Phase 3 (docs/roadmap.md acceptance criterion): a runaway job must
+    # be killed by *this* container's own limit, not by starving the
+    # host or co-located services. `mem_limit`/`cpus`/`pids_limit` are
+    # plain `docker compose` keys (no swarm/`deploy:` block needed) and
+    # are enforced by the kernel cgroup, independent of anything the
+    # process inside does. Dev-scale values — retune from real p95
+    # memory/CPU usage once Phase 4 adds actual agent-execution jobs.
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: "1.0"
+    pids_limit: 200
     volumes:
       - ../apps/worker:/app
       - worker_venv:/app/.venv

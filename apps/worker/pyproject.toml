@@ -8,6 +8,7 @@ dependencies = [
     "uvicorn[standard]>=0.34,<0.35",
     "pydantic>=2.10,<3",
     "pydantic-settings>=2.7,<3",
+    "redis>=5.2,<6",
 ]
 
 [dependency-groups]
@@ -17,6 +18,7 @@ dev = [
     "pytest>=8.3,<9",
     "pytest-asyncio>=0.25,<0.26",
     "httpx>=0.28,<0.29",
+    "fakeredis>=2.26,<3",
 ]
 
 [build-system]
@@ -37,6 +39,12 @@ ignore = []
 
 [tool.ruff.lint.isort]
 known-first-party = ["agentverse_worker"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection pattern requires `Depends(...)` as an
+# argument default — that's the framework's documented usage, not the
+# mutable-default-argument bug B008 exists to catch.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Path", "fastapi.Query", "fastapi.Header"]
 
 [tool.mypy]
 python_version = "3.12"

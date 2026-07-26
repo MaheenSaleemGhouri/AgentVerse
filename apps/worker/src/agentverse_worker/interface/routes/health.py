@@ -1,7 +1,9 @@
 """Liveness and readiness routes (CLAUDE.md §5)."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Response, status
+from redis.asyncio import Redis
 
+from agentverse_worker.interface.dependencies import get_redis_client
 from agentverse_worker.interface.schemas import HealthResponse
 
 router = APIRouter(tags=["health"])
@@ -14,11 +16,16 @@ async def health() -> HealthResponse:
 
 
 @router.get("/ready", response_model=HealthResponse)
-async def ready() -> HealthResponse:
-    """Readiness: are hard dependencies reachable.
-
-    No queue consumer exists yet in Phase 0, so there is no Redis
-    connection to check. Phase 3 adds a real Redis connectivity check
-    here once this service actually consumes jobs from a queue.
+async def ready(
+    response: Response, redis_client: Redis = Depends(get_redis_client)
+) -> HealthResponse:
+    """Readiness: Redis — the job queue's hard dependency — must be
+    reachable (docs/systems/health-checks.md: "Phase 3: apps/worker's
+    /ready gains a real Redis connectivity check").
     """
+    try:
+        await redis_client.ping()
+    except Exception:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return HealthResponse(status="unavailable")
     return HealthResponse(status="ok")
