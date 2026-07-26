@@ -12,6 +12,7 @@ dependencies = [
     "asyncpg>=0.31,<0.32",
     "alembic>=1.18,<2",
     "pyjwt[crypto]>=2.13,<3",
+    "openai>=1.59,<2",
 ]
 
 [dependency-groups]

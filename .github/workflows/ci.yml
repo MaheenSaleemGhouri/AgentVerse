@@ -82,6 +82,10 @@ jobs:
       AGENTVERSE_API_AUTH_INTERNAL_URL: http://localhost:3000
       AGENTVERSE_API_AUTH_PUBLIC_URL: http://localhost:3000
       AGENTVERSE_API_INTERNAL_API_SECRET: ci-only-secret-not-for-production
+      # Never a real key: unit tests inject a fake ProviderAdapter and
+      # never construct a real AsyncOpenAI client, so this only needs to
+      # satisfy Settings' "no default" requirement, not authenticate.
+      AGENTVERSE_API_OPENAI_API_KEY: sk-ci-placeholder-not-a-real-key
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0

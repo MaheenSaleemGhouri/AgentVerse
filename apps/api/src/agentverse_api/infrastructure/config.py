@@ -59,6 +59,15 @@ class Settings(BaseSettings):
     def auth_jwks_url(self) -> str:
         return f"{self.auth_internal_url}/api/auth/jwks"
 
+    # Required, no default (CLAUDE.md Rule 1: a missing secret fails
+    # startup loudly). The only place this key is read — every adapter
+    # call goes through `orchestration_service.infrastructure.providers
+    # .openai_adapter`, never a route or workflow reading it directly.
+    openai_api_key: str
+    # Override for a self-hosted/compatible endpoint or a test double;
+    # `None` means the SDK's own default (https://api.openai.com/v1).
+    openai_base_url: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:
