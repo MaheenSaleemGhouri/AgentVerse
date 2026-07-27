@@ -34,6 +34,7 @@ def _to_config(raw: dict[str, Any]) -> AgentConfig:
         temperature=raw.get("temperature"),
         max_output_tokens=raw.get("max_output_tokens"),
         tools=list(raw.get("tools", [])),
+        knowledge_base_ids=list(raw.get("knowledge_base_ids", [])),
     )
 
 
@@ -44,6 +45,7 @@ def _config_to_dict(config: AgentConfig) -> dict[str, Any]:
         "temperature": config.temperature,
         "max_output_tokens": config.max_output_tokens,
         "tools": config.tools,
+        "knowledge_base_ids": config.knowledge_base_ids,
     }
 
 

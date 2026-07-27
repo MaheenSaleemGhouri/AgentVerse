@@ -223,6 +223,120 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/knowledge-bases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Knowledge Bases Route */
+        get: operations["list_knowledge_bases_route_api_v1_workspaces__workspace_id__knowledge_bases_get"];
+        put?: never;
+        /** Create Knowledge Base Route */
+        post: operations["create_knowledge_base_route_api_v1_workspaces__workspace_id__knowledge_bases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Knowledge Base Route */
+        get: operations["get_knowledge_base_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Knowledge Base Route */
+        delete: operations["delete_knowledge_base_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Documents Route */
+        get: operations["list_documents_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__documents_get"];
+        put?: never;
+        /**
+         * Upload Document Route
+         * @description 202 — the bytes are durable and ingestion is queued. Chunking and
+         *     embedding are background work (Rule 14), so the client polls the
+         *     document's `status` rather than waiting on this call.
+         */
+        post: operations["upload_document_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__documents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Document Route */
+        delete: operations["delete_document_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__documents__document_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}/reindex": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reindex Document Route */
+        post: operations["reindex_document_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__documents__document_id__reindex_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search Route
+         * @description Runs the exact pipeline an agent run uses, so what a user sees here
+         *     is what their agent will actually retrieve.
+         */
+        post: operations["search_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/runs/{run_id}/stream": {
         parameters: {
             query?: never;
@@ -371,6 +485,8 @@ export interface components {
             max_output_tokens: number | null;
             /** Tools */
             tools: string[];
+            /** Knowledge Base Ids */
+            knowledge_base_ids: string[];
             /**
              * Created At
              * Format: date-time
@@ -397,9 +513,28 @@ export interface components {
             /** Revoked At */
             revoked_at: string | null;
         };
+        /** Body_upload_document_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__documents_post */
+        Body_upload_document_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__documents_post: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: string;
+        };
         /** ChangeMemberRoleRequest */
         ChangeMemberRoleRequest: {
             role: components["schemas"]["Role"];
+        };
+        /** CitationResponse */
+        CitationResponse: {
+            /** Chunk Id */
+            chunk_id: string;
+            /** Kb Document Id */
+            kb_document_id: string;
+            /** Knowledge Base Id */
+            knowledge_base_id: string;
+            /** Chunk Index */
+            chunk_index: number;
         };
         /** CreateAgentRequest */
         CreateAgentRequest: {
@@ -417,11 +552,20 @@ export interface components {
             max_output_tokens?: number | null;
             /** Tools */
             tools?: string[];
+            /** Knowledge Base Ids */
+            knowledge_base_ids?: string[];
         };
         /** CreateAgentResponse */
         CreateAgentResponse: {
             agent: components["schemas"]["AgentResponse"];
             version: components["schemas"]["AgentVersionResponse"];
+        };
+        /** CreateKnowledgeBaseRequest */
+        CreateKnowledgeBaseRequest: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
         };
         /** CreateWorkspaceRequest */
         CreateWorkspaceRequest: {
@@ -503,6 +647,60 @@ export interface components {
             /** Stream Id */
             stream_id: string;
         };
+        /** KbDocumentResponse */
+        KbDocumentResponse: {
+            /** Id */
+            id: string;
+            /** Knowledge Base Id */
+            knowledge_base_id: string;
+            /** Original Filename */
+            original_filename: string;
+            /** Content Type */
+            content_type: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Status */
+            status: string;
+            /** Error Message */
+            error_message: string | null;
+            /** Chunk Count */
+            chunk_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** KnowledgeBaseResponse */
+        KnowledgeBaseResponse: {
+            /** Id */
+            id: string;
+            /** Workspace Id */
+            workspace_id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Embedding Model */
+            embedding_model: string;
+            /** Embedding Model Version */
+            embedding_model_version: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /** MemberResponse */
         MemberResponse: {
             /** Workspace Id */
@@ -565,6 +763,48 @@ export interface components {
              */
             created_at: string;
         };
+        /** SearchHitResponse */
+        SearchHitResponse: {
+            /** Chunk Id */
+            chunk_id: string;
+            /** Kb Document Id */
+            kb_document_id: string;
+            /** Chunk Index */
+            chunk_index: number;
+            /** Content */
+            content: string;
+            /** Score */
+            score: number;
+            /** Vector Rank */
+            vector_rank: number | null;
+            /** Keyword Rank */
+            keyword_rank: number | null;
+        };
+        /** SearchRequest */
+        SearchRequest: {
+            /** Query */
+            query: string;
+            /**
+             * Top K
+             * @default 8
+             */
+            top_k: number;
+        };
+        /** SearchResponse */
+        SearchResponse: {
+            /** Hits */
+            hits: components["schemas"]["SearchHitResponse"][];
+            /** Citations */
+            citations: components["schemas"]["CitationResponse"][];
+            /** Context Text */
+            context_text: string;
+            /** Used Tokens */
+            used_tokens: number;
+            /** Budget Tokens */
+            budget_tokens: number;
+            /** Dropped Chunk Count */
+            dropped_chunk_count: number;
+        };
         /** UpdateAgentVersionRequest */
         UpdateAgentVersionRequest: {
             /** Model */
@@ -577,6 +817,18 @@ export interface components {
             max_output_tokens?: number | null;
             /** Tools */
             tools?: string[];
+            /** Knowledge Base Ids */
+            knowledge_base_ids?: string[];
+        };
+        /**
+         * UploadDocumentResponse
+         * @description 202 body. The document is durable and queued; it is not searchable
+         *     until ingestion moves it to `indexed`, which the client polls for.
+         */
+        UploadDocumentResponse: {
+            document: components["schemas"]["KbDocumentResponse"];
+            /** Job Id */
+            job_id: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -1120,6 +1372,302 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_knowledge_bases_route_api_v1_workspaces__workspace_id__knowledge_bases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeBaseResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_knowledge_base_route_api_v1_workspaces__workspace_id__knowledge_bases_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateKnowledgeBaseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeBaseResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_knowledge_base_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                knowledge_base_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeBaseResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_knowledge_base_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                knowledge_base_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_documents_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__documents_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                knowledge_base_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KbDocumentResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_document_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__documents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                knowledge_base_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_document_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__documents_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_document_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__documents__document_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                knowledge_base_id: string;
+                document_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reindex_document_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__documents__document_id__reindex_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                knowledge_base_id: string;
+                document_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KbDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                knowledge_base_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResponse"];
                 };
             };
             /** @description Validation Error */

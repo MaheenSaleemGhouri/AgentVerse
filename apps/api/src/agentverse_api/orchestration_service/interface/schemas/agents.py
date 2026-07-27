@@ -17,6 +17,9 @@ class CreateAgentRequest(BaseModel):
     temperature: float | None = Field(default=None, ge=0, le=2)
     max_output_tokens: int | None = Field(default=None, ge=1, le=32000)
     tools: list[str] = Field(default_factory=list, max_length=20)
+    # Capped like `tools`: each attached KB is another retrieval arm
+    # pair per run, so an unbounded list is a latency and cost vector.
+    knowledge_base_ids: list[str] = Field(default_factory=list, max_length=10)
 
 
 class UpdateAgentVersionRequest(BaseModel):
@@ -28,6 +31,9 @@ class UpdateAgentVersionRequest(BaseModel):
     temperature: float | None = Field(default=None, ge=0, le=2)
     max_output_tokens: int | None = Field(default=None, ge=1, le=32000)
     tools: list[str] = Field(default_factory=list, max_length=20)
+    # Capped like `tools`: each attached KB is another retrieval arm
+    # pair per run, so an unbounded list is a latency and cost vector.
+    knowledge_base_ids: list[str] = Field(default_factory=list, max_length=10)
 
 
 class AgentVersionResponse(BaseModel):
@@ -38,6 +44,7 @@ class AgentVersionResponse(BaseModel):
     temperature: float | None
     max_output_tokens: int | None
     tools: list[str]
+    knowledge_base_ids: list[str]
     created_at: datetime
 
 

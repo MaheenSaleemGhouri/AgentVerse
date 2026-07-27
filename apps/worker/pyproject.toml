@@ -14,6 +14,9 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0.51,<3",
     "asyncpg>=0.31,<0.32",
     "openai>=2.45,<3",
+    "pypdf>=6.14.2",
+    "python-docx>=1.2.0",
+    "pgvector>=0.4,<0.5",
 ]
 
 [dependency-groups]
@@ -58,9 +61,19 @@ mypy_path = "src"
 explicit_package_bases = true
 plugins = ["pydantic.mypy"]
 
+# pgvector ships no py.typed marker (upstream gap). Scoped to this one
+# third-party module rather than inline ignores at each import site, so
+# the untyped surface stays visible in config. Mirrors apps/api.
+[[tool.mypy.overrides]]
+module = ["pgvector.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "integration: requires a real Postgres with pgvector (AGENTVERSE_WORKER_DATABASE_URL) — CLAUDE.md §11, never mocked",
+]
 
 [tool.uv.sources]
 agentverse-shared = { path = "../../packages/python-shared", editable = true }

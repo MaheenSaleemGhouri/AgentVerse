@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type BuilderPanelTab = "instructions" | "model" | "tools";
+export type BuilderPanelTab = "instructions" | "model" | "tools" | "knowledge";
 
 interface AgentBuilderState {
   activeTab: BuilderPanelTab;

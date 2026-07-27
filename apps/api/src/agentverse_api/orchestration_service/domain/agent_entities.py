@@ -35,6 +35,12 @@ class AgentConfig:
     temperature: float | None = None
     max_output_tokens: int | None = None
     tools: list[str] = field(default_factory=list)
+    #: Knowledge bases this agent retrieves from (Phase 5). Part of the
+    #: versioned config, not a mutable side-table, so a published
+    #: version's grounding sources are exactly what it was published
+    #: with — detaching a KB later cannot retroactively change what an
+    #: already-recorded run retrieved.
+    knowledge_base_ids: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)

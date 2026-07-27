@@ -11,6 +11,7 @@ export const agentConfigSchema = z.object({
   temperature: z.number().min(0).max(2).nullable(),
   max_output_tokens: z.number().int().min(1).max(32000).nullable(),
   tools: z.array(z.string()).max(20),
+  knowledge_base_ids: z.array(z.string()).max(10),
 });
 
 export type AgentConfigFormValues = z.infer<typeof agentConfigSchema>;

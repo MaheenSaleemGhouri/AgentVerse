@@ -10,6 +10,7 @@ import type { AgentVersion } from "@/lib/api/agents";
 import { useAgentBuilderStore, type BuilderPanelTab } from "@/lib/stores/agent-builder-store";
 import { agentConfigSchema, BUILTIN_TOOLS, MODEL_OPTIONS, type AgentConfigFormValues } from "@/lib/validation/agent-config";
 
+import { KnowledgeBaseAttach } from "@/components/agents/knowledge-base-attach";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -55,6 +56,7 @@ export function AgentConfigPanel({
       temperature: version.temperature,
       max_output_tokens: version.max_output_tokens,
       tools: version.tools,
+      knowledge_base_ids: version.knowledge_base_ids,
     },
   });
 
@@ -83,6 +85,7 @@ export function AgentConfigPanel({
             <TabsTrigger value="instructions">Instructions</TabsTrigger>
             <TabsTrigger value="model">Model</TabsTrigger>
             <TabsTrigger value="tools">Tools</TabsTrigger>
+            <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           </TabsList>
 
           <TabsContent value="instructions" className="mt-4">
@@ -214,6 +217,30 @@ export function AgentConfigPanel({
                       </div>
                     );
                   })}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </TabsContent>
+          <TabsContent value="knowledge" className="mt-4">
+            <FormField
+              control={form.control}
+              name="knowledge_base_ids"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Grounding</FormLabel>
+                  <FormDescription>
+                    Attached documents are retrieved on every run and cited in the answer.
+                  </FormDescription>
+                  <FormControl>
+                    <div>
+                      <KnowledgeBaseAttach
+                        workspaceId={workspaceId}
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                    </div>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

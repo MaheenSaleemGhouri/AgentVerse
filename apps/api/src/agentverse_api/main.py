@@ -20,6 +20,9 @@ from agentverse_api.orchestration_service.interface.routers.internal_job_test im
 from agentverse_api.orchestration_service.interface.routers.internal_provider_test import (
     router as internal_provider_test_router,
 )
+from agentverse_api.orchestration_service.interface.routers.knowledge import (
+    router as knowledge_router,
+)
 from agentverse_api.orchestration_service.interface.routers.run_stream import (
     router as run_stream_router,
 )
@@ -38,6 +41,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(workspaces_router)
     app.include_router(agents_router)
+    app.include_router(knowledge_router)
     app.include_router(run_stream_router)
     app.include_router(api_keys_router)
     app.include_router(internal_auth_events_router)

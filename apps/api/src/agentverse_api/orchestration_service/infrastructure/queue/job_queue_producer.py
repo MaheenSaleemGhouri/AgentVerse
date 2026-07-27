@@ -47,3 +47,10 @@ class JobQueueProducer:
 
     async def enqueue_agent_run(self, *, run_id: str, max_attempts: int = 3) -> tuple[str, str]:
         return await self.enqueue("agent_run", {"run_id": run_id}, max_attempts=max_attempts)
+
+    async def enqueue_kb_ingest(
+        self, *, kb_document_id: str, max_attempts: int = 3
+    ) -> tuple[str, str]:
+        return await self.enqueue(
+            "kb_ingest", {"kb_document_id": kb_document_id}, max_attempts=max_attempts
+        )

@@ -75,6 +75,24 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     queue_stream: str = "queue:jobs"
 
+    # Phase 5 — knowledge bases. The storage root must be outside any
+    # web-served directory; nothing serves these files over HTTP
+    # (CLAUDE.md §10). apps/worker reads the same root under its own
+    # setting — same value, separately declared, because the two services
+    # share the key layout as a contract, never a config object.
+    document_storage_root: str = "/var/lib/agentverse/documents"
+
+    # Caps the blast radius of one upload — embedding spend, worker
+    # memory, and request-body buffering all scale with it. 25 MB fits a
+    # large PDF manual without letting a single request pin a worker.
+    max_document_bytes: int = 25 * 1024 * 1024
+
+    # New knowledge bases are created with this embedding identity.
+    # Existing ones keep whatever they were created with, so retrieval
+    # never mixes versions mid-backfill.
+    embedding_model: str = "text-embedding-3-small"
+    embedding_model_version: str = "1"
+
 
 @lru_cache
 def get_settings() -> Settings:

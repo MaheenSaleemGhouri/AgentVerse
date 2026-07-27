@@ -28,6 +28,9 @@ import uuid
 from typing import Any
 
 from agentverse_shared.cost_accounting import TokenUsage, calculate_cost_micro_usd
+from agentverse_shared.embeddings.port import EmbeddingProvider
+from agentverse_shared.retrieval.port import ChunkSearchPort
+from agentverse_shared.text.tokenizer import TokenCounter
 from redis.asyncio import Redis
 
 from agents import Agent, ItemHelpers, ModelSettings, Runner
@@ -35,6 +38,7 @@ from agents.items import MessageOutputItem, ToolCallItem, ToolCallOutputItem
 from agents.stream_events import RunItemStreamEvent
 from agentverse_worker.agents.builtin_tools import resolve_tools
 from agentverse_worker.agents.events import publish_event
+from agentverse_worker.agents.grounding import KnowledgeBaseDirectory, ground_run
 from agentverse_worker.agents.repository import (
     AgentRepositoryProtocol,
     RunRecord,
@@ -44,6 +48,12 @@ from agentverse_worker.infrastructure.config import Settings
 from agentverse_worker.queue.models import Job, JobResult
 
 logger = logging.getLogger(__name__)
+
+#: Used when the agent config leaves `max_output_tokens` unset. The
+#: context budget is computed by subtraction, so *something* must be
+#: reserved for the response — reserving nothing would let retrieved
+#: context fill the window and leave no room to answer.
+_DEFAULT_RESERVED_OUTPUT_TOKENS = 2048
 
 
 class _RunAbortedError(Exception):
@@ -58,14 +68,23 @@ class _RunAbortedError(Exception):
 
 
 async def handle_agent_run_job(
-    job: Job, *, settings: Settings, redis: Redis, repo: AgentRepositoryProtocol
+    job: Job,
+    *,
+    settings: Settings,
+    redis: Redis,
+    repo: AgentRepositoryProtocol,
+    directory: KnowledgeBaseDirectory,
+    search: ChunkSearchPort,
+    embedder: EmbeddingProvider,
+    counter: TokenCounter,
 ) -> JobResult:
-    """`repo` is injected by the caller (the queue-factory closure, which
-    opens one DB session for the job's duration) rather than constructed
-    here — CLAUDE.md §11: dependency-injected clients are mockable via
-    fakes, which is what lets this function's actual logic (bounds,
-    status transitions, step recording) be unit-tested without a live
-    Postgres connection.
+    """`repo` and the retrieval collaborators are injected by the caller
+    (the queue-factory closure, which opens one DB session for the job's
+    duration) rather than constructed here — CLAUDE.md §11:
+    dependency-injected clients are mockable via fakes, which is what
+    lets this function's actual logic (bounds, status transitions, step
+    recording, grounding) be unit-tested without a live Postgres
+    connection or a real embedding provider.
     """
     run_id = job.payload.get("run_id")
     if not run_id:
@@ -96,6 +115,10 @@ async def handle_agent_run_job(
             redis=redis,
             repo=repo,
             sequence=sequence,
+            directory=directory,
+            search=search,
+            embedder=embedder,
+            counter=counter,
         )
     except _RunAbortedError as exc:
         await repo.update_run_status(run_id=run_id, status="error", error_message=exc.reason)
@@ -197,11 +220,66 @@ async def _execute(
     redis: Redis,
     repo: AgentRepositoryProtocol,
     sequence: _SequenceCounter,
+    directory: KnowledgeBaseDirectory,
+    search: ChunkSearchPort,
+    embedder: EmbeddingProvider,
+    counter: TokenCounter,
 ) -> TokenUsage:
     config = version.config
+    prompt = run.input.get("prompt", "")
+
+    # Grounding happens before the SDK `Agent` is constructed, because it
+    # is what determines the agent's instructions. It never raises: a
+    # failure degrades to the ungrounded prompt and reports itself in the
+    # trace step below.
+    grounding = await ground_run(
+        query=prompt,
+        system_instructions=config["system_instructions"],
+        workspace_id=run.workspace_id,
+        # `.get` rather than `[...]`: agent versions published before
+        # Phase 5 have no `knowledge_base_ids` key at all, and a stored
+        # config is data, not a schema that migrates itself.
+        knowledge_base_ids=list(config.get("knowledge_base_ids") or []),
+        model=config["model"],
+        reserved_output_tokens=config.get("max_output_tokens") or _DEFAULT_RESERVED_OUTPUT_TOKENS,
+        directory=directory,
+        search=search,
+        embedder=embedder,
+        counter=counter,
+    )
+    if config.get("knowledge_base_ids"):
+        # Emitted only when the agent actually has knowledge bases —
+        # otherwise every ungrounded run would carry a noise step saying
+        # nothing happened. When it *is* emitted it always appears, hit
+        # or miss or failure, so "why did my agent ignore my documents?"
+        # is answerable from the trace alone.
+        await _record_and_publish_step(
+            repo,
+            redis,
+            run=run,
+            step_type="retrieval",
+            sequence=sequence,
+            payload={
+                "citations": [
+                    {
+                        "chunk_id": c.chunk_id,
+                        "kb_document_id": c.kb_document_id,
+                        "knowledge_base_id": c.knowledge_base_id,
+                        "chunk_index": c.chunk_index,
+                    }
+                    for c in grounding.citations
+                ],
+                "used_tokens": grounding.used_tokens,
+                "dropped_chunk_count": grounding.dropped_chunk_count,
+                "skipped_knowledge_base_ids": list(grounding.skipped_knowledge_base_ids),
+                "error": grounding.error,
+            },
+            cost=None,
+        )
+
     agent = Agent(
         name=f"agent-{run.agent_id}",
-        instructions=config["system_instructions"],
+        instructions=grounding.instructions,
         model=config["model"],
         tools=resolve_tools(config.get("tools", [])),
         model_settings=ModelSettings(
@@ -209,7 +287,6 @@ async def _execute(
             max_tokens=config.get("max_output_tokens"),
         ),
     )
-    prompt = run.input.get("prompt", "")
 
     result = Runner.run_streamed(agent, prompt, max_turns=settings.run_max_turns)
     start = time.monotonic()

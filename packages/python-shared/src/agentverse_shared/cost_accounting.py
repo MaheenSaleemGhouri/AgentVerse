@@ -70,10 +70,35 @@ MODEL_PRICING: dict[str, ModelPricing] = {
 }
 
 
+#: Usable context window per model, in tokens. Lives beside pricing
+#: because it answers the same kind of question — a property of the model
+#: the platform must know before it can call it — and because both are
+#: read by the same callers. Retrieval's context budget is computed by
+#: subtraction from this, so a missing entry must raise rather than
+#: default: a guessed window either wastes budget or overflows the call.
+MODEL_CONTEXT_WINDOWS: dict[str, int] = {
+    "gpt-4o-mini": 128_000,
+    "gpt-4o": 128_000,
+}
+
+
 class UnknownModelPricingError(Exception):
     def __init__(self, model: str) -> None:
         self.model = model
         super().__init__(f"No pricing entry for model {model!r}")
+
+
+class UnknownModelWindowError(Exception):
+    def __init__(self, model: str) -> None:
+        self.model = model
+        super().__init__(f"No context-window entry for model {model!r}")
+
+
+def context_window_for(model: str) -> int:
+    window = MODEL_CONTEXT_WINDOWS.get(model)
+    if window is None:
+        raise UnknownModelWindowError(model)
+    return window
 
 
 def calculate_cost_micro_usd(model: str, usage: TokenUsage) -> int:

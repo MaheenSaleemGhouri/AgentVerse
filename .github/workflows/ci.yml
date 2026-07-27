@@ -49,18 +49,20 @@ jobs:
       - run: pnpm --filter '${{ matrix.package }}' run build
 
   python-checks:
-    name: python / apps/${{ matrix.service }}
+    name: python / ${{ matrix.path }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        service: [api, worker]
+        path: [apps/api, apps/worker, packages/python-shared]
     defaults:
       run:
-        working-directory: apps/${{ matrix.service }}
-    # Present for both matrix legs (harmless, unused by worker — Phase 1
-    # introduces no worker-owned schema) rather than conditioning the
-    # service block itself, which GitHub Actions doesn't support per-matrix-value.
+        working-directory: ${{ matrix.path }}
+    # Every leg gets its own pgvector container. The schema is owned by
+    # apps/api's Alembic migrations, so each leg applies them from there
+    # before running — without that, apps/worker's and python-shared's
+    # integration tests skip against an empty database and the
+    # cross-tenant isolation coverage silently does not run.
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -77,6 +79,12 @@ jobs:
           --health-retries 10
     env:
       AGENTVERSE_API_DATABASE_URL: postgresql+asyncpg://agentverse:agentverse_ci_only@localhost:5432/agentverse
+      # Set for every leg so the integration suites actually execute
+      # rather than deselecting themselves. Their conftests skip when the
+      # variable is unset, which reads as green — the failure mode this
+      # exists to prevent.
+      AGENTVERSE_WORKER_DATABASE_URL: postgresql+asyncpg://agentverse:agentverse_ci_only@localhost:5432/agentverse
+      AGENTVERSE_SHARED_DATABASE_URL: postgresql+asyncpg://agentverse:agentverse_ci_only@localhost:5432/agentverse
       # Both point at the same runner-local nothing-is-listening address —
       # fine for ruff/mypy/unit tests (nothing calls out) and for the
       # integration suite (get_current_identity is dependency-overridden,
@@ -84,23 +92,25 @@ jobs:
       AGENTVERSE_API_AUTH_INTERNAL_URL: http://localhost:3000
       AGENTVERSE_API_AUTH_PUBLIC_URL: http://localhost:3000
       AGENTVERSE_API_INTERNAL_API_SECRET: ci-only-secret-not-for-production
-      # Never a real key: unit tests inject a fake ProviderAdapter and
-      # never construct a real AsyncOpenAI client, so this only needs to
-      # satisfy Settings' "no default" requirement, not authenticate.
+      # Never a real key: unit tests inject a fake ProviderAdapter/embedder
+      # and never construct a real AsyncOpenAI client, so this only needs
+      # to satisfy Settings' "no default" requirement, not authenticate.
       AGENTVERSE_API_OPENAI_API_KEY: sk-ci-placeholder-not-a-real-key
+      AGENTVERSE_WORKER_OPENAI_API_KEY: sk-ci-placeholder-not-a-real-key
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-          cache-dependency-glob: apps/${{ matrix.service }}/uv.lock
+          cache-dependency-glob: ${{ matrix.path }}/uv.lock
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy src
-      - if: matrix.service == 'api'
-        run: uv run alembic upgrade head
+      - name: Apply schema migrations (owned by apps/api)
+        working-directory: apps/api
+        run: uv sync --frozen && uv run alembic upgrade head
       - run: uv run pytest -q
 
   # Dependency-vulnerability scan (CLAUDE.md §10): pnpm's built-in audit

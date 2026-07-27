@@ -23,6 +23,18 @@ import {
   type UpdateAgentVersionRequest,
 } from "@/lib/api/agents";
 import {
+  createKnowledgeBase as createKnowledgeBaseApi,
+  deleteDocument as deleteDocumentApi,
+  deleteKnowledgeBase as deleteKnowledgeBaseApi,
+  type KbDocument,
+  type KnowledgeBase,
+  listDocuments as listDocumentsApi,
+  listKnowledgeBases as listKnowledgeBasesApi,
+  reindexDocument as reindexDocumentApi,
+  type SearchResponse,
+  searchKnowledgeBase as searchKnowledgeBaseApi,
+} from "@/lib/api/knowledge";
+import {
   changeMemberRole as changeMemberRoleApi,
   createWorkspace as createWorkspaceApi,
   inviteMember as inviteMemberApi,
@@ -91,4 +103,59 @@ export async function runAgentAction(
   idempotencyKey: string
 ): Promise<Run> {
   return runAgentApi(workspaceId, agentId, prompt, idempotencyKey);
+}
+
+export async function createKnowledgeBaseAction(
+  workspaceId: string,
+  name: string,
+  description: string | null
+): Promise<KnowledgeBase> {
+  return createKnowledgeBaseApi(workspaceId, { name, description });
+}
+
+export async function deleteKnowledgeBaseAction(
+  workspaceId: string,
+  knowledgeBaseId: string
+): Promise<void> {
+  await deleteKnowledgeBaseApi(workspaceId, knowledgeBaseId);
+}
+
+/**
+ * Polled by the document list while anything is still ingesting.
+ * Read-only, but a Server Action rather than a Server Component fetch
+ * because the caller is a Client Component refreshing on an interval.
+ */
+export async function listDocumentsAction(
+  workspaceId: string,
+  knowledgeBaseId: string
+): Promise<KbDocument[]> {
+  return listDocumentsApi(workspaceId, knowledgeBaseId);
+}
+
+export async function listKnowledgeBasesAction(workspaceId: string): Promise<KnowledgeBase[]> {
+  return listKnowledgeBasesApi(workspaceId);
+}
+
+export async function deleteDocumentAction(
+  workspaceId: string,
+  knowledgeBaseId: string,
+  documentId: string
+): Promise<void> {
+  await deleteDocumentApi(workspaceId, knowledgeBaseId, documentId);
+}
+
+export async function reindexDocumentAction(
+  workspaceId: string,
+  knowledgeBaseId: string,
+  documentId: string
+): Promise<KbDocument> {
+  return reindexDocumentApi(workspaceId, knowledgeBaseId, documentId);
+}
+
+export async function searchKnowledgeBaseAction(
+  workspaceId: string,
+  knowledgeBaseId: string,
+  query: string
+): Promise<SearchResponse> {
+  return searchKnowledgeBaseApi(workspaceId, knowledgeBaseId, query);
 }

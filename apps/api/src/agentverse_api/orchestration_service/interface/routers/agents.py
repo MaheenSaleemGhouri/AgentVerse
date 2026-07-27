@@ -72,6 +72,7 @@ async def create_agent_route(
         temperature=body.temperature,
         max_output_tokens=body.max_output_tokens,
         tools=body.tools,
+        knowledge_base_ids=body.knowledge_base_ids,
     )
     agent, version = await create_agent(
         workspace_id=context.workspace_id,
@@ -117,6 +118,7 @@ def _version_response(version: AgentVersion) -> AgentVersionResponse:
         temperature=version.config.temperature,
         max_output_tokens=version.config.max_output_tokens,
         tools=version.config.tools,
+        knowledge_base_ids=version.config.knowledge_base_ids,
         created_at=version.created_at,
     )
 
@@ -154,6 +156,7 @@ async def create_version_route(
         temperature=body.temperature,
         max_output_tokens=body.max_output_tokens,
         tools=body.tools,
+        knowledge_base_ids=body.knowledge_base_ids,
     )
     version = await agent_repo.create_version(
         agent_id=agent_id, config=config, created_by_user_id=context.user_id

@@ -8,7 +8,13 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from agentverse_shared.embeddings.openai_provider import OpenAIEmbeddingProvider
+from agentverse_shared.embeddings.port import EmbeddingProvider
 from agentverse_shared.locks.distributed_lock import DistributedLock
+from agentverse_shared.retrieval.port import ChunkSearchPort
+from agentverse_shared.retrieval.postgres_search import PostgresChunkSearch
+from agentverse_shared.storage.document_store import DocumentStore, LocalDocumentStore
+from agentverse_shared.text.tokenizer import TiktokenCounter, TokenCounter
 from fastapi import Depends
 from redis.asyncio import Redis
 from redis.asyncio import from_url as redis_from_url
@@ -21,8 +27,14 @@ from agentverse_api.orchestration_service.application.provider_test_service impo
 )
 from agentverse_api.orchestration_service.application.run_agent import LockFactory
 from agentverse_api.orchestration_service.domain.ports.agent_repository import AgentRepository
+from agentverse_api.orchestration_service.domain.ports.knowledge_repository import (
+    KnowledgeRepository,
+)
 from agentverse_api.orchestration_service.domain.ports.provider_adapter import ProviderAdapter
 from agentverse_api.orchestration_service.domain.ports.run_repository import AgentRunRepository
+from agentverse_api.orchestration_service.infrastructure.knowledge_repository import (
+    SqlKnowledgeRepository,
+)
 from agentverse_api.orchestration_service.infrastructure.providers.openai_adapter import (
     OpenAIProviderAdapter,
 )
@@ -91,3 +103,47 @@ def get_agent_run_repository(
     session: AsyncSession = Depends(get_db_session),
 ) -> AgentRunRepository:
     return SqlAgentRunRepository(session)
+
+
+def get_knowledge_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> KnowledgeRepository:
+    return SqlKnowledgeRepository(session)
+
+
+def get_chunk_search(session: AsyncSession = Depends(get_db_session)) -> ChunkSearchPort:
+    return PostgresChunkSearch(session)
+
+
+@lru_cache
+def get_document_store() -> DocumentStore:
+    """Process-wide singleton — it holds only a resolved root path.
+
+    apps/worker constructs the same store over the same root under its
+    own setting. The two services share the key *layout* as a contract,
+    never a config object (CLAUDE.md §5).
+    """
+    return LocalDocumentStore(get_settings().document_storage_root)
+
+
+@lru_cache
+def get_embedding_provider() -> EmbeddingProvider:
+    """The single adapter every embedding call goes through (Rule 16).
+    Cached for the same reason as the chat provider: the underlying
+    client owns a connection pool.
+    """
+    settings = get_settings()
+    return OpenAIEmbeddingProvider(
+        api_key=settings.openai_api_key,
+        model=settings.embedding_model,
+        model_version=settings.embedding_model_version,
+        base_url=settings.openai_base_url,
+    )
+
+
+@lru_cache
+def get_token_counter() -> TokenCounter:
+    """Cached because the first `count` call loads (and network-fetches)
+    the BPE encoding — that must not happen per request.
+    """
+    return TiktokenCounter()

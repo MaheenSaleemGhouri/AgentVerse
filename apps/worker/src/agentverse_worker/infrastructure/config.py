@@ -56,6 +56,19 @@ class Settings(BaseSettings):
     run_timeout_seconds: float = 120.0
     run_cost_ceiling_micro_usd: int = 2_000_000  # $2.00
 
+    # Phase 5 (knowledge bases). These must agree with each knowledge
+    # base's stored `embedding_model`/`embedding_model_version`; the
+    # ingestion job refuses to run when they diverge rather than writing
+    # vectors that cannot be compared with the ones already indexed.
+    embedding_model: str = "text-embedding-3-small"
+    embedding_model_version: str = "1"
+
+    # Where uploaded knowledge-base documents live. Must be outside any
+    # web-served directory (CLAUDE.md §10) and must be the *same*
+    # location apps/api writes uploads to — the API writes, this worker
+    # reads. In Docker that is a shared volume.
+    document_storage_root: str = "/var/lib/agentverse/documents"
+
 
 @lru_cache
 def get_settings() -> Settings:

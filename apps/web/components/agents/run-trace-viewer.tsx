@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Loader2, MessageSquare, Wrench, XCircle } from "lucide-react";
+import { BookOpen, CheckCircle2, Loader2, MessageSquare, Wrench, XCircle } from "lucide-react";
 
 import { useAgentRunStream, type RunStepEvent } from "@/lib/hooks/useAgentRunStream";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,8 @@ function stepSummary(step: RunStepEvent): string {
   switch (step.type) {
     case "run_started":
       return "Run started";
+    case "retrieval":
+      return retrievalSummary(step);
     case "llm_call":
       return typeof step.payload.text === "string" ? step.payload.text : "Model responded";
     case "tool_call":
@@ -29,8 +31,29 @@ function stepSummary(step: RunStepEvent): string {
   }
 }
 
+/**
+ * Grounding is reported whether it succeeded, found nothing, or failed —
+ * a run that silently answered without its documents is the failure this
+ * step exists to make visible.
+ */
+function retrievalSummary(step: RunStepEvent): string {
+  if (typeof step.payload.error === "string") {
+    return `Knowledge retrieval unavailable — answering without documents (${step.payload.error})`;
+  }
+  const citations = Array.isArray(step.payload.citations) ? step.payload.citations.length : 0;
+  if (citations === 0) {
+    return "No matching documents — answering without grounding";
+  }
+  const skipped = Array.isArray(step.payload.skipped_knowledge_base_ids)
+    ? step.payload.skipped_knowledge_base_ids.length
+    : 0;
+  const suffix = skipped > 0 ? ` (${skipped} knowledge base(s) skipped — reindex needed)` : "";
+  return `Retrieved ${citations} document chunk(s)${suffix}`;
+}
+
 const STEP_ICON: Record<RunStepEvent["type"], React.ComponentType<{ className?: string }>> = {
   run_started: Loader2,
+  retrieval: BookOpen,
   llm_call: MessageSquare,
   tool_call: Wrench,
   run_completed: CheckCircle2,

@@ -36,15 +36,19 @@ async def test_build_queue_dead_letters_forced_failure(fake_redis: FakeRedis) ->
     assert await queue.dlq_depth() == 1
 
 
-async def test_build_queue_registers_both_echo_and_agent_run_handlers(
-    fake_redis: FakeRedis,
-) -> None:
-    """Structural check only — actually invoking the `agent_run` handler
-    needs a live Postgres connection (`get_session()`), which isn't
-    exercised here; `tests/agents/test_agent_run_job.py` covers the
-    handler's own logic directly, injected with a fake repository.
+async def test_build_queue_registers_every_job_type(fake_redis: FakeRedis) -> None:
+    """Structural check only — actually invoking the `agent_run` or
+    `kb_ingest` handlers needs a live Postgres connection
+    (`get_session()`), which isn't exercised here. Each handler's own
+    logic is covered directly, injected with fakes, in
+    `tests/agents/test_agent_run_job.py` and
+    `tests/knowledge/test_kb_ingest_job.py`.
+
+    Asserting the exact set (not just membership) is deliberate: a job
+    type added to the enqueue side but never registered here would
+    otherwise fail only at runtime, as an unroutable job going to the DLQ.
     """
     settings = Settings()
     queue = build_queue(fake_redis, settings)
 
-    assert set(queue._handlers.keys()) == {"echo", "agent_run"}  # noqa: SLF001
+    assert set(queue._handlers.keys()) == {"echo", "agent_run", "kb_ingest"}  # noqa: SLF001

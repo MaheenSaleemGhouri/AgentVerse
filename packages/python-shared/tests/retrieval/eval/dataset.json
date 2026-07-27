@@ -1,0 +1,105 @@
+{
+  "description": "Labelled golden dataset for the retrieval ranking stages (fusion + rerank + assembly). Each case supplies what the two storage arms would return for a query — the ranked candidate lists — plus the chunk ids a human judged relevant. The SQL arms themselves are covered by tests/retrieval/integration; this set exists to measure the ranking logic we own, deterministically and without a database or an embedding provider.",
+  "corpus": [
+    {
+      "chunk_id": "billing-1",
+      "kb_document_id": "doc-billing",
+      "content": "Invoices are issued on the first day of each billing period and are payable within 14 days. Usage overage is billed in arrears on the following invoice."
+    },
+    {
+      "chunk_id": "billing-2",
+      "kb_document_id": "doc-billing",
+      "content": "A failed payment moves the subscription to past_due. Three retry attempts are made over ten days before the subscription is cancelled."
+    },
+    {
+      "chunk_id": "billing-3",
+      "kb_document_id": "doc-billing",
+      "content": "Plan changes are prorated to the second. Downgrading refunds the unused remainder of the current period as account credit, never as a cash refund."
+    },
+    {
+      "chunk_id": "refund-1",
+      "kb_document_id": "doc-refunds",
+      "content": "Refund requests are accepted within 30 days of the original charge. Refunds are returned to the original payment method and settle in five to ten business days."
+    },
+    {
+      "chunk_id": "refund-2",
+      "kb_document_id": "doc-refunds",
+      "content": "Annual plans are refundable on a pro-rata basis for the unused months. Monthly plans are refunded in full only within the first 30 days."
+    },
+    {
+      "chunk_id": "sso-1",
+      "kb_document_id": "doc-security",
+      "content": "SSO is available on the Enterprise tier. SAML 2.0 and OIDC are both supported, and just-in-time provisioning creates workspace members on first login."
+    },
+    {
+      "chunk_id": "sso-2",
+      "kb_document_id": "doc-security",
+      "content": "Audit logs record authentication events, permission changes, and destructive operations. They are append-only and retained for one year."
+    },
+    {
+      "chunk_id": "quota-1",
+      "kb_document_id": "doc-limits",
+      "content": "Each workspace has a monthly agent-run quota determined by its subscription tier. Exceeding it returns HTTP 429 with a quota_exceeded error code."
+    },
+    {
+      "chunk_id": "quota-2",
+      "kb_document_id": "doc-limits",
+      "content": "Rate limits are applied per workspace and per API key using a sliding window. The retry_after field tells the client when to try again."
+    },
+    {
+      "chunk_id": "onboard-1",
+      "kb_document_id": "doc-getting-started",
+      "content": "Create a workspace, build an agent from a template, then run it. Most teams reach a first successful run in under ten minutes."
+    }
+  ],
+  "cases": [
+    {
+      "query": "How long do I have to request a refund?",
+      "relevant_chunk_ids": ["refund-1", "refund-2"],
+      "vector_hits": ["refund-1", "refund-2", "billing-3", "billing-1", "quota-1"],
+      "keyword_hits": ["refund-2", "refund-1", "billing-3"]
+    },
+    {
+      "query": "What happens when my payment fails?",
+      "relevant_chunk_ids": ["billing-2"],
+      "vector_hits": ["billing-2", "billing-1", "refund-1", "billing-3"],
+      "keyword_hits": ["billing-2", "refund-1"]
+    },
+    {
+      "query": "Does AgentVerse support SAML single sign-on?",
+      "relevant_chunk_ids": ["sso-1"],
+      "vector_hits": ["sso-1", "sso-2", "onboard-1"],
+      "keyword_hits": ["sso-1"]
+    },
+    {
+      "query": "quota_exceeded error code",
+      "relevant_chunk_ids": ["quota-1", "quota-2"],
+      "vector_hits": ["quota-2", "quota-1", "billing-1"],
+      "keyword_hits": ["quota-1", "quota-2"]
+    },
+    {
+      "query": "When is my invoice due?",
+      "relevant_chunk_ids": ["billing-1"],
+      "vector_hits": ["billing-1", "billing-3", "billing-2", "refund-1"],
+      "keyword_hits": ["billing-1", "billing-3"]
+    },
+    {
+      "query": "How do I get started?",
+      "relevant_chunk_ids": ["onboard-1"],
+      "vector_hits": ["onboard-1", "sso-1", "quota-1"],
+      "keyword_hits": []
+    },
+    {
+      "query": "Is proration a credit or a cash refund?",
+      "relevant_chunk_ids": ["billing-3"],
+      "vector_hits": ["billing-3", "refund-2", "refund-1", "billing-1"],
+      "keyword_hits": ["refund-1", "billing-3", "refund-2"]
+    },
+    {
+      "query": "How long are audit logs kept?",
+      "relevant_chunk_ids": ["sso-2"],
+      "vector_hits": ["sso-2", "sso-1", "quota-2"],
+      "keyword_hits": ["sso-2"]
+    }
+  ]
+}

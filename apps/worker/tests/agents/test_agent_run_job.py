@@ -14,11 +14,14 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from agentverse_shared.embeddings.port import EmbeddingResult, EmbeddingUnavailableError
+from agentverse_shared.retrieval.types import RetrievedChunk
 from openai.types.responses import ResponseOutputText
 
 from agents import Agent
 from agents.items import MessageOutputItem, ToolCallItem, ToolCallOutputItem
 from agents.stream_events import RunItemStreamEvent
+from agentverse_worker.agents.grounding import KnowledgeBaseIdentity
 from agentverse_worker.agents.repository import RunRecord, VersionRecord
 from agentverse_worker.infrastructure.config import Settings
 from agentverse_worker.jobs import agent_run_job
@@ -113,6 +116,101 @@ class FakeRedis:
         self.published.append((channel, message))
 
 
+class FakeDirectory:
+    def __init__(self, identities: list[KnowledgeBaseIdentity] | None = None) -> None:
+        self._identities = identities or []
+        self.calls: list[dict[str, Any]] = []
+
+    async def get_embedding_identities(
+        self, *, workspace_id: str, knowledge_base_ids: list[str]
+    ) -> list[KnowledgeBaseIdentity]:
+        self.calls.append(
+            {"workspace_id": workspace_id, "knowledge_base_ids": list(knowledge_base_ids)}
+        )
+        return [i for i in self._identities if i.id in set(knowledge_base_ids)]
+
+
+class FakeSearch:
+    """Records the kwargs it was called with, so tenancy is asserted on
+    the *arguments* rather than on a filtered result the fake produced.
+    """
+
+    def __init__(self, chunks: list[RetrievedChunk] | None = None) -> None:
+        self._chunks = chunks or []
+        self.calls: list[dict[str, Any]] = []
+
+    async def vector_search(self, **kwargs: Any) -> list[RetrievedChunk]:
+        self.calls.append({"arm": "vector", **kwargs})
+        return list(self._chunks)
+
+    async def keyword_search(self, **kwargs: Any) -> list[RetrievedChunk]:
+        self.calls.append({"arm": "keyword", **kwargs})
+        return list(self._chunks)
+
+
+class FakeEmbedder:
+    def __init__(self, *, error: Exception | None = None) -> None:
+        self._error = error
+
+    async def embed(self, texts: list[str]) -> EmbeddingResult:
+        if self._error is not None:
+            raise self._error
+        return EmbeddingResult(
+            vectors=[[0.1, 0.2, 0.3] for _ in texts],
+            model="text-embedding-3-small",
+            model_version="1",
+            prompt_tokens=len(texts),
+        )
+
+    @property
+    def model(self) -> str:
+        return "text-embedding-3-small"
+
+    @property
+    def model_version(self) -> str:
+        return "1"
+
+
+class WordCounter:
+    """One token per whitespace-separated word — deterministic, so budget
+    assertions are exact rather than BPE-dependent.
+    """
+
+    def count(self, text: str) -> int:
+        return len(text.split())
+
+
+def _chunk(chunk_id: str, content: str, *, kb_id: str = "kb-1") -> RetrievedChunk:
+    return RetrievedChunk(
+        chunk_id=chunk_id,
+        kb_document_id="doc-1",
+        knowledge_base_id=kb_id,
+        workspace_id=WORKSPACE_ID,
+        chunk_index=0,
+        content=content,
+        token_count=len(content.split()),
+        score=0.9,
+    )
+
+
+def _deps(
+    *,
+    directory: FakeDirectory | None = None,
+    search: FakeSearch | None = None,
+    embedder: FakeEmbedder | None = None,
+) -> dict[str, Any]:
+    """Default collaborators for tests that are not about grounding: an
+    empty directory means every run is ungrounded, which is exactly the
+    pre-Phase-5 behaviour those tests assert.
+    """
+    return {
+        "directory": directory or FakeDirectory(),
+        "search": search or FakeSearch(),
+        "embedder": embedder or FakeEmbedder(),
+        "counter": WordCounter(),
+    }
+
+
 def _make_run_and_version() -> tuple[RunRecord, VersionRecord]:
     run = RunRecord(
         id=RUN_ID,
@@ -147,7 +245,11 @@ async def test_missing_run_fails_without_touching_runner(monkeypatch: pytest.Mon
         max_attempts=3,
     )
     result = await handle_agent_run_job(
-        job, settings=Settings(database_url="x", openai_api_key="x"), redis=FakeRedis(), repo=repo
+        job,
+        settings=Settings(database_url="x", openai_api_key="x"),
+        redis=FakeRedis(),
+        repo=repo,
+        **_deps(),
     )
 
     assert result.error is not None
@@ -175,7 +277,7 @@ async def test_successful_run_records_steps_and_success_status(
         job_id="j1", job_type="agent_run", payload={"run_id": RUN_ID}, attempt=0, max_attempts=3
     )
     settings = Settings(database_url="x", openai_api_key="x")
-    result = await handle_agent_run_job(job, settings=settings, redis=redis, repo=repo)
+    result = await handle_agent_run_job(job, settings=settings, redis=redis, repo=repo, **_deps())
 
     assert result.output == {"run_id": RUN_ID, "status": "success"}
     statuses = [s["status"] for s in repo.statuses]
@@ -218,7 +320,7 @@ async def test_cost_ceiling_exceeded_aborts_run(monkeypatch: pytest.MonkeyPatch)
         job_id="j1", job_type="agent_run", payload={"run_id": RUN_ID}, attempt=0, max_attempts=3
     )
     settings = Settings(database_url="x", openai_api_key="x", run_cost_ceiling_micro_usd=0)
-    result = await handle_agent_run_job(job, settings=settings, redis=redis, repo=repo)
+    result = await handle_agent_run_job(job, settings=settings, redis=redis, repo=repo, **_deps())
 
     assert result.output == {"run_id": RUN_ID, "status": "error"}
     assert fake_result.cancelled is True
@@ -241,8 +343,209 @@ async def test_time_budget_exceeded_aborts_run(monkeypatch: pytest.MonkeyPatch) 
     )
     # Any elapsed time exceeds a zero-second budget.
     settings = Settings(database_url="x", openai_api_key="x", run_timeout_seconds=0.0)
-    result = await handle_agent_run_job(job, settings=settings, redis=redis, repo=repo)
+    result = await handle_agent_run_job(job, settings=settings, redis=redis, repo=repo, **_deps())
 
     assert result.output == {"run_id": RUN_ID, "status": "error"}
     assert fake_result.cancelled is True
     assert "time budget" in repo.statuses[-1]["error_message"]
+
+
+def _grounded_version(kb_ids: list[str]) -> VersionRecord:
+    return VersionRecord(
+        id=VERSION_ID,
+        agent_id=AGENT_ID,
+        config={
+            "model": "gpt-4o-mini",
+            "system_instructions": "be helpful",
+            "tools": [],
+            "knowledge_base_ids": kb_ids,
+        },
+    )
+
+
+def _identity(kb_id: str, *, model: str = "text-embedding-3-small", version: str = "1"):
+    return KnowledgeBaseIdentity(id=kb_id, embedding_model=model, embedding_model_version=version)
+
+
+async def test_agent_without_knowledge_bases_emits_no_retrieval_step(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run, version = _make_run_and_version()
+    repo = FakeRepo(run=run, version=version)
+    search = FakeSearch()
+    monkeypatch.setattr(
+        agent_run_job.Runner,
+        "run_streamed",
+        lambda *a, **k: _FakeRunResultStreaming(events=[_message_event("hi")]),
+    )
+
+    job = Job(
+        job_id="j1", job_type="agent_run", payload={"run_id": RUN_ID}, attempt=0, max_attempts=3
+    )
+    await handle_agent_run_job(
+        job,
+        settings=Settings(database_url="x", openai_api_key="x"),
+        redis=FakeRedis(),
+        repo=repo,
+        **_deps(search=search),
+    )
+
+    assert "retrieval" not in [s["step_type"] for s in repo.steps]
+    # Not merely "no step" — retrieval must not have been attempted at
+    # all, so an agent with no KBs never pays for an embedding call.
+    assert search.calls == []
+
+
+async def test_grounded_run_injects_delimited_context_and_records_citations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run, _ = _make_run_and_version()
+    repo = FakeRepo(run=run, version=_grounded_version(["kb-1"]))
+    directory = FakeDirectory([_identity("kb-1")])
+    search = FakeSearch([_chunk("chunk-1", "invoices are billed monthly in arrears")])
+
+    captured: dict[str, Any] = {}
+
+    def _capture(agent, prompt, **kwargs):
+        captured["instructions"] = agent.instructions
+        captured["prompt"] = prompt
+        return _FakeRunResultStreaming(events=[_message_event("monthly")])
+
+    monkeypatch.setattr(agent_run_job.Runner, "run_streamed", _capture)
+
+    job = Job(
+        job_id="j1", job_type="agent_run", payload={"run_id": RUN_ID}, attempt=0, max_attempts=3
+    )
+    result = await handle_agent_run_job(
+        job,
+        settings=Settings(database_url="x", openai_api_key="x"),
+        redis=FakeRedis(),
+        repo=repo,
+        **_deps(directory=directory, search=search),
+    )
+
+    assert result.output == {"run_id": RUN_ID, "status": "success"}
+    instructions = captured["instructions"]
+    assert instructions.startswith("be helpful")
+    # The system prompt survives intact and the retrieved text is fenced
+    # off from it — untrusted content must be visibly data (Rule 6).
+    assert "<retrieved_context>" in instructions
+    assert "</retrieved_context>" in instructions
+    assert "invoices are billed monthly in arrears" in instructions
+    # The user prompt is unchanged; grounding rides on instructions only.
+    assert captured["prompt"] == "hello"
+
+    retrieval_steps = [s for s in repo.steps if s["step_type"] == "retrieval"]
+    assert len(retrieval_steps) == 1
+    payload = retrieval_steps[0]["payload"]
+    assert [c["chunk_id"] for c in payload["citations"]] == ["chunk-1"]
+    assert payload["error"] is None
+    # The retrieval step precedes any llm_call step — the trace reads in
+    # the order things actually happened.
+    step_types = [s["step_type"] for s in repo.steps]
+    assert step_types.index("retrieval") < step_types.index("llm_call")
+
+
+async def test_retrieval_is_scoped_to_the_runs_workspace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run, _ = _make_run_and_version()
+    repo = FakeRepo(run=run, version=_grounded_version(["kb-1"]))
+    directory = FakeDirectory([_identity("kb-1")])
+    search = FakeSearch([_chunk("chunk-1", "scoped content")])
+    monkeypatch.setattr(
+        agent_run_job.Runner,
+        "run_streamed",
+        lambda *a, **k: _FakeRunResultStreaming(events=[_message_event("ok")]),
+    )
+
+    job = Job(
+        job_id="j1", job_type="agent_run", payload={"run_id": RUN_ID}, attempt=0, max_attempts=3
+    )
+    await handle_agent_run_job(
+        job,
+        settings=Settings(database_url="x", openai_api_key="x"),
+        redis=FakeRedis(),
+        repo=repo,
+        **_deps(directory=directory, search=search),
+    )
+
+    # Asserted on the arguments both collaborators received, not on the
+    # rows they returned: a search that forgot the filter would still
+    # look correct against a fake that filters for it (Rule 11).
+    assert directory.calls[0]["workspace_id"] == WORKSPACE_ID
+    assert search.calls, "retrieval never reached the search port"
+    for call in search.calls:
+        assert call["workspace_id"] == WORKSPACE_ID
+        assert call["knowledge_base_ids"] == ["kb-1"]
+
+
+async def test_embedding_failure_degrades_the_run_instead_of_failing_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run, _ = _make_run_and_version()
+    repo = FakeRepo(run=run, version=_grounded_version(["kb-1"]))
+    directory = FakeDirectory([_identity("kb-1")])
+    embedder = FakeEmbedder(error=EmbeddingUnavailableError("provider down"))
+
+    captured: dict[str, Any] = {}
+
+    def _capture(agent, prompt, **kwargs):
+        captured["instructions"] = agent.instructions
+        return _FakeRunResultStreaming(events=[_message_event("answered anyway")])
+
+    monkeypatch.setattr(agent_run_job.Runner, "run_streamed", _capture)
+
+    job = Job(
+        job_id="j1", job_type="agent_run", payload={"run_id": RUN_ID}, attempt=0, max_attempts=3
+    )
+    result = await handle_agent_run_job(
+        job,
+        settings=Settings(database_url="x", openai_api_key="x"),
+        redis=FakeRedis(),
+        repo=repo,
+        **_deps(directory=directory, embedder=embedder),
+    )
+
+    # Degraded, not broken: the run still succeeds ungrounded...
+    assert result.output == {"run_id": RUN_ID, "status": "success"}
+    assert captured["instructions"] == "be helpful"
+    # ...but the failure is on the trace, not swallowed.
+    retrieval_step = next(s for s in repo.steps if s["step_type"] == "retrieval")
+    assert "provider down" in retrieval_step["payload"]["error"]
+    assert retrieval_step["payload"]["citations"] == []
+
+
+async def test_knowledge_bases_with_mismatched_embedding_identity_are_skipped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run, _ = _make_run_and_version()
+    repo = FakeRepo(run=run, version=_grounded_version(["kb-1", "kb-2"]))
+    directory = FakeDirectory(
+        [_identity("kb-1"), _identity("kb-2", model="text-embedding-3-large")]
+    )
+    search = FakeSearch([_chunk("chunk-1", "matching model content")])
+    monkeypatch.setattr(
+        agent_run_job.Runner,
+        "run_streamed",
+        lambda *a, **k: _FakeRunResultStreaming(events=[_message_event("ok")]),
+    )
+
+    job = Job(
+        job_id="j1", job_type="agent_run", payload={"run_id": RUN_ID}, attempt=0, max_attempts=3
+    )
+    await handle_agent_run_job(
+        job,
+        settings=Settings(database_url="x", openai_api_key="x"),
+        redis=FakeRedis(),
+        repo=repo,
+        **_deps(directory=directory, search=search),
+    )
+
+    # Mixing embedding versions in one similarity search degrades scores
+    # silently, so the mismatched KB is excluded — and named, so the user
+    # can see why their documents were ignored.
+    for call in search.calls:
+        assert call["knowledge_base_ids"] == ["kb-1"]
+    retrieval_step = next(s for s in repo.steps if s["step_type"] == "retrieval")
+    assert retrieval_step["payload"]["skipped_knowledge_base_ids"] == ["kb-2"]

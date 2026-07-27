@@ -5,9 +5,9 @@ import {
   ChartColumnBig,
   CreditCard,
   LayoutDashboard,
+  Library,
   Plug,
   Settings,
-  Sparkles,
   Users,
   Workflow,
 } from "lucide-react";
@@ -29,7 +29,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: (id) => `/dashboard/${id}`, icon: LayoutDashboard },
   { label: "Agents", href: (id) => `/dashboard/${id}/agents`, icon: Bot },
-  { label: "Knowledge", href: () => "#", icon: Sparkles, comingSoon: true },
+  { label: "Knowledge", href: (id) => `/dashboard/${id}/knowledge`, icon: Library },
   { label: "MCP", href: () => "#", icon: Plug, comingSoon: true },
   { label: "Workflows", href: () => "#", icon: Workflow, comingSoon: true },
   { label: "Analytics", href: () => "#", icon: ChartColumnBig, comingSoon: true },

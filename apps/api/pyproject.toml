@@ -14,6 +14,11 @@ dependencies = [
     "pyjwt[crypto]>=2.13,<3",
     "openai>=1.59,<2",
     "redis>=5.2,<6",
+    "pgvector>=0.4,<0.5",
+    # Required by the knowledge-base upload route: FastAPI raises at
+    # import time on a multipart endpoint without it, so this is a hard
+    # runtime dependency, not a test-only one.
+    "python-multipart>=0.0.20,<0.1",
     "agentverse-shared",
 ]
 
@@ -50,7 +55,13 @@ known-first-party = ["agentverse_api"]
 # FastAPI's dependency-injection pattern requires `Depends(...)` as an
 # argument default — that's the framework's documented usage, not the
 # mutable-default-argument bug B008 exists to catch.
-extend-immutable-calls = ["fastapi.Depends", "fastapi.Path", "fastapi.Query", "fastapi.Header"]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Path",
+    "fastapi.Query",
+    "fastapi.Header",
+    "fastapi.File",
+]
 
 [tool.ruff.lint.per-file-ignores]
 # Alembic-generated migrations: machine-generated, reviewed for
@@ -64,6 +75,14 @@ strict = true
 mypy_path = "src"
 explicit_package_bases = true
 plugins = ["pydantic.mypy"]
+
+# pgvector ships no py.typed marker (upstream gap, not our choice).
+# Scoped to this one third-party module rather than silenced with inline
+# ignores at each import site, so the untyped surface stays visible in
+# config instead of scattered through code.
+[[tool.mypy.overrides]]
+module = ["pgvector.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

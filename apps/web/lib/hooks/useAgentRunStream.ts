@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
-export type RunStepType = "run_started" | "llm_call" | "tool_call" | "run_completed" | "run_failed";
+export type RunStepType =
+  | "run_started"
+  | "retrieval"
+  | "llm_call"
+  | "tool_call"
+  | "run_completed"
+  | "run_failed";
 
 export interface RunStepEvent {
   type: RunStepType;

@@ -5,6 +5,28 @@ description = "Genuinely shared, service-agnostic utilities used by more than on
 requires-python = ">=3.12"
 dependencies = [
     "redis>=5.2,<6",
+    # Real tokenizer, needed identically by apps/worker (chunk sizing at
+    # ingestion) and apps/api (context-budget assembly at retrieval) —
+    # `rag-expert` forbids character-count approximation for budgeting.
+    "tiktoken>=0.13,<0.14",
+    # The shared embedding provider is the single adapter both services
+    # call (CLAUDE.md Rule 16); it is the only file here importing openai.
+    #
+    # Deliberately spans both majors: apps/api pins <2 (its Phase 2 chat
+    # adapter is tested against 1.x) while apps/worker pins >=2.45 (the
+    # Agents SDK requires it). A narrower range here would make one of the
+    # two services unresolvable. Only `embeddings.create` and the exception
+    # types are used, and both are API-stable across 1.x/2.x. Converging
+    # the two services onto one major is tracked separately — it is an
+    # apps/api adapter-retest task, not a Phase 5 change.
+    "openai>=1.59,<3",
+    # The `kb_chunks` similarity/FTS SQL is shared for the same reason the
+    # pipeline above it is: apps/api's search endpoint and apps/worker's
+    # run grounding must query identically, or the search UI would show a
+    # user results their agent never sees. Core only — no ORM models, no
+    # metadata ownership; the schema stays owned by apps/api's Alembic
+    # migrations (CLAUDE.md §8).
+    "sqlalchemy[asyncio]>=2.0.51,<3",
 ]
 
 [dependency-groups]
@@ -14,6 +36,7 @@ dev = [
     "pytest>=8.3,<9",
     "pytest-asyncio>=0.25,<0.26",
     "fakeredis>=2.26,<3",
+    "asyncpg>=0.31,<0.32",
 ]
 
 [build-system]
@@ -44,3 +67,6 @@ explicit_package_bases = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "integration: requires a real Postgres with pgvector (AGENTVERSE_SHARED_DATABASE_URL) — CLAUDE.md §11, never mocked",
+]
