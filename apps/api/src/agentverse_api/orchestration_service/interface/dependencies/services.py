@@ -32,6 +32,7 @@ from agentverse_api.orchestration_service.domain.ports.knowledge_repository impo
 )
 from agentverse_api.orchestration_service.domain.ports.provider_adapter import ProviderAdapter
 from agentverse_api.orchestration_service.domain.ports.run_repository import AgentRunRepository
+from agentverse_api.orchestration_service.domain.ports.team_repository import TeamRepository
 from agentverse_api.orchestration_service.infrastructure.knowledge_repository import (
     SqlKnowledgeRepository,
 )
@@ -44,6 +45,9 @@ from agentverse_api.orchestration_service.infrastructure.queue.job_queue_produce
 from agentverse_api.orchestration_service.infrastructure.repositories import (
     SqlAgentRepository,
     SqlAgentRunRepository,
+)
+from agentverse_api.orchestration_service.infrastructure.team_repository import (
+    SqlTeamRepository,
 )
 
 
@@ -103,6 +107,10 @@ def get_agent_run_repository(
     session: AsyncSession = Depends(get_db_session),
 ) -> AgentRunRepository:
     return SqlAgentRunRepository(session)
+
+
+def get_team_repository(session: AsyncSession = Depends(get_db_session)) -> TeamRepository:
+    return SqlTeamRepository(session)
 
 
 def get_knowledge_repository(

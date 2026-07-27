@@ -8,6 +8,10 @@ const VALID = {
   temperature: 0.7,
   max_output_tokens: 1000,
   tools: ["calculator"],
+  // Required by the schema since Phase 5 attached knowledge bases to a
+  // version. Omitting it made every "accepts a valid config" case fail
+  // on a missing field rather than on what it was testing.
+  knowledge_base_ids: [],
 };
 
 describe("agentConfigSchema", () => {

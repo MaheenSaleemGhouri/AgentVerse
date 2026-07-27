@@ -17,6 +17,9 @@ import {
   createAgent as createAgentApi,
   createAgentVersion as createAgentVersionApi,
   deleteAgent as deleteAgentApi,
+  getAgent as getAgentApi,
+  getLatestVersion as getLatestVersionApi,
+  listAgents as listAgentsApi,
   publishAgent as publishAgentApi,
   type Run,
   runAgent as runAgentApi,
@@ -26,6 +29,7 @@ import {
   createKnowledgeBase as createKnowledgeBaseApi,
   deleteDocument as deleteDocumentApi,
   deleteKnowledgeBase as deleteKnowledgeBaseApi,
+  getKnowledgeBase as getKnowledgeBaseApi,
   type KbDocument,
   type KnowledgeBase,
   listDocuments as listDocumentsApi,
@@ -35,10 +39,47 @@ import {
   searchKnowledgeBase as searchKnowledgeBaseApi,
 } from "@/lib/api/knowledge";
 import {
+  type AddMemberRequest,
+  addTeamMember as addTeamMemberApi,
+  type Communication,
+  createTeam as createTeamApi,
+  type CreateTeamInput,
+  deleteTeam as deleteTeamApi,
+  duplicateTeam as duplicateTeamApi,
+  type ExecutionEvent,
+  executeTeam as executeTeamApi,
+  getTeam as getTeamApi,
+  getTeamAnalytics as getTeamAnalyticsApi,
+  getTeamSession as getTeamSessionApi,
+  type Handoff,
+  listSessionCommunications as listSessionCommunicationsApi,
+  listSessionEvents as listSessionEventsApi,
+  listSessionHandoffs as listSessionHandoffsApi,
+  listTeams as listTeamsApi,
+  listTeamSessions as listTeamSessionsApi,
+  removeTeamMember as removeTeamMemberApi,
+  reorderTeamMembers as reorderTeamMembersApi,
+  type Team,
+  type TeamAnalytics,
+  type TeamMember,
+  type TeamSession,
+  type TeamSessionPage,
+  updateTeam as updateTeamApi,
+  type UpdateTeamRequest,
+} from "@/lib/api/teams";
+import {
+  type ApiKey,
   changeMemberRole as changeMemberRoleApi,
   createWorkspace as createWorkspaceApi,
   inviteMember as inviteMemberApi,
+  issueApiKey as issueApiKeyApi,
+  type IssuedApiKey,
+  listApiKeys as listApiKeysApi,
+  listMembers as listMembersApi,
+  listMyWorkspaces as listMyWorkspacesApi,
+  type Member,
   removeMember as removeMemberApi,
+  revokeApiKey as revokeApiKeyApi,
   type Role,
   type Workspace,
 } from "@/lib/api/workspaces";
@@ -158,4 +199,172 @@ export async function searchKnowledgeBaseAction(
   query: string
 ): Promise<SearchResponse> {
   return searchKnowledgeBaseApi(workspaceId, knowledgeBaseId, query);
+}
+
+/* -------------------------------------------------------------------------
+ * Read actions
+ *
+ * Server Components fetch directly via `lib/api/*`; these exist for the
+ * Client Components that drive TanStack Query hooks, which cannot import
+ * the `server-only` client. Same functions, same auth path — this file
+ * is a transport bridge, never a second data layer.
+ * ---------------------------------------------------------------------- */
+
+export async function listAgentsAction(workspaceId: string): Promise<Agent[]> {
+  return listAgentsApi(workspaceId);
+}
+
+export async function getAgentAction(workspaceId: string, agentId: string): Promise<Agent> {
+  return getAgentApi(workspaceId, agentId);
+}
+
+export async function getLatestVersionAction(
+  workspaceId: string,
+  agentId: string
+): Promise<AgentVersion | null> {
+  return getLatestVersionApi(workspaceId, agentId);
+}
+
+export async function getKnowledgeBaseAction(
+  workspaceId: string,
+  knowledgeBaseId: string
+): Promise<KnowledgeBase> {
+  return getKnowledgeBaseApi(workspaceId, knowledgeBaseId);
+}
+
+export async function listMembersAction(workspaceId: string): Promise<Member[]> {
+  return listMembersApi(workspaceId);
+}
+
+export async function listApiKeysAction(workspaceId: string): Promise<ApiKey[]> {
+  return listApiKeysApi(workspaceId);
+}
+
+export async function issueApiKeyAction(
+  workspaceId: string,
+  name: string
+): Promise<IssuedApiKey> {
+  return issueApiKeyApi(workspaceId, name);
+}
+
+export async function revokeApiKeyAction(workspaceId: string, apiKeyId: string): Promise<void> {
+  await revokeApiKeyApi(workspaceId, apiKeyId);
+}
+
+export async function listMyWorkspacesAction(): Promise<Workspace[]> {
+  return listMyWorkspacesApi();
+}
+
+// --- AI teams (multi-agent orchestration) --------------------------------
+// Distinct from the workspace-member actions above: those manage humans
+// and RBAC, these manage teams of agents. Same file because the Server
+// Action bridge is a transport concern, not a domain boundary.
+
+export async function listTeamsAction(workspaceId: string): Promise<Team[]> {
+  return listTeamsApi(workspaceId);
+}
+
+export async function getTeamAction(workspaceId: string, teamId: string): Promise<Team> {
+  return getTeamApi(workspaceId, teamId);
+}
+
+export async function createTeamAction(
+  workspaceId: string,
+  body: CreateTeamInput
+): Promise<Team> {
+  return createTeamApi(workspaceId, body);
+}
+
+export async function updateTeamAction(
+  workspaceId: string,
+  teamId: string,
+  body: UpdateTeamRequest
+): Promise<Team> {
+  return updateTeamApi(workspaceId, teamId, body);
+}
+
+export async function duplicateTeamAction(workspaceId: string, teamId: string): Promise<Team> {
+  return duplicateTeamApi(workspaceId, teamId);
+}
+
+export async function deleteTeamAction(workspaceId: string, teamId: string): Promise<void> {
+  return deleteTeamApi(workspaceId, teamId);
+}
+
+export async function addTeamMemberAction(
+  workspaceId: string,
+  teamId: string,
+  body: AddMemberRequest
+): Promise<TeamMember> {
+  return addTeamMemberApi(workspaceId, teamId, body);
+}
+
+export async function removeTeamMemberAction(
+  workspaceId: string,
+  teamId: string,
+  memberId: string
+): Promise<void> {
+  return removeTeamMemberApi(workspaceId, teamId, memberId);
+}
+
+export async function reorderTeamMembersAction(
+  workspaceId: string,
+  teamId: string,
+  memberIds: string[]
+): Promise<Team> {
+  return reorderTeamMembersApi(workspaceId, teamId, memberIds);
+}
+
+export async function executeTeamAction(
+  workspaceId: string,
+  teamId: string,
+  prompt: string
+): Promise<TeamSession> {
+  return executeTeamApi(workspaceId, teamId, prompt);
+}
+
+export async function listTeamSessionsAction(
+  workspaceId: string,
+  teamId: string
+): Promise<TeamSessionPage> {
+  return listTeamSessionsApi(workspaceId, teamId);
+}
+
+export async function getTeamSessionAction(
+  workspaceId: string,
+  teamId: string,
+  sessionId: string
+): Promise<TeamSession> {
+  return getTeamSessionApi(workspaceId, teamId, sessionId);
+}
+
+export async function listSessionEventsAction(
+  workspaceId: string,
+  teamId: string,
+  sessionId: string
+): Promise<ExecutionEvent[]> {
+  return listSessionEventsApi(workspaceId, teamId, sessionId);
+}
+
+export async function listSessionHandoffsAction(
+  workspaceId: string,
+  teamId: string,
+  sessionId: string
+): Promise<Handoff[]> {
+  return listSessionHandoffsApi(workspaceId, teamId, sessionId);
+}
+
+export async function listSessionCommunicationsAction(
+  workspaceId: string,
+  teamId: string,
+  sessionId: string
+): Promise<Communication[]> {
+  return listSessionCommunicationsApi(workspaceId, teamId, sessionId);
+}
+
+export async function getTeamAnalyticsAction(
+  workspaceId: string,
+  teamId: string
+): Promise<TeamAnalytics> {
+  return getTeamAnalyticsApi(workspaceId, teamId);
 }

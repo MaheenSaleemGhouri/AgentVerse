@@ -1,10 +1,20 @@
-import { Sidebar } from "@/components/dashboard/sidebar";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+
+import { listMyWorkspaces } from "@/lib/api/workspaces";
+import { auth } from "@/lib/auth";
+
+import { Sidebar } from "@/components/shell/sidebar";
+import { Topbar } from "@/components/shell/topbar";
 
 /**
- * Adds the AVDS fixed sidebar once a workspace is selected — the
- * top-level `/dashboard` (workspace picker, no `workspaceId` yet) stays
- * outside this layout and keeps the plain shell from the parent
- * `(dashboard)/layout.tsx`.
+ * The workspace shell — topbar + fixed AVDS sidebar around every
+ * workspace-scoped route.
+ *
+ * Both the session and the workspace list are fetched server-side and
+ * passed down as props (CLAUDE.md §6: initial data is server-fetched),
+ * so the shell renders complete on first paint rather than flashing an
+ * empty switcher while a client request resolves.
  */
 export default async function WorkspaceShellLayout({
   children,
@@ -14,11 +24,35 @@ export default async function WorkspaceShellLayout({
   params: Promise<{ workspaceId: string }>;
 }): Promise<React.JSX.Element> {
   const { workspaceId } = await params;
+  const session = await auth.api.getSession({ headers: await headers() });
+
+  if (!session) {
+    redirect("/login");
+  }
+
+  const workspaces = await listMyWorkspaces();
+
+  // A workspace id the caller is not a member of must not render a shell
+  // that implies it exists — every child fetch would 404 anyway, and
+  // showing the chrome first would confirm it by inference (Rule 11).
+  if (!workspaces.some((workspace) => workspace.id === workspaceId)) {
+    redirect("/dashboard");
+  }
 
   return (
-    <div className="flex flex-1 gap-6">
-      <Sidebar workspaceId={workspaceId} />
-      <div className="flex-1 py-2">{children}</div>
+    <div className="flex min-h-screen flex-col">
+      <Topbar
+        workspaces={workspaces}
+        activeWorkspaceId={workspaceId}
+        userEmail={session.user.email}
+        userName={session.user.name}
+      />
+      <div className="flex flex-1">
+        <Sidebar workspaceId={workspaceId} />
+        <main className="min-w-0 flex-1 px-6 py-6 lg:px-8">
+          <div className="mx-auto w-full max-w-7xl">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }

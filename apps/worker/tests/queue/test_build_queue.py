@@ -37,12 +37,13 @@ async def test_build_queue_dead_letters_forced_failure(fake_redis: FakeRedis) ->
 
 
 async def test_build_queue_registers_every_job_type(fake_redis: FakeRedis) -> None:
-    """Structural check only — actually invoking the `agent_run` or
-    `kb_ingest` handlers needs a live Postgres connection
-    (`get_session()`), which isn't exercised here. Each handler's own
-    logic is covered directly, injected with fakes, in
-    `tests/agents/test_agent_run_job.py` and
-    `tests/knowledge/test_kb_ingest_job.py`.
+    """Structural check only — actually invoking the `agent_run`,
+    `kb_ingest`, or `team_session` handlers needs a live Postgres
+    connection (`get_session()`), which isn't exercised here. Each
+    handler's own logic is covered directly, injected with fakes, in
+    `tests/agents/test_agent_run_job.py`,
+    `tests/knowledge/test_kb_ingest_job.py`, and
+    `tests/teams/test_team_session_job.py`.
 
     Asserting the exact set (not just membership) is deliberate: a job
     type added to the enqueue side but never registered here would
@@ -51,4 +52,4 @@ async def test_build_queue_registers_every_job_type(fake_redis: FakeRedis) -> No
     settings = Settings()
     queue = build_queue(fake_redis, settings)
 
-    assert set(queue._handlers.keys()) == {"echo", "agent_run", "kb_ingest"}  # noqa: SLF001
+    assert set(queue._handlers.keys()) == {"echo", "agent_run", "kb_ingest", "team_session"}  # noqa: SLF001

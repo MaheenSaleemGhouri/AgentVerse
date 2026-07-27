@@ -66,3 +66,10 @@ export async function issueApiKey(workspaceId: string, name: string): Promise<Is
 export async function listApiKeys(workspaceId: string): Promise<ApiKey[]> {
   return apiFetch<ApiKey[]>(`/api/v1/workspaces/${workspaceId}/api-keys`);
 }
+
+export async function revokeApiKey(workspaceId: string, apiKeyId: string): Promise<void> {
+  await apiFetch<void>(`/api/v1/workspaces/${workspaceId}/api-keys/${apiKeyId}`, {
+    method: "DELETE",
+    skipJson: true,
+  });
+}

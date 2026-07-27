@@ -1,9 +1,8 @@
-import { Bot } from "lucide-react";
-
 import { listAgents } from "@/lib/api/agents";
 
-import { AgentCard } from "@/components/agents/agent-card";
+import { AgentsGrid } from "@/components/agents/agents-grid";
 import { CreateAgentDialog } from "@/components/agents/create-agent-dialog";
+import { PageHeader } from "@/components/patterns/page-header";
 
 export default async function AgentsPage({
   params,
@@ -11,40 +10,23 @@ export default async function AgentsPage({
   params: Promise<{ workspaceId: string }>;
 }): Promise<React.JSX.Element> {
   const { workspaceId } = await params;
+  // Server-fetched for first paint; `AgentsGrid` seeds the TanStack
+  // Query cache with it so client-side filtering and post-mutation
+  // refetches take over without a loading flash (CLAUDE.md §6).
   const agents = await listAgents(workspaceId);
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Agents</h1>
-          <p className="text-sm text-muted-foreground">
-            Build a single agent with tools, then run it and watch it work.
-          </p>
-        </div>
-        <CreateAgentDialog workspaceId={workspaceId} />
-      </div>
-
-      {agents.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-16 text-center">
-          <span className="flex size-12 items-center justify-center rounded-full bg-accent text-accent-foreground">
-            <Bot className="size-6" />
-          </span>
-          <div>
-            <p className="font-medium">No agents yet</p>
-            <p className="text-sm text-muted-foreground">
-              Create your first agent to reach a working run in minutes.
-            </p>
-          </div>
-          <CreateAgentDialog workspaceId={workspaceId} />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {agents.map((agent) => (
-            <AgentCard key={agent.id} workspaceId={workspaceId} agent={agent} />
-          ))}
-        </div>
-      )}
+      <PageHeader
+        title="Agents"
+        description="Configure instructions, model, tools, and knowledge — then publish and run."
+        actions={<CreateAgentDialog workspaceId={workspaceId} />}
+      />
+      <AgentsGrid workspaceId={workspaceId} initialAgents={agents} />
     </div>
   );
 }
+
+export const metadata = {
+  title: "Agents · AgentVerse",
+};

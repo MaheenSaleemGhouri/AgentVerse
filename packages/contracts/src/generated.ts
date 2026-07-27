@@ -354,6 +354,261 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Teams Route */
+        get: operations["list_teams_route_api_v1_workspaces__workspace_id__teams_get"];
+        put?: never;
+        /** Create Team Route */
+        post: operations["create_team_route_api_v1_workspaces__workspace_id__teams_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/teams/{team_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Team Route */
+        get: operations["get_team_route_api_v1_workspaces__workspace_id__teams__team_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Team Route
+         * @description Admin-only and soft — a team's session history has to stay
+         *     resolvable so completed runs still render after the team is gone.
+         */
+        delete: operations["delete_team_route_api_v1_workspaces__workspace_id__teams__team_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Team Route */
+        patch: operations["update_team_route_api_v1_workspaces__workspace_id__teams__team_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/teams/{team_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Duplicate Team Route
+         * @description Copies a team's configuration and seats, not its history.
+         *
+         *     Sessions, handoffs, and memory belong to the original run and would
+         *     be false if attributed to a new team. Members are copied as seats
+         *     pointing at the same agents — the agents themselves are never
+         *     duplicated, since a team composes agents rather than owning them.
+         */
+        post: operations["duplicate_team_route_api_v1_workspaces__workspace_id__teams__team_id__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/teams/{team_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Member Route */
+        post: operations["add_member_route_api_v1_workspaces__workspace_id__teams__team_id__members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/teams/{team_id}/members/{member_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Member Route */
+        delete: operations["remove_member_route_api_v1_workspaces__workspace_id__teams__team_id__members__member_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/teams/{team_id}/members/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reorder Members Route
+         * @description Drag-and-drop ordering.
+         *
+         *     The submitted list must name exactly the team's current members: a
+         *     partial list would leave the omitted ones at stale positions, which
+         *     for a `sequential` team silently changes what runs when.
+         */
+        put: operations["reorder_members_route_api_v1_workspaces__workspace_id__teams__team_id__members_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/teams/{team_id}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sessions Route */
+        get: operations["list_sessions_route_api_v1_workspaces__workspace_id__teams__team_id__sessions_get"];
+        put?: never;
+        /**
+         * Execute Team Route
+         * @description `202 Accepted` with a session id — execution is a worker job, never
+         *     inline in the request (Rule 14).
+         */
+        post: operations["execute_team_route_api_v1_workspaces__workspace_id__teams__team_id__sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/teams/{team_id}/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Session Route */
+        get: operations["get_session_route_api_v1_workspaces__workspace_id__teams__team_id__sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/teams/{team_id}/sessions/{session_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Events Route
+         * @description The durable trace behind the Runtime Monitor.
+         *
+         *     Paged by `after_sequence` rather than by offset: the client already
+         *     knows the last sequence it rendered, and a trace stream growing
+         *     underneath an offset would skip or repeat rows.
+         */
+        get: operations["list_events_route_api_v1_workspaces__workspace_id__teams__team_id__sessions__session_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/teams/{team_id}/sessions/{session_id}/handoffs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Handoffs Route */
+        get: operations["list_handoffs_route_api_v1_workspaces__workspace_id__teams__team_id__sessions__session_id__handoffs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/teams/{team_id}/sessions/{session_id}/communications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Communications Route */
+        get: operations["list_communications_route_api_v1_workspaces__workspace_id__teams__team_id__sessions__session_id__communications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/teams/{team_id}/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Team Analytics Route */
+        get: operations["team_analytics_route_api_v1_workspaces__workspace_id__teams__team_id__analytics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/teams/{team_id}/sessions/{session_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream Team Session */
+        get: operations["stream_team_session_api_v1_workspaces__workspace_id__teams__team_id__sessions__session_id__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/api-keys": {
         parameters: {
             query?: never;
@@ -444,6 +699,28 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AddMemberRequest */
+        AddMemberRequest: {
+            /** Agent Id */
+            agent_id: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "supervisor" | "planner" | "executor" | "critic" | "researcher" | "coder" | "writer" | "worker" | "aggregator";
+            /**
+             * Position
+             * @default 0
+             */
+            position: number;
+            /** Handoff Description */
+            handoff_description?: string | null;
+            /**
+             * Can Receive Handoff
+             * @default true
+             */
+            can_receive_handoff: boolean;
+        };
         /** AgentResponse */
         AgentResponse: {
             /** Id */
@@ -536,6 +813,33 @@ export interface components {
             /** Chunk Index */
             chunk_index: number;
         };
+        /** CommunicationResponse */
+        CommunicationResponse: {
+            /** Id */
+            id: string;
+            /** Session Id */
+            session_id: string;
+            /** From Agent Id */
+            from_agent_id: string | null;
+            /** To Agent Id */
+            to_agent_id: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "task_request" | "task_result" | "context_share" | "intermediate_result" | "error_report";
+            /** Content */
+            content: {
+                [key: string]: unknown;
+            };
+            /** Sequence */
+            sequence: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** CreateAgentRequest */
         CreateAgentRequest: {
             /** Name */
@@ -567,15 +871,107 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** CreateTeamRequest */
+        CreateTeamRequest: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Topology
+             * @enum {string}
+             */
+            topology: "supervisor_worker" | "planner_executor_critic" | "sequential" | "parallel";
+            /** Objective */
+            objective?: string | null;
+            /**
+             * Max Turns
+             * @default 20
+             */
+            max_turns: number;
+            /**
+             * Max Cost Micro Usd
+             * @default 1000000
+             */
+            max_cost_micro_usd: number;
+            /**
+             * Timeout Seconds
+             * @default 300
+             */
+            timeout_seconds: number;
+            /**
+             * Shared Memory Enabled
+             * @default true
+             */
+            shared_memory_enabled: boolean;
+            /** Shared Knowledge Base Ids */
+            shared_knowledge_base_ids?: string[];
+        };
         /** CreateWorkspaceRequest */
         CreateWorkspaceRequest: {
             /** Name */
             name: string;
         };
+        /** ExecuteTeamRequest */
+        ExecuteTeamRequest: {
+            /** Prompt */
+            prompt: string;
+        };
+        /** ExecutionEventResponse */
+        ExecutionEventResponse: {
+            /** Id */
+            id: string;
+            /** Type */
+            type: string;
+            /** Sequence */
+            sequence: number;
+            /** Agent Id */
+            agent_id: string | null;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Cost Micro Usd */
+            cost_micro_usd: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HandoffResponse */
+        HandoffResponse: {
+            /** Id */
+            id: string;
+            /** Session Id */
+            session_id: string;
+            /** From Agent Id */
+            from_agent_id: string | null;
+            /** To Agent Id */
+            to_agent_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "automatic" | "manual" | "conditional" | "parallel";
+            /** Contract */
+            contract: {
+                [key: string]: unknown;
+            };
+            /** Reason */
+            reason: string | null;
+            /** Sequence */
+            sequence: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** HealthResponse */
         HealthResponse: {
@@ -732,6 +1128,18 @@ export interface components {
             user_id: string;
         };
         /**
+         * ReorderMembersRequest
+         * @description Drag-and-drop ordering, applied as one write.
+         *
+         *     The full ordered list, not a delta: a delta would need the client and
+         *     server to agree on a starting state, and for a `sequential` team a
+         *     disagreement changes execution order rather than just the display.
+         */
+        ReorderMembersRequest: {
+            /** Member Ids */
+            member_ids: string[];
+        };
+        /**
          * Role
          * @enum {string}
          */
@@ -805,6 +1213,136 @@ export interface components {
             /** Dropped Chunk Count */
             dropped_chunk_count: number;
         };
+        /** TeamAnalyticsResponse */
+        TeamAnalyticsResponse: {
+            /** Total Sessions */
+            total_sessions: number;
+            /** Succeeded Sessions */
+            succeeded_sessions: number;
+            /** Failed Sessions */
+            failed_sessions: number;
+            /** Total Cost Micro Usd */
+            total_cost_micro_usd: number;
+            /** Average Cost Micro Usd */
+            average_cost_micro_usd: number;
+            /** Total Turns */
+            total_turns: number;
+            /** Total Handoffs */
+            total_handoffs: number;
+        };
+        /** TeamMemberResponse */
+        TeamMemberResponse: {
+            /** Id */
+            id: string;
+            /** Team Id */
+            team_id: string;
+            /** Agent Id */
+            agent_id: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "supervisor" | "planner" | "executor" | "critic" | "researcher" | "coder" | "writer" | "worker" | "aggregator";
+            /** Position */
+            position: number;
+            /** Handoff Description */
+            handoff_description: string | null;
+            /** Can Receive Handoff */
+            can_receive_handoff: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** TeamResponse */
+        TeamResponse: {
+            /** Id */
+            id: string;
+            /** Workspace Id */
+            workspace_id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /**
+             * Topology
+             * @enum {string}
+             */
+            topology: "supervisor_worker" | "planner_executor_critic" | "sequential" | "parallel";
+            /** Objective */
+            objective: string | null;
+            /** Max Turns */
+            max_turns: number;
+            /** Max Cost Micro Usd */
+            max_cost_micro_usd: number;
+            /** Timeout Seconds */
+            timeout_seconds: number;
+            /** Shared Memory Enabled */
+            shared_memory_enabled: boolean;
+            /** Shared Knowledge Base Ids */
+            shared_knowledge_base_ids: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Members */
+            members: components["schemas"]["TeamMemberResponse"][];
+        };
+        /**
+         * TeamSessionPage
+         * @description Cursor-paginated, matching the shape every other append-mostly
+         *     collection uses (CLAUDE.md §7).
+         */
+        TeamSessionPage: {
+            /** Data */
+            data: components["schemas"]["TeamSessionResponse"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Has More */
+            has_more: boolean;
+        };
+        /** TeamSessionResponse */
+        TeamSessionResponse: {
+            /** Id */
+            id: string;
+            /** Workspace Id */
+            workspace_id: string;
+            /** Team Id */
+            team_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "success" | "error" | "cancelled";
+            /** Input */
+            input: {
+                [key: string]: unknown;
+            };
+            /** Output */
+            output: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Cost Micro Usd */
+            cost_micro_usd: number | null;
+            /** Total Turns */
+            total_turns: number;
+            /** Started At */
+            started_at: string | null;
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** UpdateAgentVersionRequest */
         UpdateAgentVersionRequest: {
             /** Model */
@@ -819,6 +1357,34 @@ export interface components {
             tools?: string[];
             /** Knowledge Base Ids */
             knowledge_base_ids?: string[];
+        };
+        /**
+         * UpdateTeamRequest
+         * @description Every field optional — an omitted field is left unchanged.
+         *
+         *     `None` is a legitimate value for `description` and `objective`
+         *     (clearing them), so "omitted" and "set to null" are distinguished by
+         *     presence in the request body, not by the value being null.
+         */
+        UpdateTeamRequest: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Topology */
+            topology?: ("supervisor_worker" | "planner_executor_critic" | "sequential" | "parallel") | null;
+            /** Objective */
+            objective?: string | null;
+            /** Max Turns */
+            max_turns?: number | null;
+            /** Max Cost Micro Usd */
+            max_cost_micro_usd?: number | null;
+            /** Timeout Seconds */
+            timeout_seconds?: number | null;
+            /** Shared Memory Enabled */
+            shared_memory_enabled?: boolean | null;
+            /** Shared Knowledge Base Ids */
+            shared_knowledge_base_ids?: string[] | null;
         };
         /**
          * UploadDocumentResponse
@@ -1688,6 +2254,578 @@ export interface operations {
             path: {
                 agent_id: string;
                 run_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_teams_route_api_v1_workspaces__workspace_id__teams_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_team_route_api_v1_workspaces__workspace_id__teams_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTeamRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_team_route_api_v1_workspaces__workspace_id__teams__team_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_team_route_api_v1_workspaces__workspace_id__teams__team_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_team_route_api_v1_workspaces__workspace_id__teams__team_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTeamRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicate_team_route_api_v1_workspaces__workspace_id__teams__team_id__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_member_route_api_v1_workspaces__workspace_id__teams__team_id__members_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddMemberRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamMemberResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_member_route_api_v1_workspaces__workspace_id__teams__team_id__members__member_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                member_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_members_route_api_v1_workspaces__workspace_id__teams__team_id__members_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderMembersRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_route_api_v1_workspaces__workspace_id__teams__team_id__sessions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                team_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamSessionPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    execute_team_route_api_v1_workspaces__workspace_id__teams__team_id__sessions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                team_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExecuteTeamRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamSessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_route_api_v1_workspaces__workspace_id__teams__team_id__sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                session_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamSessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_events_route_api_v1_workspaces__workspace_id__teams__team_id__sessions__session_id__events_get: {
+        parameters: {
+            query?: {
+                after_sequence?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                team_id: string;
+                session_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExecutionEventResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_handoffs_route_api_v1_workspaces__workspace_id__teams__team_id__sessions__session_id__handoffs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                session_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_communications_route_api_v1_workspaces__workspace_id__teams__team_id__sessions__session_id__communications_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                session_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    team_analytics_route_api_v1_workspaces__workspace_id__teams__team_id__analytics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamAnalyticsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_team_session_api_v1_workspaces__workspace_id__teams__team_id__sessions__session_id__stream_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                session_id: string;
                 workspace_id: string;
             };
             cookie?: never;

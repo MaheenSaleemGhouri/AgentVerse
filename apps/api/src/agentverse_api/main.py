@@ -26,6 +26,12 @@ from agentverse_api.orchestration_service.interface.routers.knowledge import (
 from agentverse_api.orchestration_service.interface.routers.run_stream import (
     router as run_stream_router,
 )
+from agentverse_api.orchestration_service.interface.routers.team_session_stream import (
+    router as team_session_stream_router,
+)
+from agentverse_api.orchestration_service.interface.routers.teams import (
+    router as teams_router,
+)
 
 
 def create_app() -> FastAPI:
@@ -43,6 +49,8 @@ def create_app() -> FastAPI:
     app.include_router(agents_router)
     app.include_router(knowledge_router)
     app.include_router(run_stream_router)
+    app.include_router(teams_router)
+    app.include_router(team_session_stream_router)
     app.include_router(api_keys_router)
     app.include_router(internal_auth_events_router)
     app.include_router(internal_provider_test_router)

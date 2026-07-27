@@ -15,14 +15,16 @@ from redis.asyncio import Redis
 
 from agentverse_worker.agents.repository import WorkerAgentRepository
 from agentverse_worker.infrastructure.config import Settings
-from agentverse_worker.infrastructure.db import get_session
+from agentverse_worker.infrastructure.db import get_session, get_session_factory
 from agentverse_worker.jobs.agent_run_job import handle_agent_run_job
 from agentverse_worker.jobs.echo_job import handle_echo_job
 from agentverse_worker.jobs.kb_ingest_job import handle_kb_ingest_job
+from agentverse_worker.jobs.team_session_job import handle_team_session_job
 from agentverse_worker.knowledge.directory import WorkerKnowledgeBaseDirectory
 from agentverse_worker.knowledge.repository import WorkerKnowledgeRepository
 from agentverse_worker.queue.models import Job, JobHandler, JobResult
 from agentverse_worker.queue.redis_stream_queue import RedisStreamQueue
+from agentverse_worker.teams.repository import WorkerTeamRepository
 
 
 def build_queue(redis_client: Redis, settings: Settings) -> RedisStreamQueue:
@@ -68,10 +70,26 @@ def build_queue(redis_client: Redis, settings: Settings) -> RedisStreamQueue:
                 job, repo=repo, store=store, embedder=embedder, counter=counter
             )
 
+    async def _team_session_handler(job: Job) -> JobResult:
+        # Two distinct session lifetimes here, and the distinction
+        # matters: the outer one is the job's own unit of work (status
+        # transitions, trace writes), while `get_session_factory()` is
+        # handed down so shared memory and the SDK `Session` can open
+        # their own short transactions per call — neither may hold a
+        # connection open across an LLM call (CLAUDE.md §7).
+        async with get_session() as session:
+            return await handle_team_session_job(
+                job,
+                redis=redis_client,
+                repo=WorkerTeamRepository(session),
+                session_factory=get_session_factory(),
+            )
+
     handlers: dict[str, JobHandler] = {
         "echo": handle_echo_job,
         "agent_run": _agent_run_handler,
         "kb_ingest": _kb_ingest_handler,
+        "team_session": _team_session_handler,
     }
 
     return RedisStreamQueue(

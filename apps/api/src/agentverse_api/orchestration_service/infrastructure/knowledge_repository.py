@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
 
-from sqlalchemy import Result, select, update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agentverse_api.infrastructure.sql_result import affected
 from agentverse_api.orchestration_service.domain.knowledge_entities import (
     DocumentStatus,
     KbDocument,
@@ -24,19 +24,6 @@ from agentverse_api.orchestration_service.infrastructure.models import (
     KbDocumentModel,
     KnowledgeBaseModel,
 )
-
-
-def _affected(result: Result[Any]) -> bool:
-    """Whether an UPDATE matched a row.
-
-    `rowcount` is a `CursorResult` attribute while `execute()` is typed
-    as returning the broader `Result`. Narrowed once here rather than
-    with an inline ignore at each of the three call sites — and the
-    answer matters: it is what distinguishes "deleted" from "no such
-    row in this workspace", i.e. 204 from 404.
-    """
-    rowcount = getattr(result, "rowcount", None)
-    return isinstance(rowcount, int) and rowcount > 0
 
 
 def _to_kb(row: KnowledgeBaseModel) -> KnowledgeBase:
@@ -153,7 +140,7 @@ class SqlKnowledgeRepository:
             .values(deleted_at=now, updated_at=now)
         )
         await self._session.commit()
-        return _affected(result)
+        return affected(result)
 
     async def create_document(
         self,
@@ -225,7 +212,7 @@ class SqlKnowledgeRepository:
             .values(deleted_at=now, updated_at=now)
         )
         await self._session.commit()
-        return _affected(result)
+        return affected(result)
 
     async def reset_document_for_reindex(self, *, workspace_id: str, document_id: str) -> bool:
         now = datetime.now(UTC)
@@ -247,4 +234,4 @@ class SqlKnowledgeRepository:
             )
         )
         await self._session.commit()
-        return _affected(result)
+        return affected(result)

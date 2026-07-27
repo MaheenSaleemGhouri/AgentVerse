@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { ApiError } from "@/lib/api/client";
 import { getAgent, getLatestVersion } from "@/lib/api/agents";
+import { listKnowledgeBases } from "@/lib/api/knowledge";
 
 import { AgentBuilder } from "@/components/agents/agent-builder";
 
@@ -30,5 +31,16 @@ export default async function AgentBuilderPage({
     notFound();
   }
 
-  return <AgentBuilder workspaceId={workspaceId} agent={agent} version={version} />;
+  // Fetched here rather than inside the canvas so the attached-knowledge
+  // node renders complete on first paint instead of popping in.
+  const knowledgeBases = await listKnowledgeBases(workspaceId);
+
+  return (
+    <AgentBuilder
+      workspaceId={workspaceId}
+      agent={agent}
+      version={version}
+      knowledgeBases={knowledgeBases}
+    />
+  );
 }

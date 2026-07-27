@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 /**
  * The one client-side composition root for cross-cutting providers
@@ -17,13 +18,31 @@ import { Toaster } from "@/components/ui/sonner";
  * per mount in the browser.
  */
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            // Server-originated data gets an explicit staleTime rather
+            // than the default 0 (CLAUDE.md §6) — without it every
+            // remount refetches, which on a dashboard of several panels
+            // is a burst of redundant requests. Per-hook staleTime
+            // overrides this where the data is more volatile.
+            staleTime: 30_000,
+            retry: 1,
+            refetchOnWindowFocus: false,
+          },
+        },
+      })
+  );
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>
-        {children}
-        <Toaster />
+        <TooltipProvider>
+          {children}
+          <Toaster />
+        </TooltipProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );
