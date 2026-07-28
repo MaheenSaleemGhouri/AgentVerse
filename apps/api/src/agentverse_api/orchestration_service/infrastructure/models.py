@@ -13,13 +13,31 @@ from datetime import datetime
 from typing import Any
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, ForeignKey, Identity, Integer, Text, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    ForeignKey,
+    Identity,
+    Integer,
+    LargeBinary,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from agentverse_api.infrastructure.orm_base import Base
 from agentverse_api.orchestration_service.domain.agent_entities import AgentStatus
+from agentverse_api.orchestration_service.domain.integration_entities import (
+    AuthScheme,
+    HealthStatus,
+    InstallStatus,
+    McpAvailability,
+    McpTransport,
+    PermissionLevel,
+    ToolCallStatus,
+)
 from agentverse_api.orchestration_service.domain.knowledge_entities import (
     DEFAULT_EMBEDDING_MODEL,
     EMBEDDING_DIMENSIONS,
@@ -509,3 +527,400 @@ class TeamSessionItemModel(Base):
     #: One SDK `TResponseInputItem`, stored opaquely — the shape belongs
     #: to the pinned SDK version, not to AgentVerse.
     item: Mapped[dict[str, Any]] = mapped_column(JSONB)
+
+
+# --- MCP integrations (Phase 6) ----------------------------------------
+# Two layers: `mcp_servers` is the platform-wide catalog of what *could*
+# be installed; `installed_servers` is a workspace's installation of one.
+# Adding support for a service is a catalog row, not a module (ADR-0010).
+
+
+class McpServerModel(Base):
+    """The marketplace catalog. Deliberately **not** workspace-scoped.
+
+    A tenant-owned table without `workspace_id` is normally a bug
+    (CLAUDE.md §8). This is one of the explicit exceptions — the catalog
+    is platform data, the same for every tenant — and it is called out
+    in ADR-0010 so the exemption is a recorded decision, not an omission.
+    """
+
+    __tablename__ = "mcp_servers"
+    __table_args__ = (UniqueConstraint("slug", name="uq_mcp_server_slug"),)
+
+    id: Mapped[str] = _uuid_pk()
+    slug: Mapped[str] = mapped_column(Text)
+    name: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(Text, index=True)
+    transport: Mapped[McpTransport] = mapped_column(
+        SqlEnum(McpTransport, name="mcp_transport", values_callable=lambda e: [m.value for m in e])
+    )
+    availability: Mapped[McpAvailability] = mapped_column(
+        SqlEnum(
+            McpAvailability,
+            name="mcp_availability",
+            values_callable=lambda e: [m.value for m in e],
+        )
+    )
+    auth_scheme: Mapped[AuthScheme] = mapped_column(
+        SqlEnum(AuthScheme, name="mcp_auth_scheme", values_callable=lambda e: [m.value for m in e])
+    )
+    #: STDIO entries only, and always from this row — never user input.
+    #: A user-supplied command would be remote code execution on the
+    #: worker fleet with extra steps (ADR-0010).
+    command: Mapped[str | None] = mapped_column(Text, default=None)
+    command_args: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    endpoint_url: Mapped[str | None] = mapped_column(Text, default=None)
+    required_credentials: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    oauth_scopes: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    documentation_url: Mapped[str | None] = mapped_column(Text, default=None)
+    icon_slug: Mapped[str | None] = mapped_column(Text, default=None)
+    is_deprecated: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime]
+    updated_at: Mapped[datetime]
+
+
+class InstalledServerModel(Base):
+    __tablename__ = "installed_servers"
+
+    id: Mapped[str] = _uuid_pk()
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    #: Null for a custom user-registered server. RESTRICT because
+    #: removing a catalog entry a workspace has installed must fail
+    #: loudly rather than orphan the installation.
+    mcp_server_id: Mapped[str | None] = mapped_column(
+        ForeignKey("mcp_servers.id", ondelete="RESTRICT"), default=None
+    )
+    display_name: Mapped[str] = mapped_column(Text)
+    transport: Mapped[McpTransport] = mapped_column(
+        SqlEnum(McpTransport, name="mcp_transport", create_type=False)
+    )
+    endpoint_url: Mapped[str | None] = mapped_column(Text, default=None)
+    status: Mapped[InstallStatus] = mapped_column(
+        SqlEnum(
+            InstallStatus, name="mcp_install_status", values_callable=lambda e: [m.value for m in e]
+        ),
+        default=InstallStatus.PENDING_AUTH,
+    )
+    health: Mapped[HealthStatus] = mapped_column(
+        SqlEnum(
+            HealthStatus, name="mcp_health_status", values_callable=lambda e: [m.value for m in e]
+        ),
+        default=HealthStatus.UNKNOWN,
+    )
+    #: Non-secret settings only. Secrets live in `credentials`, encrypted
+    #: — anything here is readable by every endpoint returning a server.
+    config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    #: Cached discovery, so a run does not re-discover on every
+    #: invocation (`mcp-expert`: cache tool discovery with a TTL).
+    discovered_tools: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+    tools_discovered_at: Mapped[datetime | None] = mapped_column(default=None)
+    last_health_check_at: Mapped[datetime | None] = mapped_column(default=None)
+    last_error: Mapped[str | None] = mapped_column(Text, default=None)
+    version: Mapped[str | None] = mapped_column(Text, default=None)
+    installed_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime]
+    updated_at: Mapped[datetime]
+    deleted_at: Mapped[datetime | None] = mapped_column(default=None)
+
+
+class ServerVersionModel(Base):
+    """Recorded tool surface per version, so a breaking schema change on
+    the server side surfaces as a detectable diff rather than a silent
+    runtime failure (`mcp-expert`).
+    """
+
+    __tablename__ = "server_versions"
+
+    id: Mapped[str] = _uuid_pk()
+    workspace_id: Mapped[str] = mapped_column(UUID(as_uuid=False), index=True)
+    installed_server_id: Mapped[str] = mapped_column(
+        ForeignKey("installed_servers.id", ondelete="CASCADE"), index=True
+    )
+    version: Mapped[str] = mapped_column(Text)
+    tools: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    changed_tool_names: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    created_at: Mapped[datetime]
+
+
+class CredentialModel(Base):
+    """Envelope-encrypted third-party secrets.
+
+    `ciphertext` is the secret encrypted under a per-row data key;
+    `wrapped_dek` is that data key encrypted under a key from the runtime
+    environment. A Postgres dump alone yields nothing usable.
+
+    There is no plaintext column and no API path that returns one — not
+    masked, not partial. `hint` is the last four characters only; a
+    prefix would be a meaningful search key (ADR-0010).
+    """
+
+    __tablename__ = "credentials"
+    __table_args__ = (
+        UniqueConstraint("installed_server_id", "key", name="uq_credential_server_key"),
+    )
+
+    id: Mapped[str] = _uuid_pk()
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    installed_server_id: Mapped[str] = mapped_column(
+        ForeignKey("installed_servers.id", ondelete="CASCADE"), index=True
+    )
+    key: Mapped[str] = mapped_column(Text)
+    auth_scheme: Mapped[AuthScheme] = mapped_column(
+        SqlEnum(AuthScheme, name="mcp_auth_scheme", create_type=False)
+    )
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    wrapped_dek: Mapped[bytes] = mapped_column(LargeBinary)
+    #: Identifies which environment key wrapped the DEK, so rotating the
+    #: root key does not require re-encrypting every row at once.
+    key_version: Mapped[str] = mapped_column(Text)
+    hint: Mapped[str] = mapped_column(Text)
+    expires_at: Mapped[datetime | None] = mapped_column(default=None)
+    last_rotated_at: Mapped[datetime | None] = mapped_column(default=None)
+    created_at: Mapped[datetime]
+    updated_at: Mapped[datetime]
+
+
+class IntegrationPermissionModel(Base):
+    """Which agent or team may use which server's tools, and how.
+
+    Exactly one of `agent_id`/`team_id` is set, or neither for a
+    workspace-wide grant. Enforced by a CHECK constraint rather than
+    convention — "at most one" is the kind of invariant that decays.
+    """
+
+    __tablename__ = "permissions"
+    __table_args__ = (
+        CheckConstraint(
+            "NOT (agent_id IS NOT NULL AND team_id IS NOT NULL)",
+            name="ck_permission_single_subject",
+        ),
+    )
+
+    id: Mapped[str] = _uuid_pk()
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    installed_server_id: Mapped[str] = mapped_column(
+        ForeignKey("installed_servers.id", ondelete="CASCADE"), index=True
+    )
+    agent_id: Mapped[str | None] = mapped_column(
+        ForeignKey("agents.id", ondelete="CASCADE"), default=None
+    )
+    team_id: Mapped[str | None] = mapped_column(
+        ForeignKey("teams.id", ondelete="CASCADE"), default=None
+    )
+    level: Mapped[PermissionLevel] = mapped_column(
+        SqlEnum(
+            PermissionLevel,
+            name="mcp_permission_level",
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        default=PermissionLevel.READ_ONLY,
+    )
+    #: Empty means every discovered tool at this level. A non-empty list
+    #: narrows further and maps to the SDK's own `ToolFilter`.
+    allowed_tools: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    timeout_seconds: Mapped[int] = mapped_column(Integer, default=30)
+    max_retries: Mapped[int] = mapped_column(Integer, default=2)
+    cache_ttl_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    max_calls_per_run: Mapped[int] = mapped_column(Integer, default=50)
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+    granted_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime]
+    updated_at: Mapped[datetime]
+
+
+class ToolCallModel(Base):
+    """Every tool invocation, recorded whether or not it ran.
+
+    A blocked SSRF attempt that left no row would make the egress control
+    unauditable, which is most of its value — hence `denied` and
+    `circuit_open` as first-class statuses rather than silent drops.
+
+    Partitioned by `created_at` from this, its first migration: this is
+    the highest-volume table the phase adds (CLAUDE.md §8).
+    """
+
+    __tablename__ = "tool_calls"
+    __table_args__ = ({"postgresql_partition_by": "RANGE (created_at)"},)
+
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    created_at: Mapped[datetime] = mapped_column(primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(UUID(as_uuid=False), index=True)
+    run_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), default=None)
+    team_session_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), default=None)
+    agent_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), default=None)
+    installed_server_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), default=None)
+    tool_name: Mapped[str] = mapped_column(Text)
+    status: Mapped[ToolCallStatus] = mapped_column(
+        SqlEnum(
+            ToolCallStatus,
+            name="tool_call_status",
+            values_callable=lambda e: [m.value for m in e],
+        )
+    )
+    arguments: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    #: Truncated to the output cap. The full result is never persisted —
+    #: it is untrusted third-party content, and an unbounded store of it
+    #: is both a cost and a liability (threat model T2).
+    result_preview: Mapped[str | None] = mapped_column(Text, default=None)
+    result_bytes: Mapped[int | None] = mapped_column(Integer, default=None)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, default=None)
+    error_message: Mapped[str | None] = mapped_column(Text, default=None)
+    #: Which rule rejected a `denied` call — the permission rule or the
+    #: egress rule. Null otherwise.
+    denial_reason: Mapped[str | None] = mapped_column(Text, default=None)
+    attempt: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class ToolLogModel(Base):
+    """Free-form execution log lines attached to a tool call.
+
+    Separate from `tool_calls` because one call can produce many lines
+    (retries, redirect hops, circuit-breaker transitions) and folding
+    them into the call row would mean an unbounded array column.
+    """
+
+    __tablename__ = "tool_logs"
+    __table_args__ = ({"postgresql_partition_by": "RANGE (created_at)"},)
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(UUID(as_uuid=False), index=True)
+    tool_call_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), default=None)
+    installed_server_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), default=None)
+    level: Mapped[str] = mapped_column(Text)
+    message: Mapped[str] = mapped_column(Text)
+    context: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+
+
+class ToolMetricModel(Base):
+    """Pre-aggregated per-tool statistics for the runtime dashboard.
+
+    Rolled up rather than computed from `tool_calls` per page view: that
+    table is partitioned and high-volume, and a p95 over it on every
+    dashboard load is a scan nobody needs (CLAUDE.md §17).
+    """
+
+    __tablename__ = "tool_metrics"
+    __table_args__ = (
+        UniqueConstraint(
+            "installed_server_id", "tool_name", "bucket_start", name="uq_tool_metric_bucket"
+        ),
+    )
+
+    id: Mapped[str] = _uuid_pk()
+    workspace_id: Mapped[str] = mapped_column(UUID(as_uuid=False), index=True)
+    installed_server_id: Mapped[str] = mapped_column(
+        ForeignKey("installed_servers.id", ondelete="CASCADE"), index=True
+    )
+    tool_name: Mapped[str] = mapped_column(Text)
+    #: Hourly buckets. Fine enough for a latency chart, coarse enough
+    #: that the table stays small.
+    bucket_start: Mapped[datetime] = mapped_column(index=True)
+    call_count: Mapped[int] = mapped_column(Integer, default=0)
+    error_count: Mapped[int] = mapped_column(Integer, default=0)
+    denied_count: Mapped[int] = mapped_column(Integer, default=0)
+    timeout_count: Mapped[int] = mapped_column(Integer, default=0)
+    total_duration_ms: Mapped[int] = mapped_column(BigInteger, default=0)
+    p95_duration_ms: Mapped[int | None] = mapped_column(Integer, default=None)
+
+
+class OauthSessionModel(Base):
+    """A short-lived in-flight OAuth2 authorization-code exchange.
+
+    Rows are deleted on completion, not kept: the PKCE verifier is itself
+    a credential, and a stale one is a liability with no compensating
+    value. `state` is unique so a replayed callback cannot match twice.
+    """
+
+    __tablename__ = "oauth_sessions"
+    __table_args__ = (UniqueConstraint("state", name="uq_oauth_session_state"),)
+
+    id: Mapped[str] = _uuid_pk()
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    installed_server_id: Mapped[str] = mapped_column(
+        ForeignKey("installed_servers.id", ondelete="CASCADE"), index=True
+    )
+    #: CSRF token echoed by the provider on callback.
+    state: Mapped[str] = mapped_column(Text)
+    #: PKCE. Stored encrypted for the same reason the token is.
+    code_verifier_ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    wrapped_dek: Mapped[bytes] = mapped_column(LargeBinary)
+    key_version: Mapped[str] = mapped_column(Text)
+    redirect_uri: Mapped[str] = mapped_column(Text)
+    requested_scopes: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    started_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    #: Short — an authorization code exchange that has not completed in
+    #: minutes is abandoned, and the row is a live credential.
+    expires_at: Mapped[datetime]
+    created_at: Mapped[datetime]
+
+
+class WorkspaceIntegrationModel(Base):
+    """Workspace-level defaults for an installed server.
+
+    Distinct from `permissions`: a permission is a grant to a subject,
+    this is the workspace's own policy for the server as a whole (is it
+    on, who may grant it further, is it shared with teams).
+    """
+
+    __tablename__ = "workspace_integrations"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "installed_server_id", name="uq_workspace_integration"),
+    )
+
+    id: Mapped[str] = _uuid_pk()
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    installed_server_id: Mapped[str] = mapped_column(
+        ForeignKey("installed_servers.id", ondelete="CASCADE"), index=True
+    )
+    is_enabled: Mapped[bool] = mapped_column(default=True)
+    #: When false, only an admin may grant this server to an agent.
+    members_may_grant: Mapped[bool] = mapped_column(default=False)
+    default_level: Mapped[PermissionLevel] = mapped_column(
+        SqlEnum(PermissionLevel, name="mcp_permission_level", create_type=False),
+        default=PermissionLevel.READ_ONLY,
+    )
+    created_at: Mapped[datetime]
+    updated_at: Mapped[datetime]
+
+
+class TeamIntegrationModel(Base):
+    """A team's shared access to an installed server.
+
+    Separate from a per-agent permission so a team can share one
+    credential and one tool surface across its members without granting
+    each member's agent individually (the brief's "shared credentials /
+    shared tools" requirement).
+    """
+
+    __tablename__ = "team_integrations"
+    __table_args__ = (
+        UniqueConstraint("team_id", "installed_server_id", name="uq_team_integration"),
+    )
+
+    id: Mapped[str] = _uuid_pk()
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    team_id: Mapped[str] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), index=True)
+    installed_server_id: Mapped[str] = mapped_column(
+        ForeignKey("installed_servers.id", ondelete="CASCADE"), index=True
+    )
+    #: When true, every member inherits the team's grant. When false,
+    #: only members with their own per-agent grant may use it.
+    shared_with_all_members: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime]
+    updated_at: Mapped[datetime]
