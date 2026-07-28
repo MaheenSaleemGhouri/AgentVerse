@@ -2484,6 +2484,1000 @@
         }
       }
     },
+    "/api/v1/workspaces/{workspace_id}/integrations/catalog": {
+      "get": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "List Catalog Route",
+        "description": "The marketplace.\n\nStill workspace-authenticated even though the catalog is\nplatform-wide: browsing it reveals what the platform integrates with,\nwhich is not information for anonymous callers.",
+        "operationId": "list_catalog_route_api_v1_workspaces__workspace_id__integrations_catalog_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/McpServerResponse"
+                  },
+                  "title": "Response List Catalog Route Api V1 Workspaces  Workspace Id  Integrations Catalog Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/integrations": {
+      "post": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Install From Catalog Route",
+        "description": "Installs a vetted catalog entry.\n\nAdmin-gated: an install decides which third party the workspace's\nagents may reach, and its command (for stdio) runs on the worker\nfleet.",
+        "operationId": "install_from_catalog_route_api_v1_workspaces__workspace_id__integrations_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallFromCatalogRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstalledServerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "List Installed Route",
+        "operationId": "list_installed_route_api_v1_workspaces__workspace_id__integrations_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InstalledServerResponse"
+                  },
+                  "title": "Response List Installed Route Api V1 Workspaces  Workspace Id  Integrations Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/integrations/custom": {
+      "post": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Register Custom Server Route",
+        "description": "Registers a user's own MCP endpoint.\n\n`mcp_server_id` is null, which is what marks this as custom \u2014 and\nwhat makes `factory._build_stdio` refuse it, since stdio is available\nonly to vetted catalog entries.",
+        "operationId": "register_custom_server_route_api_v1_workspaces__workspace_id__integrations_custom_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterCustomServerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstalledServerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/integrations/{installed_server_id}": {
+      "get": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Get Installed Route",
+        "operationId": "get_installed_route_api_v1_workspaces__workspace_id__integrations__installed_server_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "installed_server_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Installed Server Id"
+            }
+          },
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstalledServerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Update Installed Route",
+        "operationId": "update_installed_route_api_v1_workspaces__workspace_id__integrations__installed_server_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "installed_server_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Installed Server Id"
+            }
+          },
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInstalledServerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstalledServerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Uninstall Route",
+        "description": "Soft delete. The server's `tool_calls` history stays readable \u2014\nthat history is the audit trail, and losing it because someone\nremoved the integration defeats its purpose.",
+        "operationId": "uninstall_route_api_v1_workspaces__workspace_id__integrations__installed_server_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "installed_server_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Installed Server Id"
+            }
+          },
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/integrations/{installed_server_id}/credentials": {
+      "put": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Put Credential Route",
+        "description": "Writes or rotates a credential.\n\nThe value is encrypted here and never stored, logged, or returned in\nplaintext. The AAD binds the ciphertext to this\n`(workspace, server, key)` \u2014 a row copied into another workspace\nfails to decrypt rather than handing over a working credential.",
+        "operationId": "put_credential_route_api_v1_workspaces__workspace_id__integrations__installed_server_id__credentials_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "installed_server_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Installed Server Id"
+            }
+          },
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutCredentialRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "List Credentials Route",
+        "description": "Which credentials exist, and when they were last rotated.\n\nNever their values \u2014 `CredentialResponse` has no field for one. There\nis deliberately no `GET /{key}/value` route: building the read path\nat all is what later gets loosened.",
+        "operationId": "list_credentials_route_api_v1_workspaces__workspace_id__integrations__installed_server_id__credentials_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "installed_server_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Installed Server Id"
+            }
+          },
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CredentialResponse"
+                  },
+                  "title": "Response List Credentials Route Api V1 Workspaces  Workspace Id  Integrations  Installed Server Id  Credentials Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/integrations/{installed_server_id}/credentials/{key}": {
+      "delete": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Delete Credential Route",
+        "operationId": "delete_credential_route_api_v1_workspaces__workspace_id__integrations__installed_server_id__credentials__key__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "installed_server_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Installed Server Id"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/integrations/{installed_server_id}/permissions": {
+      "post": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Grant Permission Route",
+        "description": "Grants a server's tools to an agent, a team, or the workspace.\n\n`member` rather than `admin`: the *set* of reachable servers is\nalready admin-gated at install, so a member can only grant from what\nan admin approved. Requiring an admin for every agent's tool list\nwould make the feature unusable without loosening the gate that\nactually matters.",
+        "operationId": "grant_permission_route_api_v1_workspaces__workspace_id__integrations__installed_server_id__permissions_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "installed_server_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Installed Server Id"
+            }
+          },
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantPermissionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "List Permissions Route",
+        "operationId": "list_permissions_route_api_v1_workspaces__workspace_id__integrations__installed_server_id__permissions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "installed_server_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Installed Server Id"
+            }
+          },
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "agent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PermissionResponse"
+                  },
+                  "title": "Response List Permissions Route Api V1 Workspaces  Workspace Id  Integrations  Installed Server Id  Permissions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/integrations/{installed_server_id}/permissions/{permission_id}": {
+      "delete": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Revoke Permission Route",
+        "operationId": "revoke_permission_route_api_v1_workspaces__workspace_id__integrations__installed_server_id__permissions__permission_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "installed_server_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Installed Server Id"
+            }
+          },
+          {
+            "name": "permission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Permission Id"
+            }
+          },
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/integrations/runtime/calls": {
+      "get": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "List Tool Calls Route",
+        "description": "Execution history, including denied and blocked calls.\n\nCursor-paginated on `created_at`, which is also the partition key \u2014\noffset pagination on a fast-appending partitioned table skips and\nrepeats rows as new calls land mid-page (CLAUDE.md \u00a77).",
+        "operationId": "list_tool_calls_route_api_v1_workspaces__workspace_id__integrations_runtime_calls_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "installed_server_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Installed Server Id"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "call_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Call Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolCallPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/integrations/runtime/metrics": {
+      "get": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Integration Metrics Route",
+        "operationId": "integration_metrics_route_api_v1_workspaces__workspace_id__integrations_runtime_metrics_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "installed_server_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Installed Server Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrationMetricsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/teams/{team_id}/sessions/{session_id}/stream": {
       "get": {
         "tags": [
@@ -3476,6 +4470,81 @@
         ],
         "title": "CreateWorkspaceRequest"
       },
+      "CredentialResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "installed_server_id": {
+            "type": "string",
+            "title": "Installed Server Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "auth_scheme": {
+            "type": "string",
+            "enum": [
+              "none",
+              "api_key",
+              "bearer_token",
+              "basic",
+              "oauth2",
+              "jwt",
+              "custom_header"
+            ],
+            "title": "Auth Scheme"
+          },
+          "hint": {
+            "type": "string",
+            "title": "Hint"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "last_rotated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Rotated At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "installed_server_id",
+          "key",
+          "auth_scheme",
+          "hint",
+          "expires_at",
+          "last_rotated_at",
+          "created_at"
+        ],
+        "title": "CredentialResponse",
+        "description": "Metadata about a stored credential. Never its value.\n\n`hint` is the last four characters \u2014 never a prefix, because many\ncredential formats put a recognisable low-entropy prefix at the front\n(`sk-`, `ghp_`, `xoxb-`) which identifies the key's kind and issuer."
+      },
       "ExecuteTeamRequest": {
         "properties": {
           "prompt": {
@@ -3549,6 +4618,90 @@
           "created_at"
         ],
         "title": "ExecutionEventResponse"
+      },
+      "GrantPermissionRequest": {
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "read_only",
+              "read_write",
+              "admin"
+            ],
+            "title": "Level",
+            "default": "read_only"
+          },
+          "allowed_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Allowed Tools"
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Timeout Seconds",
+            "default": 30
+          },
+          "max_retries": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Max Retries",
+            "default": 2
+          },
+          "cache_ttl_seconds": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Cache Ttl Seconds",
+            "default": 0
+          },
+          "max_calls_per_run": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Max Calls Per Run",
+            "default": 50
+          },
+          "priority": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Priority",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "GrantPermissionRequest",
+        "description": "Granting a server's tools to an agent, a team, or the workspace.\n\nAt most one subject. Both set is rejected here as well as by the\ntable's CHECK constraint \u2014 the DB is the guarantee, this is the\nreadable error."
       },
       "HTTPValidationError": {
         "properties": {
@@ -3651,6 +4804,237 @@
           "status"
         ],
         "title": "HealthResponse"
+      },
+      "InstallFromCatalogRequest": {
+        "properties": {
+          "mcp_server_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Mcp Server Id"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mcp_server_id"
+        ],
+        "title": "InstallFromCatalogRequest",
+        "description": "Installing a vetted catalog entry.\n\nDeliberately carries no command, no args, and no endpoint: all three\ncome from the catalog row. Accepting them here would let a caller\nturn a vetted stdio entry into an arbitrary local command (ADR-0010)."
+      },
+      "InstalledServerResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "mcp_server_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mcp Server Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "stdio",
+              "sse",
+              "streamable_http"
+            ],
+            "title": "Transport"
+          },
+          "endpoint_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint Url"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_auth",
+              "active",
+              "disabled",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "health": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "degraded",
+              "unreachable",
+              "unknown"
+            ],
+            "title": "Health"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/ToolSummary"
+            },
+            "type": "array",
+            "title": "Tools"
+          },
+          "tools_discovered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools Discovered At"
+          },
+          "last_health_check_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Health Check At"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "workspace_id",
+          "mcp_server_id",
+          "display_name",
+          "transport",
+          "endpoint_url",
+          "status",
+          "health",
+          "tools",
+          "tools_discovered_at",
+          "last_health_check_at",
+          "last_error",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "InstalledServerResponse"
+      },
+      "IntegrationMetricsResponse": {
+        "properties": {
+          "total_calls": {
+            "type": "integer",
+            "title": "Total Calls"
+          },
+          "succeeded_calls": {
+            "type": "integer",
+            "title": "Succeeded Calls"
+          },
+          "failed_calls": {
+            "type": "integer",
+            "title": "Failed Calls"
+          },
+          "denied_calls": {
+            "type": "integer",
+            "title": "Denied Calls"
+          },
+          "timed_out_calls": {
+            "type": "integer",
+            "title": "Timed Out Calls"
+          },
+          "cached_calls": {
+            "type": "integer",
+            "title": "Cached Calls"
+          },
+          "p95_duration_ms": {
+            "type": "integer",
+            "title": "P95 Duration Ms"
+          },
+          "average_duration_ms": {
+            "type": "integer",
+            "title": "Average Duration Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_calls",
+          "succeeded_calls",
+          "failed_calls",
+          "denied_calls",
+          "timed_out_calls",
+          "cached_calls",
+          "p95_duration_ms",
+          "average_duration_ms"
+        ],
+        "title": "IntegrationMetricsResponse"
       },
       "InviteMemberRequest": {
         "properties": {
@@ -3918,6 +5302,119 @@
         ],
         "title": "KnowledgeBaseResponse"
       },
+      "McpServerResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "stdio",
+              "sse",
+              "streamable_http"
+            ],
+            "title": "Transport"
+          },
+          "availability": {
+            "type": "string",
+            "enum": [
+              "official",
+              "community",
+              "custom_required"
+            ],
+            "title": "Availability"
+          },
+          "auth_scheme": {
+            "type": "string",
+            "enum": [
+              "none",
+              "api_key",
+              "bearer_token",
+              "basic",
+              "oauth2",
+              "jwt",
+              "custom_header"
+            ],
+            "title": "Auth Scheme"
+          },
+          "required_credentials": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Required Credentials"
+          },
+          "oauth_scopes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Oauth Scopes"
+          },
+          "documentation_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Documentation Url"
+          },
+          "icon_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon Slug"
+          },
+          "is_installable": {
+            "type": "boolean",
+            "title": "Is Installable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "description",
+          "category",
+          "transport",
+          "availability",
+          "auth_scheme",
+          "required_credentials",
+          "oauth_scopes",
+          "documentation_url",
+          "icon_slug",
+          "is_installable"
+        ],
+        "title": "McpServerResponse",
+        "description": "A marketplace catalog entry."
+      },
       "MemberResponse": {
         "properties": {
           "workspace_id": {
@@ -3946,6 +5443,97 @@
         ],
         "title": "MemberResponse"
       },
+      "PermissionResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "installed_server_id": {
+            "type": "string",
+            "title": "Installed Server Id"
+          },
+          "agent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "read_only",
+              "read_write",
+              "admin"
+            ],
+            "title": "Level"
+          },
+          "allowed_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Tools"
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "title": "Timeout Seconds"
+          },
+          "max_retries": {
+            "type": "integer",
+            "title": "Max Retries"
+          },
+          "cache_ttl_seconds": {
+            "type": "integer",
+            "title": "Cache Ttl Seconds"
+          },
+          "max_calls_per_run": {
+            "type": "integer",
+            "title": "Max Calls Per Run"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "installed_server_id",
+          "agent_id",
+          "team_id",
+          "level",
+          "allowed_tools",
+          "timeout_seconds",
+          "max_retries",
+          "cache_ttl_seconds",
+          "max_calls_per_run",
+          "priority",
+          "created_at"
+        ],
+        "title": "PermissionResponse"
+      },
       "ProviderTestRequest": {
         "properties": {
           "prompt": {
@@ -3973,6 +5561,55 @@
         ],
         "title": "ProviderTestRequest"
       },
+      "PutCredentialRequest": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Key"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Value"
+          },
+          "auth_scheme": {
+            "type": "string",
+            "enum": [
+              "none",
+              "api_key",
+              "bearer_token",
+              "basic",
+              "oauth2",
+              "jwt",
+              "custom_header"
+            ],
+            "title": "Auth Scheme"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "value",
+          "auth_scheme"
+        ],
+        "title": "PutCredentialRequest",
+        "description": "Writing or rotating a credential.\n\nOne shape for both: a rotation is a write of the same thing, and a\nseparate rotate endpoint would be a second path to keep correct."
+      },
       "RecordAuthEventRequest": {
         "properties": {
           "event_type": {
@@ -3994,6 +5631,57 @@
           "user_id"
         ],
         "title": "RecordAuthEventRequest"
+      },
+      "RegisterCustomServerRequest": {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Display Name"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "sse",
+              "streamable_http"
+            ],
+            "title": "Transport"
+          },
+          "endpoint_url": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Endpoint Url"
+          },
+          "auth_scheme": {
+            "type": "string",
+            "enum": [
+              "none",
+              "api_key",
+              "bearer_token",
+              "basic",
+              "oauth2",
+              "jwt",
+              "custom_header"
+            ],
+            "title": "Auth Scheme",
+            "default": "none"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config"
+          }
+        },
+        "type": "object",
+        "required": [
+          "display_name",
+          "transport",
+          "endpoint_url"
+        ],
+        "title": "RegisterCustomServerRequest",
+        "description": "Registering a user's own MCP server.\n\nNo `transport` field for stdio: a custom server is remote by\ndefinition and gets an HTTP transport. The literal below excludes\nstdio at the type level rather than validating it away, so the\nrefusal is visible in the generated contract."
       },
       "ReorderMembersRequest": {
         "properties": {
@@ -4587,6 +6275,206 @@
         ],
         "title": "TeamSessionResponse"
       },
+      "ToolCallPage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ToolCallResponse"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "next_cursor",
+          "has_more"
+        ],
+        "title": "ToolCallPage"
+      },
+      "ToolCallResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "agent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "installed_server_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installed Server Id"
+          },
+          "tool_name": {
+            "type": "string",
+            "title": "Tool Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "error",
+              "timeout",
+              "denied",
+              "circuit_open",
+              "cached"
+            ],
+            "title": "Status"
+          },
+          "arguments": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Arguments"
+          },
+          "result_preview": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Preview"
+          },
+          "result_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Bytes"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "denial_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Denial Reason"
+          },
+          "attempt": {
+            "type": "integer",
+            "title": "Attempt"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_id",
+          "agent_id",
+          "installed_server_id",
+          "tool_name",
+          "status",
+          "arguments",
+          "result_preview",
+          "result_bytes",
+          "duration_ms",
+          "error_message",
+          "denial_reason",
+          "attempt",
+          "created_at"
+        ],
+        "title": "ToolCallResponse"
+      },
+      "ToolSummary": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "is_mutating": {
+            "type": "boolean",
+            "title": "Is Mutating"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "is_mutating"
+        ],
+        "title": "ToolSummary"
+      },
       "UpdateAgentVersionRequest": {
         "properties": {
           "model": {
@@ -4650,6 +6538,52 @@
           "system_instructions"
         ],
         "title": "UpdateAgentVersionRequest"
+      },
+      "UpdateInstalledServerRequest": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "disabled"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          }
+        },
+        "type": "object",
+        "title": "UpdateInstalledServerRequest"
       },
       "UpdateTeamRequest": {
         "properties": {

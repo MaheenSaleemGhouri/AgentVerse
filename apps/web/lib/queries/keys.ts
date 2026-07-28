@@ -48,6 +48,37 @@ export const queryKeys = {
       ["workspaces", workspaceId, "teams", teamId, "analytics"] as const,
   },
 
+  integrations: {
+    catalog: (workspaceId: string, filters: { category?: string; q?: string } = {}) =>
+      ["workspaces", workspaceId, "integrations", "catalog", filters] as const,
+    installed: (workspaceId: string) =>
+      ["workspaces", workspaceId, "integrations"] as const,
+    detail: (workspaceId: string, installedServerId: string) =>
+      ["workspaces", workspaceId, "integrations", installedServerId] as const,
+    credentials: (workspaceId: string, installedServerId: string) =>
+      ["workspaces", workspaceId, "integrations", installedServerId, "credentials"] as const,
+    permissions: (workspaceId: string, installedServerId: string, agentId?: string) =>
+      [
+        "workspaces",
+        workspaceId,
+        "integrations",
+        installedServerId,
+        "permissions",
+        agentId ?? null,
+      ] as const,
+    calls: (workspaceId: string, filters: Record<string, string | undefined> = {}) =>
+      ["workspaces", workspaceId, "integrations", "runtime", "calls", filters] as const,
+    metrics: (workspaceId: string, installedServerId?: string) =>
+      [
+        "workspaces",
+        workspaceId,
+        "integrations",
+        "runtime",
+        "metrics",
+        installedServerId ?? null,
+      ] as const,
+  },
+
   knowledge: {
     all: (workspaceId: string) => ["workspaces", workspaceId, "knowledge-bases"] as const,
     detail: (workspaceId: string, knowledgeBaseId: string) =>

@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import Any
 
 from agents import Agent, Handoff, ModelSettings, Tool, handoff
+from agents.mcp import MCPServer
 from agentverse_worker.agents.builtin_tools import resolve_tools
 from agentverse_worker.teams.repository import MemberRecord, TeamRecord
 from agentverse_worker.teams.shared_memory import SharedMemoryStore, build_shared_memory_tools
@@ -56,12 +57,18 @@ def build_member_agent(
     team: TeamRecord,
     memory: SharedMemoryStore | None,
     handoff_targets: list[Agent] | None = None,
+    mcp_servers: list[MCPServer] | None = None,
 ) -> Agent:
     """One SDK `Agent` for one seat.
 
     `handoff_targets` is passed only for a supervisor. When it is set,
     the SDK's own `handoff()` runs delegation — the model chooses, and
     the transfer is an SDK tool call, not an AgentVerse control loop.
+
+    `mcp_servers` are already wrapped in `GovernedMcpServer` by
+    `attach_integrations`; this function never receives a raw SDK server,
+    which is what keeps "no tool call bypasses the boundary" structural
+    rather than a rule someone has to remember here.
     """
     config = member.config
     tools: list[Tool] = list(resolve_tools(list(config.get("tools") or [])))
@@ -87,6 +94,7 @@ def build_member_agent(
         model=str(config["model"]),
         tools=tools,
         handoffs=handoffs,
+        mcp_servers=list(mcp_servers or []),
         model_settings=ModelSettings(
             temperature=config.get("temperature"),
             max_tokens=config.get("max_output_tokens"),

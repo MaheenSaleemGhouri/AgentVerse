@@ -1,3 +1,5 @@
+import base64
+import os
 from collections.abc import AsyncIterator
 
 import pytest
@@ -8,6 +10,14 @@ from agentverse_worker.infrastructure.config import get_settings
 from agentverse_worker.interface.dependencies import get_queue, get_redis_client
 from agentverse_worker.main import create_app
 from agentverse_worker.queue.factory import build_queue
+
+# `build_queue` constructs the credential vault, which refuses to start
+# without a key — deliberately, since a hardcoded default is
+# indistinguishable from no encryption (CLAUDE.md Rule 1). Tests need a
+# real one, so one is generated per session rather than a fixed literal:
+# a committed test key is a key someone eventually copies into an
+# environment file.
+os.environ.setdefault("AGENTVERSE_CREDENTIAL_KEK_V1", base64.b64encode(os.urandom(32)).decode())
 
 
 @pytest.fixture

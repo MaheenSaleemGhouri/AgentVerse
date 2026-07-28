@@ -27,6 +27,13 @@ dependencies = [
     # metadata ownership; the schema stays owned by apps/api's Alembic
     # migrations (CLAUDE.md §8).
     "sqlalchemy[asyncio]>=2.0.51,<3",
+    # Envelope encryption for third-party MCP credentials (Phase 6).
+    # Shared because apps/api writes credentials and apps/worker resolves
+    # them at tool-call time — two implementations of the same envelope
+    # format is exactly the drift that makes ciphertext unreadable by the
+    # service that did not write it. AESGCM only; no custom crypto
+    # (CLAUDE.md §10).
+    "cryptography>=44,<47",
 ]
 
 [dependency-groups]

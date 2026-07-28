@@ -45,7 +45,11 @@ from agentverse_worker.agents.repository import (
     VersionRecord,
 )
 from agentverse_worker.infrastructure.config import Settings
+from agentverse_worker.mcp.attach import AttachmentResult, attach_integrations
+from agentverse_worker.mcp.repository import IntegrationRepositoryProtocol
 from agentverse_worker.queue.models import Job, JobResult
+from agentverse_worker.tools.boundary import BoundaryDeps, ExecutionContext
+from agentverse_worker.tools.policy import CallBudget, CircuitBreaker, ResultCache
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +81,10 @@ async def handle_agent_run_job(
     search: ChunkSearchPort,
     embedder: EmbeddingProvider,
     counter: TokenCounter,
+    #: Optional so every pre-Phase-6 caller and unit test keeps working
+    #: unchanged: `None` means "this run has no MCP integrations", which
+    #: is exactly the old behaviour.
+    integrations: IntegrationRepositoryProtocol | None = None,
 ) -> JobResult:
     """`repo` and the retrieval collaborators are injected by the caller
     (the queue-factory closure, which opens one DB session for the job's
@@ -119,6 +127,7 @@ async def handle_agent_run_job(
             search=search,
             embedder=embedder,
             counter=counter,
+            integrations=integrations,
         )
     except _RunAbortedError as exc:
         await repo.update_run_status(run_id=run_id, status="error", error_message=exc.reason)
@@ -224,6 +233,10 @@ async def _execute(
     search: ChunkSearchPort,
     embedder: EmbeddingProvider,
     counter: TokenCounter,
+    #: Optional so every pre-Phase-6 caller and unit test keeps working
+    #: unchanged: `None` means "this run has no MCP integrations", which
+    #: is exactly the old behaviour.
+    integrations: IntegrationRepositoryProtocol | None = None,
 ) -> TokenUsage:
     config = version.config
     prompt = run.input.get("prompt", "")
@@ -277,47 +290,118 @@ async def _execute(
             cost=None,
         )
 
+    # MCP servers granted to this agent (Phase 6). Every one that
+    # connects is wrapped in `GovernedMcpServer`, so the SDK never holds
+    # a raw server object and no tool call can bypass the execution
+    # boundary. A server that fails to connect disables only its own
+    # tools and reports why in the trace — it never fails the run.
+    attachment = await _attach_mcp(
+        run=run, repo=repo, redis=redis, integrations=integrations, sequence=sequence
+    )
+
     agent = Agent(
         name=f"agent-{run.agent_id}",
         instructions=grounding.instructions,
         model=config["model"],
         tools=resolve_tools(config.get("tools", [])),
+        mcp_servers=attachment.servers,
         model_settings=ModelSettings(
             temperature=config.get("temperature"),
             max_tokens=config.get("max_output_tokens"),
         ),
     )
 
-    result = Runner.run_streamed(agent, prompt, max_turns=settings.run_max_turns)
-    start = time.monotonic()
+    try:
+        result = Runner.run_streamed(agent, prompt, max_turns=settings.run_max_turns)
+        start = time.monotonic()
 
-    async for event in result.stream_events():
-        if isinstance(event, RunItemStreamEvent):
-            await _handle_run_item_event(event, run=run, repo=repo, redis=redis, sequence=sequence)
-        # raw_response_event token deltas are intentionally not branched
-        # on here beyond the isinstance check above excluding them — this
-        # phase publishes step-level events only; per-token live deltas
-        # are a Phase 4 UI nicety, not a named acceptance criterion, and
-        # are left for the SSE route (M4) to decide whether to forward
-        # raw deltas at all.
+        async for event in result.stream_events():
+            if isinstance(event, RunItemStreamEvent):
+                await _handle_run_item_event(
+                    event, run=run, repo=repo, redis=redis, sequence=sequence
+                )
+            # raw_response_event token deltas are intentionally not
+            # branched on here beyond the isinstance check above excluding
+            # them — this phase publishes step-level events only; per-token
+            # live deltas are a Phase 4 UI nicety, not a named acceptance
+            # criterion, and are left for the SSE route (M4) to decide
+            # whether to forward raw deltas at all.
 
-        elapsed = time.monotonic() - start
-        current_usage = TokenUsage(
-            prompt_tokens=result.context_wrapper.usage.input_tokens,
-            completion_tokens=result.context_wrapper.usage.output_tokens,
+            elapsed = time.monotonic() - start
+            current_usage = TokenUsage(
+                prompt_tokens=result.context_wrapper.usage.input_tokens,
+                completion_tokens=result.context_wrapper.usage.output_tokens,
+            )
+            if elapsed > settings.run_timeout_seconds:
+                result.cancel()
+                raise _RunAbortedError(f"exceeded time budget of {settings.run_timeout_seconds}s")
+            projected_cost = calculate_cost_micro_usd(config["model"], current_usage)
+            if projected_cost > settings.run_cost_ceiling_micro_usd:
+                result.cancel()
+                ceiling = settings.run_cost_ceiling_micro_usd
+                raise _RunAbortedError(f"exceeded cost ceiling of {ceiling} micro-USD")
+
+        final_usage = result.context_wrapper.usage
+        return TokenUsage(
+            prompt_tokens=final_usage.input_tokens, completion_tokens=final_usage.output_tokens
         )
-        if elapsed > settings.run_timeout_seconds:
-            result.cancel()
-            raise _RunAbortedError(f"exceeded time budget of {settings.run_timeout_seconds}s")
-        projected_cost = calculate_cost_micro_usd(config["model"], current_usage)
-        if projected_cost > settings.run_cost_ceiling_micro_usd:
-            result.cancel()
-            ceiling = settings.run_cost_ceiling_micro_usd
-            raise _RunAbortedError(f"exceeded cost ceiling of {ceiling} micro-USD")
+    finally:
+        # MCP connections are per-run: a pooled session would outlive the
+        # credential that opened it, so a revoked token would keep working
+        # until the pool happened to evict it. Closed in `finally` because
+        # a leaked stdio process or HTTP socket outlives the run that
+        # needed it, whether or not the run succeeded.
+        if attachment.manager is not None:
+            await attachment.manager.aclose()
 
-    final_usage = result.context_wrapper.usage
-    return TokenUsage(
-        prompt_tokens=final_usage.input_tokens, completion_tokens=final_usage.output_tokens
+
+async def _attach_mcp(
+    *,
+    run: RunRecord,
+    repo: AgentRepositoryProtocol,
+    redis: Redis,
+    integrations: IntegrationRepositoryProtocol | None,
+    sequence: _SequenceCounter,
+) -> AttachmentResult:
+    """Resolves and connects this agent's MCP grants.
+
+    Returns an empty attachment when no integration repository is wired
+    (the pre-Phase-6 code path, and every unit test that does not care
+    about MCP) — so the run behaves exactly as it did before rather than
+    requiring every caller to know about integrations.
+    """
+    if integrations is None:
+        return AttachmentResult()
+
+    async def _emit(event_type: str, payload: dict[str, Any]) -> None:
+        await _record_and_publish_step(
+            repo,
+            redis,
+            run=run,
+            step_type=event_type,
+            sequence=sequence,
+            payload=payload,
+            cost=None,
+        )
+
+    resolved = await integrations.resolve_for_agent(
+        workspace_id=run.workspace_id, agent_id=run.agent_id
+    )
+    if not resolved:
+        return AttachmentResult()
+
+    return await attach_integrations(
+        resolved,
+        context=ExecutionContext(
+            workspace_id=run.workspace_id, run_id=run.id, agent_id=run.agent_id
+        ),
+        deps=BoundaryDeps(
+            recorder=integrations,
+            breaker=CircuitBreaker(redis),
+            cache=ResultCache(redis),
+            budget=CallBudget(redis),
+        ),
+        on_event=_emit,
     )
 
 

@@ -14,6 +14,9 @@ from agentverse_api.interface.routes.health import router as health_router
 from agentverse_api.orchestration_service.interface.routers.agents import (
     router as agents_router,
 )
+from agentverse_api.orchestration_service.interface.routers.integrations import (
+    router as integrations_router,
+)
 from agentverse_api.orchestration_service.interface.routers.internal_job_test import (
     router as internal_job_test_router,
 )
@@ -50,6 +53,7 @@ def create_app() -> FastAPI:
     app.include_router(knowledge_router)
     app.include_router(run_stream_router)
     app.include_router(teams_router)
+    app.include_router(integrations_router)
     app.include_router(team_session_stream_router)
     app.include_router(api_keys_router)
     app.include_router(internal_auth_events_router)

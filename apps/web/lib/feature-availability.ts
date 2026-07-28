@@ -57,23 +57,11 @@ export const PENDING_INTEGRATIONS = {
     capability:
       "Compose multi-step agent workflows on a DAG canvas with conditional branching and human-in-the-loop approval steps.",
   },
-  mcp: {
-    phase: 6,
-    phaseName: "Tool-Calling, Tool-Execution Boundary & MCP",
-    endpoints: [
-      "GET/POST /api/v1/workspaces/{workspace_id}/mcp-connections",
-      "GET /api/v1/workspaces/{workspace_id}/mcp-connections/{id}/tools",
-    ],
-    capability:
-      "Connect third-party MCP servers, browse the tools they expose, and attach those tools to an agent.",
-  },
-  integrations: {
-    phase: 6,
-    phaseName: "Tool-Calling, Tool-Execution Boundary & MCP",
-    endpoints: ["GET/POST /api/v1/workspaces/{workspace_id}/integrations"],
-    capability:
-      "Authorise third-party services once per workspace and reuse those credentials across agents, resolved at call time from the secrets manager.",
-  },
+  // `mcp` and `integrations` were removed when Phase 6 shipped. Deleting
+  // the entry rather than leaving it is the point of this registry: any
+  // leftover `<IntegrationPending feature="mcp" />` now fails the
+  // TypeScript build instead of lingering as stale UI over a working
+  // backend.
   analytics: {
     phase: 11,
     phaseName: "Growth Loops & Multi-Provider Breadth",

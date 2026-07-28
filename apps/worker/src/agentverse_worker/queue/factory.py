@@ -9,6 +9,7 @@ import uuid
 
 from agentverse_shared.embeddings.openai_provider import OpenAIEmbeddingProvider
 from agentverse_shared.retrieval.postgres_search import PostgresChunkSearch
+from agentverse_shared.security.envelope import CredentialVault, KeyRing
 from agentverse_shared.storage.document_store import LocalDocumentStore
 from agentverse_shared.text.tokenizer import TiktokenCounter
 from redis.asyncio import Redis
@@ -22,6 +23,7 @@ from agentverse_worker.jobs.kb_ingest_job import handle_kb_ingest_job
 from agentverse_worker.jobs.team_session_job import handle_team_session_job
 from agentverse_worker.knowledge.directory import WorkerKnowledgeBaseDirectory
 from agentverse_worker.knowledge.repository import WorkerKnowledgeRepository
+from agentverse_worker.mcp.repository import WorkerIntegrationRepository
 from agentverse_worker.queue.models import Job, JobHandler, JobResult
 from agentverse_worker.queue.redis_stream_queue import RedisStreamQueue
 from agentverse_worker.teams.repository import WorkerTeamRepository
@@ -45,6 +47,12 @@ def build_queue(redis_client: Redis, settings: Settings) -> RedisStreamQueue:
     )
     store = LocalDocumentStore(settings.document_storage_root)
 
+    # Built once, like the embedder: the key ring is read from the
+    # environment at construction and a missing key must fail here — at
+    # startup, loudly — rather than on the first tool call of the first
+    # run that happens to need a credential.
+    vault = CredentialVault(KeyRing.from_env())
+
     async def _agent_run_handler(job: Job) -> JobResult:
         # Closure over `settings`/`redis_client` to match the single-arg
         # `JobHandler` shape the queue calls. Opens one DB session for
@@ -61,6 +69,7 @@ def build_queue(redis_client: Redis, settings: Settings) -> RedisStreamQueue:
                 search=PostgresChunkSearch(session),
                 embedder=embedder,
                 counter=counter,
+                integrations=WorkerIntegrationRepository(session, vault),
             )
 
     async def _kb_ingest_handler(job: Job) -> JobResult:

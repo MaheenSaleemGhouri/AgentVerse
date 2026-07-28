@@ -89,9 +89,8 @@ export const NAV_SECTIONS: readonly NavItem[] = [
   {
     label: "MCP",
     segment: "mcp",
-    icon: Plug,
-    description: "Connect third-party MCP servers and their tools",
-    pending: true,
+    icon: Activity,
+    description: "Tool-call history across every integration, including refused calls",
   },
   {
     label: "Workflows",
@@ -147,9 +146,8 @@ export const NAV_SECTIONS: readonly NavItem[] = [
     label: "Integrations",
     segment: "integrations",
     icon: Plug,
-    description: "Authorise third-party services for this workspace",
+    description: "Connect external services through MCP and manage their credentials",
     hiddenFromSidebar: true,
-    pending: true,
   },
   {
     label: "Audit logs",

@@ -13,6 +13,7 @@ from agentverse_shared.embeddings.port import EmbeddingProvider
 from agentverse_shared.locks.distributed_lock import DistributedLock
 from agentverse_shared.retrieval.port import ChunkSearchPort
 from agentverse_shared.retrieval.postgres_search import PostgresChunkSearch
+from agentverse_shared.security.envelope import CredentialVault, KeyRing
 from agentverse_shared.storage.document_store import DocumentStore, LocalDocumentStore
 from agentverse_shared.text.tokenizer import TiktokenCounter, TokenCounter
 from fastapi import Depends
@@ -27,12 +28,18 @@ from agentverse_api.orchestration_service.application.provider_test_service impo
 )
 from agentverse_api.orchestration_service.application.run_agent import LockFactory
 from agentverse_api.orchestration_service.domain.ports.agent_repository import AgentRepository
+from agentverse_api.orchestration_service.domain.ports.integration_repository import (
+    IntegrationRepository,
+)
 from agentverse_api.orchestration_service.domain.ports.knowledge_repository import (
     KnowledgeRepository,
 )
 from agentverse_api.orchestration_service.domain.ports.provider_adapter import ProviderAdapter
 from agentverse_api.orchestration_service.domain.ports.run_repository import AgentRunRepository
 from agentverse_api.orchestration_service.domain.ports.team_repository import TeamRepository
+from agentverse_api.orchestration_service.infrastructure.integration_repository import (
+    SqlIntegrationRepository,
+)
 from agentverse_api.orchestration_service.infrastructure.knowledge_repository import (
     SqlKnowledgeRepository,
 )
@@ -111,6 +118,24 @@ def get_agent_run_repository(
 
 def get_team_repository(session: AsyncSession = Depends(get_db_session)) -> TeamRepository:
     return SqlTeamRepository(session)
+
+
+def get_integration_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> IntegrationRepository:
+    return SqlIntegrationRepository(session)
+
+
+@lru_cache
+def get_credential_vault() -> CredentialVault:
+    """Process-wide singleton, same rationale as the provider adapter.
+
+    The key ring is read from the environment at construction, so a
+    missing key fails here — at startup, loudly — rather than on the
+    first credential write of the first user who tries one
+    (CLAUDE.md Rule 1).
+    """
+    return CredentialVault(KeyRing.from_env())
 
 
 def get_knowledge_repository(

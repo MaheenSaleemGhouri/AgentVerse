@@ -39,6 +39,34 @@ import {
   searchKnowledgeBase as searchKnowledgeBaseApi,
 } from "@/lib/api/knowledge";
 import {
+  type Credential,
+  deleteCredential as deleteCredentialApi,
+  getInstalled as getInstalledApi,
+  getIntegrationMetrics as getIntegrationMetricsApi,
+  type GrantPermissionRequest,
+  grantPermission as grantPermissionApi,
+  type InstalledServer,
+  type InstallFromCatalogRequest,
+  installFromCatalog as installFromCatalogApi,
+  type IntegrationMetrics,
+  listCatalog as listCatalogApi,
+  listCredentials as listCredentialsApi,
+  listInstalled as listInstalledApi,
+  listPermissions as listPermissionsApi,
+  listToolCalls as listToolCallsApi,
+  type McpServer,
+  type Permission,
+  type PutCredentialRequest,
+  putCredential as putCredentialApi,
+  type RegisterCustomServerRequest,
+  registerCustomServer as registerCustomServerApi,
+  revokePermission as revokePermissionApi,
+  type ToolCallPage,
+  uninstall as uninstallApi,
+  type UpdateInstalledServerRequest,
+  updateInstalled as updateInstalledApi,
+} from "@/lib/api/integrations";
+import {
   type AddMemberRequest,
   addTeamMember as addTeamMemberApi,
   type Communication,
@@ -367,4 +395,124 @@ export async function getTeamAnalyticsAction(
   teamId: string
 ): Promise<TeamAnalytics> {
   return getTeamAnalyticsApi(workspaceId, teamId);
+}
+
+// --- MCP integrations (Phase 6) ------------------------------------------
+// Note the absence of a `getCredentialAction`: the API has no endpoint
+// that returns a credential value, so there is nothing to wrap.
+
+export async function listCatalogAction(
+  workspaceId: string,
+  options: { category?: string; q?: string } = {}
+): Promise<McpServer[]> {
+  return listCatalogApi(workspaceId, options);
+}
+
+export async function listInstalledAction(workspaceId: string): Promise<InstalledServer[]> {
+  return listInstalledApi(workspaceId);
+}
+
+export async function getInstalledAction(
+  workspaceId: string,
+  installedServerId: string
+): Promise<InstalledServer> {
+  return getInstalledApi(workspaceId, installedServerId);
+}
+
+export async function installFromCatalogAction(
+  workspaceId: string,
+  body: InstallFromCatalogRequest
+): Promise<InstalledServer> {
+  return installFromCatalogApi(workspaceId, body);
+}
+
+export async function registerCustomServerAction(
+  workspaceId: string,
+  body: RegisterCustomServerRequest
+): Promise<InstalledServer> {
+  return registerCustomServerApi(workspaceId, body);
+}
+
+export async function updateInstalledAction(
+  workspaceId: string,
+  installedServerId: string,
+  body: UpdateInstalledServerRequest
+): Promise<InstalledServer> {
+  return updateInstalledApi(workspaceId, installedServerId, body);
+}
+
+export async function uninstallAction(
+  workspaceId: string,
+  installedServerId: string
+): Promise<void> {
+  return uninstallApi(workspaceId, installedServerId);
+}
+
+export async function putCredentialAction(
+  workspaceId: string,
+  installedServerId: string,
+  body: PutCredentialRequest
+): Promise<Credential> {
+  return putCredentialApi(workspaceId, installedServerId, body);
+}
+
+export async function listCredentialsAction(
+  workspaceId: string,
+  installedServerId: string
+): Promise<Credential[]> {
+  return listCredentialsApi(workspaceId, installedServerId);
+}
+
+export async function deleteCredentialAction(
+  workspaceId: string,
+  installedServerId: string,
+  key: string
+): Promise<void> {
+  return deleteCredentialApi(workspaceId, installedServerId, key);
+}
+
+export async function grantPermissionAction(
+  workspaceId: string,
+  installedServerId: string,
+  body: GrantPermissionRequest
+): Promise<Permission> {
+  return grantPermissionApi(workspaceId, installedServerId, body);
+}
+
+export async function listPermissionsAction(
+  workspaceId: string,
+  installedServerId: string,
+  agentId?: string
+): Promise<Permission[]> {
+  return listPermissionsApi(workspaceId, installedServerId, agentId);
+}
+
+export async function revokePermissionAction(
+  workspaceId: string,
+  installedServerId: string,
+  permissionId: string
+): Promise<void> {
+  return revokePermissionApi(workspaceId, installedServerId, permissionId);
+}
+
+export async function listToolCallsAction(
+  workspaceId: string,
+  // `| undefined` spelled out to match the client's signature under
+  // `exactOptionalPropertyTypes` — callers spread optional filter values.
+  options: {
+    installedServerId?: string | undefined;
+    runId?: string | undefined;
+    status?: string | undefined;
+    limit?: number | undefined;
+    cursor?: string | undefined;
+  } = {}
+): Promise<ToolCallPage> {
+  return listToolCallsApi(workspaceId, options);
+}
+
+export async function getIntegrationMetricsAction(
+  workspaceId: string,
+  installedServerId?: string
+): Promise<IntegrationMetrics> {
+  return getIntegrationMetricsApi(workspaceId, installedServerId);
 }

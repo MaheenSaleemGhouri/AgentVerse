@@ -1,65 +1,54 @@
-import { ArrowRight, KeyRound, Plug } from "lucide-react";
-import Link from "next/link";
+import { listCatalog, listInstalled } from "@/lib/api/integrations";
 
-import { IntegrationPending } from "@/components/patterns/integration-pending";
+import { ConnectionsList } from "@/components/integrations/connections-list";
+import { Marketplace } from "@/components/integrations/marketplace";
 import { PageHeader } from "@/components/patterns/page-header";
-import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-/**
- * Third-party integrations.
- *
- * No provider tiles are listed: naming services AgentVerse does not yet
- * connect to would read as a supported-integrations list, which would be
- * a false claim. What *is* real today — API keys for calling AgentVerse
- * from elsewhere — is linked, because that is the integration path that
- * actually works right now.
- */
 export default async function IntegrationsPage({
   params,
 }: {
   params: Promise<{ workspaceId: string }>;
 }): Promise<React.JSX.Element> {
   const { workspaceId } = await params;
+  // Both server-fetched for first paint and passed as initial data, so
+  // the marketplace and the connections list are complete on load rather
+  // than flashing skeletons for data the page already had.
+  const [catalog, installed] = await Promise.all([
+    listCatalog(workspaceId),
+    listInstalled(workspaceId),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Integrations"
-        description="Authorise a service once per workspace and reuse it across agents."
+        description="Connect external services through MCP and give your agents their tools."
       />
 
-      <Card className="gap-3 p-6">
-        <div className="flex items-start gap-3">
-          <span
-            aria-hidden="true"
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground"
-          >
-            <KeyRound className="size-4.5" />
-          </span>
-          <div className="min-w-0">
-            <p className="font-medium">Available now — API access</p>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Integrating <em>into</em> AgentVerse works today: issue a workspace-scoped API key and
-              call the agent, knowledge, and run endpoints from your own systems.
-            </p>
-            <Link
-              href={`/dashboard/${workspaceId}/settings/api-keys`}
-              className="mt-2 inline-flex items-center gap-1 text-sm text-primary underline underline-offset-4"
-            >
-              Manage API keys
-              <ArrowRight className="size-3.5" aria-hidden="true" />
-            </Link>
-          </div>
-        </div>
-      </Card>
+      {/* Opens on Connected when there is something to see, and on the
+          marketplace when there is not — a first-time user should land on
+          the thing they can act on. */}
+      <Tabs defaultValue={installed.length > 0 ? "connected" : "marketplace"}>
+        <TabsList>
+          <TabsTrigger value="connected">
+            Connected{installed.length > 0 ? ` (${installed.length})` : ""}
+          </TabsTrigger>
+          <TabsTrigger value="marketplace">Marketplace</TabsTrigger>
+        </TabsList>
 
-      <div className="space-y-3">
-        <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <Plug className="size-4" aria-hidden="true" />
-          Outbound integrations
-        </h2>
-        <IntegrationPending feature="integrations" />
-      </div>
+        <TabsContent value="connected" className="mt-5">
+          <ConnectionsList workspaceId={workspaceId} initialServers={installed} />
+        </TabsContent>
+
+        <TabsContent value="marketplace" className="mt-5">
+          <Marketplace
+            workspaceId={workspaceId}
+            initialCatalog={catalog}
+            initialInstalled={installed}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

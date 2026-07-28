@@ -56,6 +56,10 @@ services:
       AGENTVERSE_API_AUTH_PUBLIC_URL: http://localhost:${WEB_PORT:-3000}
       AGENTVERSE_API_INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?Set INTERNAL_API_SECRET in infra/.env — see infra/.env.example}
       AGENTVERSE_API_OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in infra/.env — see infra/.env.example}
+      # Phase 6: apps/api writes third-party MCP credentials, apps/worker
+      # resolves them. Same key on both, or ciphertext written by one is
+      # unreadable by the other.
+      AGENTVERSE_CREDENTIAL_KEK_V1: ${AGENTVERSE_CREDENTIAL_KEK_V1:?Set AGENTVERSE_CREDENTIAL_KEK_V1 in infra/.env — see infra/.env.example}
       # Phase 3: producer side of apps/worker's job queue — same Redis
       # instance, container-network hostname (not the "localhost" default
       # that's only correct when running apps/api directly on the host).
@@ -97,6 +101,11 @@ services:
       # infrastructure/config.py's Settings.database_url docstring).
       AGENTVERSE_WORKER_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-agentverse}:${POSTGRES_PASSWORD:-agentverse_dev_only}@postgres:5432/${POSTGRES_DB:-agentverse}
       AGENTVERSE_WORKER_OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in infra/.env — see infra/.env.example}
+      # Phase 6: the SAME key apps/api uses. A credential sealed by one
+      # service must be readable by the other, so this is deliberately
+      # not service-prefixed. `:?` so a missing key fails compose up
+      # rather than the first tool call (CLAUDE.md Rule 1).
+      AGENTVERSE_CREDENTIAL_KEK_V1: ${AGENTVERSE_CREDENTIAL_KEK_V1:?Set AGENTVERSE_CREDENTIAL_KEK_V1 in infra/.env — see infra/.env.example}
     # Phase 3 (docs/roadmap.md acceptance criterion): a runaway job must
     # be killed by *this* container's own limit, not by starving the
     # host or co-located services. `mem_limit`/`cpus`/`pids_limit` are
