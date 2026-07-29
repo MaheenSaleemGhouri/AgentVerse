@@ -111,14 +111,14 @@ Migration verified against real pg16: `upgrade → downgrade → upgrade`,
 | --- | --- | --- |
 | 1 | Requirements | ✅ brief + roadmap Phase 6 |
 | 2 | Architecture | ✅ ADR-0010 |
-| 3 | Security reviewed | ⚠️ **Threat model authored; `owasp-expert` and `security-reviewer` passes not run** |
+| 3 | Security reviewed | ⚠️ [`security-reviewer` pass run](./security/phase-6-security-review.md) — no blocking finding, one dependency finding fixed (`cryptography`), `starlette` advisories accepted via the FastAPI pin. **`owasp-expert` standing audit still not run** |
 | 4 | Tests passing | ✅ |
-| 5 | Documentation | ✅ 5 documents |
-| 6 | Performance | ⚠️ **No latency budget published for tool-call endpoints** |
-| 7 | Accessibility | ⚠️ **No axe-core or keyboard pass on the new screens** |
-| 8 | Monitoring | ⚠️ **No dashboard or alert for denied-call rate** |
+| 5 | Documentation | ✅ 8 documents |
+| 6 | Performance | ⚠️ [Budgets published](./performance/tool-execution-budgets.md) — **no measurement, no load test, no CI gate**, so the item is not satisfied |
+| 7 | Accessibility | ⚠️ [axe gate green, 2 real defects fixed](./accessibility/phase-6-audit.md) — **manual keyboard, screen-reader, contrast, reduced-motion passes not run** |
+| 8 | Monitoring | ⚠️ [Dashboard, 9 metrics, 7 alerts, 4 runbooks specified](./observability/tool-execution-monitoring.md) — **nothing instrumented or deployed** |
 | 9 | Deployment ready | ✅ additive migration, reversible; KEK documented in both `.env.example` files and compose |
-| 10 | Final review | ⚠️ **Not run** |
+| 10 | Final review | ⚠️ [Go-with-conditions recorded](./releases/phase-6-go-no-go.md) |
 
 ## Gaps — what is not built
 

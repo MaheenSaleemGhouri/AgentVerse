@@ -33,7 +33,10 @@ dependencies = [
     # format is exactly the drift that makes ciphertext unreadable by the
     # service that did not write it. AESGCM only; no custom crypto
     # (CLAUDE.md §10).
-    "cryptography>=44,<47",
+    # >=48.0.1 for GHSA-537c-gmf6-5ccf. This is the library that seals
+    # every MCP credential (security/envelope.py), so it is not a
+    # dependency to leave on a vulnerable version.
+    "cryptography>=48.0.1,<49",
 ]
 
 [dependency-groups]
