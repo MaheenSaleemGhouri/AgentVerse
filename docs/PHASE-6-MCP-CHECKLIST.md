@@ -124,11 +124,11 @@ Migration verified against real pg16: `upgrade → downgrade → upgrade`,
 | --- | --- | --- |
 | 1 | Requirements | ✅ brief + roadmap Phase 6 |
 | 2 | Architecture | ✅ ADR-0010 |
-| 3 | Security reviewed | ⚠️ [`security-reviewer` pass run](./security/phase-6-security-review.md) — no blocking finding, one dependency finding fixed (`cryptography`), `starlette` advisories accepted via the FastAPI pin. **`owasp-expert` standing audit still not run** |
+| 3 | Security reviewed | ✅ [`security-reviewer` pass](./security/phase-6-security-review.md) + [`owasp-expert` Top 10 audit](./security/owasp-audit-phase-6.md) — no blocking finding; 2 findings fixed (`cryptography` CVE, KEK in `.env.example`), `starlette` accepted with an owner. **No penetration test** |
 | 4 | Tests passing | ✅ |
 | 5 | Documentation | ✅ 8 documents |
-| 6 | Performance | ⚠️ [Budgets published](./performance/tool-execution-budgets.md) — **no measurement, no load test, no CI gate**, so the item is not satisfied |
-| 7 | Accessibility | ⚠️ [axe gate green, 2 real defects fixed](./accessibility/phase-6-audit.md) — **manual keyboard, screen-reader, contrast, reduced-motion passes not run** |
+| 6 | Performance | ⚠️ [Budgets published; tool path measured under concurrency and CI-gated](./performance/tool-execution-budgets.md) — overhead is 4.5 Redis round trips, refusals 0.60× a permitted call. **Endpoint and frontend budgets still unmeasured; no Lighthouse/bundle gate** |
+| 7 | Accessibility | ❌ [axe gate green, 2 defects fixed, contrast now measured](./accessibility/phase-6-audit.md) — **measurement found 6 real AA contrast failures in the shared palette** (`StatusBadge`, `Button`). Pinned and CI-gated, not fixed: a product-wide `design-system-architect` call. Manual keyboard + screen-reader passes still not run |
 | 8 | Monitoring | ⚠️ [9 metrics emitted and scraped, 7 alert rules unit-tested, routing + 10-panel dashboard checked in, all gated in CI](./observability/tool-execution-monitoring.md) — **no PagerDuty/Slack receiver provisioned, so nothing pages a human yet** |
 | 9 | Deployment ready | ✅ additive migration, reversible; KEK documented in both `.env.example` files and compose; **both `runtime` images now build and are gated by the `container-build` CI job** (they had been unbuildable since Phase 5 — shared package resolved by relative path, never copied into the image) |
 | 10 | Final review | ⚠️ [Go-with-conditions recorded](./releases/phase-6-go-no-go.md) |

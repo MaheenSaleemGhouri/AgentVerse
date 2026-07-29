@@ -72,7 +72,7 @@ ignore_missing_imports = true
 asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
-    "integration: requires a real Postgres with pgvector (AGENTVERSE_WORKER_DATABASE_URL) — CLAUDE.md §11, never mocked",
+    "integration: requires a real Postgres with pgvector (AGENTVERSE_WORKER_DATABASE_URL) or a real Redis (AGENTVERSE_WORKER_REDIS_URL) — CLAUDE.md §11, never mocked",
 ]
 
 [tool.uv.sources]

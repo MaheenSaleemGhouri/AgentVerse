@@ -103,11 +103,53 @@ has run.
 | --- | --- |
 | **Manual keyboard-only pass** in a real browser | **Not run.** The static review above establishes that the markup is operable in principle; it does not establish that focus *order* is sensible, that nothing is a keyboard trap, or that the filter groups feel usable |
 | **Screen-reader pass** (NVDA or VoiceOver) | **Not run.** No claim is made about what these screens actually announce |
-| **Contrast measurement** | **Not run.** The tokens are the shared AVDS semantic ramps used across the product, not values Phase 6 introduced, so they are very likely already compliant — but "likely" is not a measurement, and none was taken for this audit |
+| **Contrast measurement** | **Run — see below. The guess recorded here previously was wrong.** |
 | **Reduced-motion verification** | **Not run.** The only animation is `StatusBadge`'s pulse, already gated behind `motion-safe:` in code; the emulated-setting check was not performed |
 
 None of these are blocked — they need a browser session and a person at
 the keyboard, which this audit did not include.
+
+## Contrast — measured, and failing
+
+`app/design-tokens-contrast.test.ts` parses the real tokens out of
+`globals.css` and computes WCAG ratios for the pairs the components
+actually render. It runs on every `pnpm test`.
+
+This section previously said contrast was "not run" but that the tokens
+were "very likely already compliant". **That guess was wrong.** Six
+rendered pairs fail AA in light theme and three in dark:
+
+| Pair | Light | Dark | Rendered by |
+| --- | --- | --- | --- |
+| `--success` on `--success-soft` | **2.52:1** | 5.01:1 ✅ | `StatusBadge` success |
+| `--warning` on `--warning-soft` | **2.14:1** | 6.44:1 ✅ | `StatusBadge` warning |
+| `--info` on `--info-soft` | **2.82:1** | 4.87:1 ✅ | `StatusBadge` info |
+| `--destructive` on `--destructive-soft` | **3.29:1** | **4.37:1** | `StatusBadge` danger |
+| `--primary-foreground` on `--primary` | **4.35:1** | **4.35:1** | `Button` default variant |
+| `--destructive-foreground` on `--destructive` | **3.76:1** | **3.76:1** | KB count badge |
+
+All are body-sized text, so none qualifies for the 3:1 large-text
+allowance. Everything else measured — body text, muted text on both
+page and card, secondary surfaces, and the focus ring against the page
+(1.4.11) — passes in both themes.
+
+**These are not Phase 6 defects.** `StatusBadge`, `Button`, and the
+count badge all predate it; Phase 6 renders `StatusBadge` and therefore
+inherits the failure. Fixing it means changing status colours across the
+entire product, which is a `design-system-architect` decision and not
+something to slip into an integrations phase.
+
+The failures are **pinned, not skipped**: the test asserts each is still
+failing at its measured ratio, so darkening a token tells you to remove
+the entry and letting it drift further fails the build. A plain skip
+would have let the palette rot while reporting green.
+
+Three things this measurement does *not* establish: it checks token
+pairs found by reading the components, so a future component pairing two
+tokens nobody anticipated is uncovered; it computes ratios rather than
+rendering them, so an opacity modifier applied in a class
+(`bg-destructive-soft/30`, which the runtime view uses) is not accounted
+for; and it says nothing about non-text contrast beyond the focus ring.
 
 ## Target size
 

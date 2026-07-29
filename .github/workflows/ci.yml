@@ -77,7 +77,23 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      # The boundary's circuit breaker, per-run budget, and result cache
+      # are all Redis-backed, so the concurrency measurement in
+      # tests/tools/test_boundary_load.py needs a real one — fakeredis is
+      # in-process and would report latency unrelated to a deployed
+      # system. Without this service the measurement skips, and a
+      # performance gate that skips is not a gate.
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
+      AGENTVERSE_WORKER_REDIS_URL: redis://localhost:6379/0
       AGENTVERSE_API_DATABASE_URL: postgresql+asyncpg://agentverse:agentverse_ci_only@localhost:5432/agentverse
       # Set for every leg so the integration suites actually execute
       # rather than deselecting themselves. Their conftests skip when the

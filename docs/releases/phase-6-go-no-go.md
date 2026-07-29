@@ -22,13 +22,30 @@ work: metrics are emitted and scraped, alert rules are unit-tested,
 routing and a ten-panel dashboard are checked in, and CI now builds
 both `runtime` images and validates the whole observability config.
 
-**One thing holds production back, and it is not code: no alert
-receiver is provisioned.** The routing exists and reads its credentials
-from mounted secret files; no PagerDuty service or Slack webhook has
-been created, so those files exist nowhere and Alertmanager cannot
-start. Until someone provisions them, an egress denial is a row in
-Prometheus that nobody is told about — and the security controls this
-phase is built around are only as good as the notice they generate.
+**Two things hold production back.**
+
+1. **No alert receiver is provisioned.** The routing exists and reads
+   its credentials from mounted secret files; no PagerDuty service or
+   Slack webhook has been created, so those files exist nowhere and
+   Alertmanager cannot start. Until someone provisions them, an egress
+   denial is a row in Prometheus that nobody is told about — and the
+   security controls this phase is built around are only as good as the
+   notice they generate.
+
+2. **Six WCAG 2.2 AA contrast failures, now measured.** Gate 7 is the
+   one that got *worse* under inspection, which is the point of
+   measuring: the audit previously recorded contrast as "not run" while
+   guessing the tokens were "very likely already compliant". They are
+   not. `StatusBadge` renders status text at 2.14:1–3.29:1 in light
+   theme where AA requires 4.5:1, and the default `Button` is 4.35:1 in
+   both themes. §15 makes AA a merge gate and Rule 7 makes it
+   non-negotiable, so this blocks on its own terms.
+
+   The failures are in the shared AVDS palette and predate Phase 6;
+   fixing them changes status colours product-wide, which is
+   `design-system-architect`'s call rather than an integrations
+   phase's. They are pinned in a CI-gated test so the palette cannot
+   drift further while that decision is made.
 
 Recorded because it was found here rather than in an incident: **both
 container images had never been built successfully.** `api.Dockerfile`
@@ -47,11 +64,11 @@ and that is a gate that was not actually being checked.
 | --- | --- | --- |
 | 1 Requirements | `product-manager` | ✅ brief + roadmap Phase 6 |
 | 2 Architecture | `architecture-reviewer` | ✅ ADR-0010 |
-| 3 Security | `security-reviewer` | ⚠️ Pass, no blocking finding; `owasp-expert` audit not run |
+| 3 Security | `security-reviewer` | ✅ Pass + `owasp-expert` Top 10 audit; 2 findings fixed, no penetration test |
 | 4 Tests | `testing-architect` | ✅ 995 tests green across four suites, zero skipped, plus the alert-rule unit suite; lint/type clean |
 | 5 Documentation | `documentation-engineer` | ✅ |
-| 6 Performance | `performance-engineer` | ❌ Budgets only — nothing measured |
-| 7 Accessibility | `accessibility-expert` | ⚠️ Automated gate green; manual passes not run |
+| 6 Performance | `performance-engineer` | ⚠️ Tool path measured + CI-gated; endpoint/frontend budgets unmeasured |
+| 7 Accessibility | `accessibility-expert` | ❌ **6 measured AA contrast failures in the shared palette**; manual passes not run |
 | 8 Monitoring | `observability-engineer` | ⚠️ Instrumented, scraped, alert-tested, dashboard + routing checked in and CI-gated; **no receiver provisioned** |
 | 9 Deployment | `deployment-engineer` | ✅ Additive migration with tested downgrade; both `runtime` images build and are CI-gated (**they had not built since Phase 5**) |
 | 10 Final | `final-qa-reviewer` | This document |
