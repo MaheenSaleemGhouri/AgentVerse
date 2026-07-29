@@ -14,6 +14,7 @@ import { useCatalog, useInstallFromCatalog, useInstalledServers } from "@/lib/qu
 
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
+import { FilterGroup } from "@/components/patterns/filter-group";
 import { StatusBadge } from "@/components/patterns/status-badge";
 import { RegisterCustomServerDialog } from "@/components/integrations/register-custom-server-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -21,10 +22,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type CategoryFilter = "all" | (typeof CATEGORIES)[number];
+
+const CATEGORY_FILTERS: ReadonlyArray<{ value: CategoryFilter; label: string }> = [
+  { value: "all", label: "All" },
+  ...CATEGORIES.map((name) => ({ value: name, label: name })),
+];
 
 /**
  * The MCP marketplace.
@@ -107,16 +112,12 @@ export function Marketplace({
         <RegisterCustomServerDialog workspaceId={workspaceId} />
       </div>
 
-      <Tabs value={category} onValueChange={(value) => setCategory(value as CategoryFilter)}>
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="all">All</TabsTrigger>
-          {CATEGORIES.map((name) => (
-            <TabsTrigger key={name} value={name}>
-              {name}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      <FilterGroup
+        label="Filter integrations by category"
+        value={category}
+        onValueChange={setCategory}
+        options={CATEGORY_FILTERS}
+      />
 
       {visible.length === 0 ? (
         <EmptyState
@@ -180,7 +181,11 @@ function CatalogCard({
         {entry.required_credentials.length > 0 && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Badge variant="secondary">
+              {/* Focusable so the credential list is reachable without a
+                  pointer — a tooltip on an inert span is invisible to
+                  keyboard users, and this is information they need
+                  before handing over a secret. */}
+              <Badge variant="secondary" tabIndex={0}>
                 {entry.required_credentials.length}{" "}
                 {entry.required_credentials.length === 1 ? "credential" : "credentials"}
               </Badge>

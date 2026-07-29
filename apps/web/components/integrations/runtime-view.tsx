@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 
 import { EmptyState } from "@/components/patterns/empty-state";
 import { ErrorState } from "@/components/patterns/error-state";
+import { FilterGroup } from "@/components/patterns/filter-group";
 import { StatCard } from "@/components/patterns/stat-card";
 import { StatusBadge } from "@/components/patterns/status-badge";
 import {
@@ -18,7 +19,6 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const STATUS_FILTERS = [
   { value: "all", label: "All" },
@@ -27,6 +27,8 @@ const STATUS_FILTERS = [
   { value: "denied", label: "Denied" },
   { value: "timeout", label: "Timed out" },
 ] as const;
+
+type StatusFilter = (typeof STATUS_FILTERS)[number]["value"];
 
 /**
  * Tool-call execution history and metrics.
@@ -43,7 +45,7 @@ export function RuntimeView({
   workspaceId: string;
   installedServerId?: string;
 }): React.JSX.Element {
-  const [status, setStatus] = React.useState<string>("all");
+  const [status, setStatus] = React.useState<StatusFilter>("all");
   const metrics = useIntegrationMetrics(workspaceId, installedServerId);
   const calls = useToolCalls(workspaceId, {
     installedServerId,
@@ -92,15 +94,12 @@ export function RuntimeView({
         </p>
       )}
 
-      <Tabs value={status} onValueChange={setStatus}>
-        <TabsList>
-          {STATUS_FILTERS.map((filter) => (
-            <TabsTrigger key={filter.value} value={filter.value}>
-              {filter.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      <FilterGroup
+        label="Filter tool calls by status"
+        value={status}
+        onValueChange={setStatus}
+        options={STATUS_FILTERS}
+      />
 
       {calls.isLoading && !calls.data ? (
         <div className="flex flex-col gap-2">
