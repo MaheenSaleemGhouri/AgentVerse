@@ -19,6 +19,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from agentverse_shared.observability.metrics import record_breaker_opened
 from redis.asyncio import Redis
 
 #: Consecutive failures before the breaker opens. Low, because the thing
@@ -106,9 +107,19 @@ class CircuitBreaker:
         await self._redis.expire(failure_key, self._open_seconds * 2)
 
         if failures >= self._threshold:
-            await self._redis.set(
-                self._open_key(workspace_id, server_id), "1", ex=self._open_seconds
+            was_open = await self._redis.set(
+                self._open_key(workspace_id, server_id),
+                "1",
+                ex=self._open_seconds,
+                # `get=True` returns the prior value, so a genuine
+                # closed→open transition is distinguishable from a
+                # further failure against an already-open breaker.
+                # Counting every failure past the threshold would make
+                # one dead server look like a fleet-wide event.
+                get=True,
             )
+            if was_open is None:
+                record_breaker_opened()
             return BreakerState(
                 is_open=True, failure_count=int(failures), retry_after_seconds=self._open_seconds
             )

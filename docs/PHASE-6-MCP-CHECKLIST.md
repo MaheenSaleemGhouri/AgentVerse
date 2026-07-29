@@ -78,14 +78,15 @@ fails the TypeScript build.
 
 | Suite | Result |
 | --- | --- |
-| `packages/python-shared` | 256 passed |
+| `packages/python-shared` | 267 passed |
 | `apps/api` | 440 passed |
-| `apps/worker` | 242 passed |
+| `apps/worker` | 255 passed |
 | `apps/web` | 33 passed |
+| `promtool test rules` (alert unit tests) | SUCCESS |
 | ruff + mypy (3 packages) | clean |
 | tsc + eslint + next build | clean |
 
-**971 tests, zero skipped.** The Python suites were re-run against a
+**995 tests, zero skipped.** The Python suites were re-run against a
 real pgvector pg16 at revision `c4e81f3d9b27` with
 `AGENTVERSE_{API,WORKER,SHARED}_DATABASE_URL` set, so the integration
 layer — tenant isolation on `kb_chunks`, shared-memory and session
@@ -128,8 +129,8 @@ Migration verified against real pg16: `upgrade → downgrade → upgrade`,
 | 5 | Documentation | ✅ 8 documents |
 | 6 | Performance | ⚠️ [Budgets published](./performance/tool-execution-budgets.md) — **no measurement, no load test, no CI gate**, so the item is not satisfied |
 | 7 | Accessibility | ⚠️ [axe gate green, 2 real defects fixed](./accessibility/phase-6-audit.md) — **manual keyboard, screen-reader, contrast, reduced-motion passes not run** |
-| 8 | Monitoring | ⚠️ [Dashboard, 9 metrics, 7 alerts, 4 runbooks specified](./observability/tool-execution-monitoring.md) — **nothing instrumented or deployed** |
-| 9 | Deployment ready | ✅ additive migration, reversible; KEK documented in both `.env.example` files and compose |
+| 8 | Monitoring | ⚠️ [9 metrics emitted, scraped by Prometheus, 7 alert rules unit-tested](./observability/tool-execution-monitoring.md) — **no Alertmanager receiver, no Grafana dashboard** |
+| 9 | Deployment ready | ⚠️ additive migration, reversible; KEK documented in both `.env.example` files and compose. **Both container images were unbuildable since Phase 5 (shared package resolved by relative path, never copied into the image) — fixed and verified building here** |
 | 10 | Final review | ⚠️ [Go-with-conditions recorded](./releases/phase-6-go-no-go.md) |
 
 ## Gaps — what is not built

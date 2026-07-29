@@ -16,14 +16,15 @@ import contextlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from agents import set_default_openai_client, set_tracing_disabled
 from fastapi import FastAPI
 from openai import AsyncOpenAI
 
+from agents import set_default_openai_client, set_tracing_disabled
 from agentverse_worker.infrastructure.config import get_settings
 from agentverse_worker.infrastructure.logging import configure_logging
 from agentverse_worker.interface.dependencies import get_queue, get_redis_client
 from agentverse_worker.interface.routes.health import router as health_router
+from agentverse_worker.interface.routes.metrics import router as metrics_router
 from agentverse_worker.interface.routes.queue_metrics import router as queue_metrics_router
 from agentverse_worker.queue.factory import build_queue  # noqa: F401 - re-exported for tests
 
@@ -70,6 +71,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health_router)
     app.include_router(queue_metrics_router)
+    app.include_router(metrics_router)
     return app
 
 

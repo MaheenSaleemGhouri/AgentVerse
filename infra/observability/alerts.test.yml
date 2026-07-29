@@ -1,0 +1,137 @@
+# Unit tests for the alert rules. Run with:
+#   promtool test rules infra/observability/alerts.test.yml
+#
+# `promtool check rules` only proves the PromQL parses. These prove it
+# *fires* — and, just as importantly, that it does not fire when it
+# should not. Two of these rules page a human at a single event, so
+# "does the expression actually match" is not a question to leave to the
+# first real incident.
+
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  # --- The rule the whole surface exists for ------------------------
+  - interval: 1m
+    name: a single egress denial pages
+    input_series:
+      # Flat zero, then one increment — one blocked call, which is the
+      # smallest signal this alert must not miss.
+      - series: 'agentverse_egress_denied_total{range="metadata"}'
+        values: "0 0 0 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: EgressDenied
+        exp_alerts:
+          - exp_labels:
+              severity: p1
+              route: security-oncall
+              range: metadata
+            exp_annotations:
+              summary: "Agent-initiated call to a denied destination (metadata)"
+              description: "The egress guard blocked an outbound call. Nothing was reached — the guard runs before connect and revalidates each redirect hop, so this is a blocked attempt, not a breach. A `metadata` range is a cloud-credential probe until proven otherwise; other ranges are usually a customer pointing at their own private network."
+              runbook: "docs/observability/tool-execution-monitoring.md#runbook--egress-denial"
+
+  - interval: 1m
+    name: a quiet egress counter does not page
+    input_series:
+      - series: 'agentverse_egress_denied_total{range="metadata"}'
+        values: "0 0 0 0 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: EgressDenied
+        exp_alerts: []
+
+  - interval: 1m
+    name: an old denial stops paging once it leaves the window
+    # The reason the rule uses increase() over a window rather than the
+    # raw counter: a cumulative counter stays above zero forever, so
+    # `> 0` on it would latch the page on permanently after one event.
+    input_series:
+      - series: 'agentverse_egress_denied_total{range="rfc1918"}'
+        values: "1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: EgressDenied
+        exp_alerts: []
+
+  # --- Credential unsealing ----------------------------------------
+  - interval: 1m
+    name: a credential unseal failure pages
+    input_series:
+      - series: "agentverse_credential_unseal_failures_total"
+        values: "0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CredentialUnsealFailure
+        exp_alerts:
+          - exp_labels:
+              severity: p1
+              route: platform-oncall
+            exp_annotations:
+              summary: "A stored MCP credential could not be decrypted"
+              description: "Steady state is zero. Two causes: AGENTVERSE_CREDENTIAL_KEK_V1 differs between apps/api and apps/worker (the common one, usually after a deploy), or the AAD did not match — which means a credential row was moved between workspaces and is a possible tampering event, not a bug."
+              runbook: "docs/observability/tool-execution-monitoring.md#runbook--credential-unseal-failure"
+
+  # --- Refusals are not failures -----------------------------------
+  - interval: 1m
+    name: a flood of refusals does not look like an outage
+    # The claim that most distinguishes this alerting design from a
+    # naive error-rate one. An injected instruction firing hundreds of
+    # refused tool calls is the platform working perfectly; if that read
+    # as a 100% failure rate, every successful defence would page the
+    # on-call and the real signal would be trained away.
+    input_series:
+      - series: 'agentverse_tool_calls_total{status="denied"}'
+        values: "0+50x30"
+      - series: 'agentverse_tool_calls_total{status="circuit_open"}'
+        values: "0+20x30"
+      - series: 'agentverse_tool_calls_total{status="success"}'
+        values: "0+10x30"
+      - series: 'agentverse_tool_calls_total{status="error"}'
+        values: "0x30"
+      - series: 'agentverse_tool_calls_total{status="timeout"}'
+        values: "0x30"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: ToolFailureRateHigh
+        exp_alerts: []
+
+  - interval: 1m
+    name: genuine failures above a quarter do alert
+    input_series:
+      - series: 'agentverse_tool_calls_total{status="success"}'
+        values: "0+10x40"
+      - series: 'agentverse_tool_calls_total{status="error"}'
+        values: "0+10x40"
+      - series: 'agentverse_tool_calls_total{status="timeout"}'
+        values: "0x40"
+      - series: 'agentverse_tool_calls_total{status="denied"}'
+        values: "0x40"
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: ToolFailureRateHigh
+        exp_alerts:
+          - exp_labels:
+              severity: p2
+              route: platform-oncall
+            exp_annotations:
+              summary: "Tool call failure rate above 25%"
+              description: "Excludes refusals. Check whether it is one server or many — one is theirs, many means the worker fleet is degraded before any customer is to blame."
+              runbook: "docs/observability/tool-execution-monitoring.md#runbook--elevated-failure-rate"
+
+  - interval: 1m
+    name: a trickle of traffic does not alert on one failure
+    # Without the rate floor, one failure out of two calls is 50% and
+    # would page — on a workspace that made two calls all hour.
+    input_series:
+      - series: 'agentverse_tool_calls_total{status="success"}'
+        values: "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1"
+      - series: 'agentverse_tool_calls_total{status="error"}'
+        values: "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 38m
+        alertname: ToolFailureRateHigh
+        exp_alerts: []

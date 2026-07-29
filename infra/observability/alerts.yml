@@ -1,0 +1,163 @@
+# Alert rules for the MCP tool-execution surface.
+#
+# The design and the reasoning behind each threshold live in
+# `docs/observability/tool-execution-monitoring.md`; this file is the
+# executable form. Every rule carries a `runbook` annotation pointing at
+# the section that tells the responder what to do — an alert without one
+# is a page that starts with someone reading source code.
+#
+# Severities map to routing: p1 pages, p2 raises a ticket immediately,
+# p3 raises a ticket for the next working day.
+
+groups:
+  - name: agentverse-tool-execution
+    rules:
+      # --- P1: security ---------------------------------------------
+      #
+      # Both of these page on a single event, and that is deliberate.
+      # Their steady state is exactly zero, so there is no rate to
+      # threshold — any occurrence is the event.
+
+      - alert: EgressDenied
+        # `> 0` on a 5m increase rather than `> 0` on the raw counter:
+        # the counter is cumulative and would stay above zero forever
+        # after one denial, leaving the alert permanently firing.
+        expr: increase(agentverse_egress_denied_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: p1
+          route: security-oncall
+        annotations:
+          summary: >-
+            Agent-initiated call to a denied destination
+            ({{ $labels.range }})
+          description: >-
+            The egress guard blocked an outbound call. Nothing was
+            reached — the guard runs before connect and revalidates each
+            redirect hop, so this is a blocked attempt, not a breach.
+            A `metadata` range is a cloud-credential probe until proven
+            otherwise; other ranges are usually a customer pointing at
+            their own private network.
+          runbook: docs/observability/tool-execution-monitoring.md#runbook--egress-denial
+
+      - alert: CredentialUnsealFailure
+        expr: increase(agentverse_credential_unseal_failures_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: p1
+          route: platform-oncall
+        annotations:
+          summary: A stored MCP credential could not be decrypted
+          description: >-
+            Steady state is zero. Two causes: AGENTVERSE_CREDENTIAL_KEK_V1
+            differs between apps/api and apps/worker (the common one,
+            usually after a deploy), or the AAD did not match — which
+            means a credential row was moved between workspaces and is a
+            possible tampering event, not a bug.
+          runbook: docs/observability/tool-execution-monitoring.md#runbook--credential-unseal-failure
+
+      # --- P2/P3: reliability ---------------------------------------
+
+      - alert: ToolFailureRateHigh
+        # Refusals are excluded from the numerator on purpose: `denied`
+        # and `circuit_open` are controls working correctly, and folding
+        # them in would make blocking an attack look like an outage.
+        # The `> 0.2` denominator clause suppresses the alert on tiny
+        # samples, where one failure is 50% and means nothing.
+        expr: >-
+          sum(rate(agentverse_tool_calls_total{status=~"error|timeout"}[15m]))
+          /
+          sum(rate(agentverse_tool_calls_total[15m])) > 0.25
+          and sum(rate(agentverse_tool_calls_total[15m])) > 0.02
+        for: 15m
+        labels:
+          severity: p2
+          route: platform-oncall
+        annotations:
+          summary: Tool call failure rate above 25%
+          description: >-
+            Excludes refusals. Check whether it is one server or many —
+            one is theirs, many means the worker fleet is degraded before
+            any customer is to blame.
+          runbook: docs/observability/tool-execution-monitoring.md#runbook--elevated-failure-rate
+
+      - alert: BoundaryOverheadBudgetBreached
+        # This histogram excludes both the third-party call and retry
+        # backoff, so a breach is our code and nobody else's. That is
+        # the entire reason it is a separate metric from
+        # tool_call_duration_seconds.
+        expr: >-
+          histogram_quantile(
+            0.95,
+            sum(rate(agentverse_tool_boundary_overhead_seconds_bucket[15m])) by (le)
+          ) > 0.025
+        for: 15m
+        labels:
+          severity: p3
+          route: platform-oncall
+        annotations:
+          summary: Tool boundary overhead p95 above the 25ms budget
+          description: >-
+            Our compute plus a few Redis round trips. The third party is
+            not involved in this metric — profile the boundary itself.
+            Budget source: docs/performance/tool-execution-budgets.md
+          runbook: docs/performance/tool-execution-budgets.md
+
+      - alert: CircuitBreakersOpeningRepeatedly
+        expr: increase(agentverse_circuit_breaker_opened_total[30m]) > 5
+        for: 5m
+        labels:
+          severity: p3
+          route: platform-oncall
+        annotations:
+          summary: Circuit breakers opening repeatedly
+          description: >-
+            Counts open *transitions*, so a single permanently-dead
+            server contributes roughly one per open window rather than
+            one per failed call. A sustained rate means many servers are
+            failing, which points at the fleet or its network rather
+            than at any one customer's endpoint.
+          runbook: docs/observability/tool-execution-monitoring.md#runbook--breaker-stuck-open
+
+      - alert: McpAttachmentFailing
+        expr: >-
+          sum(rate(agentverse_mcp_connect_total{outcome="unreachable"}[30m]))
+          /
+          sum(rate(agentverse_mcp_connect_total[30m])) > 0.5
+        for: 30m
+        labels:
+          severity: p3
+          route: platform-oncall
+        annotations:
+          summary: Over half of MCP server attachments are failing
+          description: >-
+            Expected to be non-zero in normal operation — customer
+            servers go down and that is their business. Sustained above
+            half suggests something on our side, such as egress policy
+            or DNS in the worker network.
+          runbook: docs/observability/tool-execution-monitoring.md#runbook--elevated-failure-rate
+
+      # --- P3: behavioural ------------------------------------------
+
+      - alert: DenialRateSpike
+        # Compared against the same window a week earlier rather than a
+        # fixed threshold: a workspace tightening its permissions
+        # legitimately raises the baseline, and a fixed number would
+        # either page on that or miss a real spike at a busier tenant.
+        expr: >-
+          sum(rate(agentverse_tool_calls_denied_total{reason="permission"}[1h]))
+          >
+          3 * sum(rate(agentverse_tool_calls_denied_total{reason="permission"}[1h] offset 7d))
+          and sum(rate(agentverse_tool_calls_denied_total{reason="permission"}[1h])) > 0.01
+        for: 1h
+        labels:
+          severity: p3
+          route: platform-oncall
+        annotations:
+          summary: Permission denials 3x the weekly baseline
+          description: >-
+            Usually a permission change with a wider blast radius than
+            intended. The other possibility is an agent newly acting on
+            injected content and reaching for tools it does not hold —
+            check what those runs read.
+          runbook: docs/observability/tool-execution-monitoring.md

@@ -37,6 +37,12 @@ dependencies = [
     # every MCP credential (security/envelope.py), so it is not a
     # dependency to leave on a vulnerable version.
     "cryptography>=48.0.1,<49",
+    # RED/USE metrics for the tool-execution boundary. Shared because the
+    # egress guard and the credential envelope live here and are called
+    # from both services, so the metric names must be defined once
+    # (Rule 3). The boring choice deliberately (CLAUDE.md §3, KISS):
+    # a scrape endpoint and a text format, no agent, no push gateway.
+    "prometheus-client>=0.21,<1",
 ]
 
 [dependency-groups]

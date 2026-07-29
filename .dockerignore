@@ -12,6 +12,15 @@
 **/dist/
 
 **/.venv/
+# Listed explicitly as well as by the glob above. A uv-created venv
+# contains a `lib64 -> lib` symlink; when the venv was created from WSL
+# and the build runs through Docker Desktop on Windows, the context
+# walker fails on that link with "the file cannot be accessed by the
+# system" *before* the glob is applied. The explicit paths are matched
+# earlier and skip the directory outright.
+apps/api/.venv/
+apps/worker/.venv/
+packages/python-shared/.venv/
 **/__pycache__/
 **/*.py[cod]
 **/.mypy_cache/

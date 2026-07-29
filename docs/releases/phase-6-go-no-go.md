@@ -12,12 +12,26 @@ tool-execution boundary. Checklist: `PHASE-6-MCP-CHECKLIST.md`.
 
 **GO WITH CONDITIONS — staging only. Not cleared for production.**
 
+*Revised after the monitoring instrumentation landed and after a
+deployment defect was found. The verdict is unchanged; the reasons for
+it are not.*
+
 The code is complete and correct as far as the gates that ran can
-establish. Three gates ran only in their automatable half, and one of
-those (monitoring) is the reason production is excluded: shipping an
-agent tool-execution surface with no metric emitted and no alert armed
-means an egress denial or a credential unseal failure would be invisible
-until someone looked at a database table.
+establish. Monitoring is no longer the blocker — metrics are emitted,
+scraped, and alert-tested. Two things now hold production back:
+
+1. **No notification path.** Alert rules evaluate; nothing pages. An
+   egress denial would be visible in Prometheus and seen by nobody.
+2. **The container images had never been built.** Both
+   `api.Dockerfile` and `worker.Dockerfile` copied only their own
+   service directory while both `pyproject.toml` files resolve
+   `agentverse-shared` by relative path, so `uv sync` failed inside
+   every image. This was introduced in Phase 5 and went unnoticed
+   because the local stack was always run with `uv run` on the host.
+   It is fixed and both images now build, but "deployment ready" was
+   asserted in this checklist for a release with no deployable
+   artifact, and that is worth recording rather than quietly
+   correcting.
 
 ## Gate roll-up
 
@@ -26,17 +40,17 @@ until someone looked at a database table.
 | 1 Requirements | `product-manager` | ✅ brief + roadmap Phase 6 |
 | 2 Architecture | `architecture-reviewer` | ✅ ADR-0010 |
 | 3 Security | `security-reviewer` | ⚠️ Pass, no blocking finding; `owasp-expert` audit not run |
-| 4 Tests | `testing-architect` | ✅ 971 tests green across four suites, zero skipped; lint/type clean |
+| 4 Tests | `testing-architect` | ✅ 995 tests green across four suites, zero skipped, plus the alert-rule unit suite; lint/type clean |
 | 5 Documentation | `documentation-engineer` | ✅ |
 | 6 Performance | `performance-engineer` | ❌ Budgets only — nothing measured |
 | 7 Accessibility | `accessibility-expert` | ⚠️ Automated gate green; manual passes not run |
-| 8 Monitoring | `observability-engineer` | ❌ Specified, not instrumented |
-| 9 Deployment | `deployment-engineer` | ✅ additive migration with tested downgrade |
+| 8 Monitoring | `observability-engineer` | ⚠️ Instrumented, scraped, alert-tested; no pager, no dashboard |
+| 9 Deployment | `deployment-engineer` | ⚠️ Additive migration with tested downgrade; **images did not build until this change** |
 | 10 Final | `final-qa-reviewer` | This document |
 
 ## What ran, and what it proves
 
-**Tests (gate 4).** 256 + 440 + 242 + 33 across shared, api, worker, and
+**Tests (gate 4).** 267 + 440 + 255 + 33 across shared, api, worker, and
 web, with the database-backed integration layer actually running rather
 than deselected. Migration verified on real pg16 through `upgrade →
 downgrade → upgrade`, not a mocked database. 32 adversarial egress tests, 35 crypto
@@ -60,11 +74,11 @@ tooltip guarding credential requirements was also fixed.
 
 ## Conditions on this GO
 
-1. **Staging deployment only.** Production requires gate 8 — at minimum
-   `egress_denied_total`, `credential_unseal_failures_total`, and
-   `tool_calls_total{status}` emitted, with the two P1 alerts armed.
-   Without them the security controls work but nobody would know when
-   they fire.
+1. **Staging deployment only.** The metrics condition is met — all three
+   named counters are emitted, scraped, and covered by alert-rule unit
+   tests. What remains is an Alertmanager with real receivers, so the
+   two P1 rules reach a human. Until then the security controls work
+   and nobody would be told when they fire.
 2. **`AGENTVERSE_CREDENTIAL_KEK_V1` must be set for both apps/api and
    apps/worker, to the same value.** Startup fails loudly without it.
    Divergent values produce credentials one service cannot read — the
@@ -82,10 +96,28 @@ tooltip guarding credential requirements was also fixed.
 5. **A load test before any workspace exceeds roughly 100k tool calls.**
    The metrics endpoint aggregates live over `tool_calls`; the
    `tool_metrics` rollup job does not exist.
+6. **Existing local stacks need no manual cleanup, but the venv volumes
+   were renamed.** The service directories moved inside the images from
+   `/app` to `/src/apps/<service>`, and a venv records absolute paths.
+   `api_venv`/`worker_venv` became `api_venv_src`/`worker_venv_src` so
+   the next `docker compose up` creates fresh ones instead of failing
+   with `Failed to spawn: uvicorn`. The old volumes are orphaned, not
+   deleted; `docker volume prune` reclaims them when the developer
+   chooses.
 
 ## Rollback
 
-One action: redeploy the previous image tag. Migration `c4e81f3d9b27` is
+**Read this first: there is no previous image tag.** The Dockerfile
+defect above means no prior Phase 5 or Phase 6 image was ever built
+successfully, so "redeploy the previous tag" has nothing to redeploy.
+The first successful build of this service is the one in this change.
+Once a staging deploy produces a tagged image, the rollback story below
+becomes real; until then, rollback means reverting the commit and
+building again, which is exactly the fresh-build-under-pressure that a
+rollback plan exists to avoid.
+
+Thereafter: one action, redeploy the previous image tag. Migration
+`c4e81f3d9b27` is
 additive — 11 new tables, no column dropped or renamed, no existing
 table altered destructively — so previous-version code runs unchanged
 against the new schema. The `downgrade()` is tested and reversible, but

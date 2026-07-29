@@ -5,8 +5,18 @@ paging alert with severity, routing, and a runbook. Owner:
 `observability-engineer`; logging schema `logging-expert`; tracing
 `opentelemetry-expert`.
 
-This document defines the dashboard and alerts. **None of it is
-deployed** — there is no metrics backend running. See the last section.
+This document defines the dashboard and alerts. The metrics below are
+**emitted** by the worker and the rules are **checked in and
+evaluating**; what is still missing is a pager on the other end. The
+last section says exactly which parts are real.
+
+| Artifact | Where |
+| --- | --- |
+| Metric definitions | `packages/python-shared/src/agentverse_shared/observability/metrics.py` |
+| Scrape endpoint | worker `GET /internal/metrics` |
+| Scrape config | `infra/observability/prometheus.yml` |
+| Alert rules | `infra/observability/alerts.yml` |
+| Local stack | `prometheus` service in `infra/docker-compose.yml` |
 
 ## What makes this surface different
 
@@ -27,25 +37,54 @@ would merge:
 
 ## Metrics
 
-Emitted from the boundary (`apps/worker/src/agentverse_worker/tools/`),
-labelled `workspace_id`, `installed_server_id`, `tool_name`, `status`.
+Emitted from the worker: the boundary
+(`apps/worker/src/agentverse_worker/tools/`), the MCP connection
+manager, and the credential repository. All names are prefixed
+`agentverse_`.
 
-`workspace_id` as a label is a cardinality risk at scale. It is kept
-because per-tenant attribution is what makes these numbers actionable,
-and dropped to a bucketed label if cardinality becomes a cost problem —
-recorded here so that trade-off is a decision, not a surprise.
+| Metric | Type | Labels | Purpose |
+| --- | --- | --- | --- |
+| `agentverse_tool_calls_total` | counter | `status` | RED: rate + errors. `status` is the full enum incl. `denied`, `circuit_open`, `cached` |
+| `agentverse_tool_call_duration_seconds` | histogram | — | RED: duration. Buckets to 120 s (the hard timeout) |
+| `agentverse_tool_boundary_overhead_seconds` | histogram | — | Our latency, isolated from the third party's *and* from retry backoff — the split the budget doc insists on |
+| `agentverse_tool_calls_denied_total` | counter | `reason` | Which control refused: `permission`, `invalid_arguments`, `budget_exceeded`, `circuit_open`, `egress` |
+| `agentverse_egress_denied_total` | counter | `range` | `metadata`, `link_local`, `loopback`, `rfc1918`, `cgnat`, … |
+| `agentverse_mcp_connect_total` | counter | `outcome` | `healthy` / `degraded` / `unreachable` at run start |
+| `agentverse_mcp_connect_duration_seconds` | histogram | — | Attachment cost at run start |
+| `agentverse_circuit_breaker_opened_total` | counter | — | Open *transitions*, not failures |
+| `agentverse_credential_unseal_failures_total` | counter | — | Should be flat zero — a non-zero value means AAD mismatch or key rotation trouble |
 
-| Metric | Type | Purpose |
-| --- | --- | --- |
-| `tool_calls_total{status}` | counter | RED: rate + errors. `status` is the full enum incl. `denied`, `circuit_open`, `cached` |
-| `tool_call_duration_seconds` | histogram | RED: duration. Buckets to 120 s (the hard timeout) |
-| `tool_boundary_overhead_seconds` | histogram | Our latency, isolated from the third party's — the split the budget doc insists on |
-| `tool_calls_denied_total{reason}` | counter | `reason` distinguishes a permission refusal from an egress denial |
-| `egress_denied_total{range}` | counter | `range` = rfc1918 / loopback / link_local / metadata |
-| `mcp_server_health{installed_server_id}` | gauge | 1 healthy, 0 unreachable |
-| `mcp_connect_duration_seconds` | histogram | Attachment cost at run start |
-| `circuit_breaker_open{installed_server_id}` | gauge | USE: saturation of a downstream |
-| `credential_unseal_failures_total` | counter | Should be flat zero — a non-zero value means AAD mismatch or key rotation trouble |
+### Two changes the implementation forced
+
+The design above is not what this document originally specified.
+Recorded rather than quietly amended, because both changes are the kind
+that look like details and are not.
+
+**No `workspace_id`, `installed_server_id`, or `tool_name` label.** The
+original plan carried all three and noted `workspace_id` as "a
+cardinality risk at scale, dropped to a bucketed label if it becomes a
+cost problem". Writing it made that untenable. `workspace_id` grows
+with the customer base; worse, **`tool_name` is attacker-influenced** —
+a custom MCP server declares its own tool names, so a server
+advertising ten thousand tools mints ten thousand series and takes down
+our monitoring from a customer's config. Every label is now drawn from
+a closed vocabulary declared in code, and any unexpected value collapses
+to `other`, so the cardinality ceiling is enforced by the metrics module
+rather than trusted from call sites.
+
+Nothing is lost. Per-tenant, per-server, and per-tool attribution lives
+in `tool_calls` — partitioned, workspace-scoped, and already served by
+`GET /integrations/metrics`. Prometheus answers "is the fleet healthy,
+is anything being refused"; the tenant-scoped API answers "which
+workspace, which server, which tool". That is the correct division, and
+it also means the scrape endpoint carries no tenant data at all.
+
+**`mcp_server_health` and `circuit_breaker_open` are counters, not
+per-server gauges.** Both were specified keyed by `installed_server_id`,
+which is the same unbounded-label problem. `circuit_breaker_opened_total`
+counts open *transitions* — a single dead server contributes one event,
+not one per failed call — and "which server is currently open" is a
+question the integrations API already answers per workspace.
 
 ## Dashboard
 
@@ -70,11 +109,15 @@ reads them:
 | --- | --- | --- | --- | --- |
 | **Egress denial** | `increase(egress_denied_total[5m]) > 0` | **P1 page** | security on-call | [§ Egress denial](#runbook--egress-denial) |
 | Credential unseal failure | `increase(credential_unseal_failures_total[15m]) > 0` | P1 page | platform on-call | [§ Unseal failure](#runbook--credential-unseal-failure) |
-| Tool failure rate | `> 25%` per server over 15m, min 20 calls | P2 ticket | platform on-call | [§ Failure rate](#runbook--elevated-failure-rate) |
+| Tool failure rate | `> 25%` over 15m, excluding refusals, above a traffic floor | P2 ticket | platform on-call | [§ Failure rate](#runbook--elevated-failure-rate) |
 | Boundary overhead breach | p95 `> 25ms` over 15m | P3 ticket | platform on-call | Our code got slower. Profile the boundary; the third party is not involved in this metric |
-| Breaker stuck open | open `> 30m` | P3 ticket | platform on-call | [§ Breaker](#runbook--breaker-stuck-open) |
-| Denial-rate change | permission denials `> 3×` the 7-day baseline | P3 ticket | platform on-call | Usually a permission change with a wider blast radius than intended, or an agent newly reading injected content |
-| Server unreachable | health 0 `> 1h` with attach attempts | P3 ticket | platform on-call | Expected to be common and mostly customer-side |
+| Breakers opening repeatedly | `> 5` open transitions in 30m | P3 ticket | platform on-call | [§ Breaker](#runbook--breaker-stuck-open) |
+| Denial-rate change | permission denials `> 3×` the same hour a week earlier | P3 ticket | platform on-call | Usually a permission change with a wider blast radius than intended, or an agent newly reading injected content |
+| MCP attachment failing | `> 50%` unreachable over 30m | P3 ticket | platform on-call | Expected to be non-zero and mostly customer-side; sustained above half points at our egress policy or DNS |
+
+The executable form is `infra/observability/alerts.yml`; the exact
+thresholds and their reasoning live there as comments next to each
+expression, so the two cannot drift into disagreeing about a number.
 
 **Egress denial pages at a single event, and that is deliberate.** In
 normal operation nobody's MCP server resolves to `169.254.169.254`. One
@@ -125,9 +168,20 @@ it is firing, not to raise the threshold.
 ### Runbook — breaker stuck open
 
 1. Confirm the server is genuinely down before intervening.
-2. A stuck-open breaker with a healthy server means the half-open probe
-   is not running — a platform bug, and the reason this alert exists.
-3. Do not clear breaker state as a matter of routine; it re-arms itself.
+2. Do not clear breaker state as a matter of routine; it re-arms itself.
+
+**A limitation to know before you rely on this.** The alert fires on
+repeated *open transitions*, not on a breaker that is stuck open. That
+is a consequence of dropping `installed_server_id` as a label — see the
+cardinality note above — and it means the original "open > 30m" check no
+longer exists. A genuinely stuck-open breaker with a healthy server
+would show as a run whose tools are unavailable and no alert at all.
+
+Detecting it needs a scrape-time collector that reads breaker state out
+of Redis, which is real work and is not done. Until it is, the
+workspace-scoped integrations API is where a stuck breaker is visible,
+and a customer reporting "my tools stopped working" is how you would
+find out. Recorded because a gap named is a gap someone can close.
 
 ## Tracing and logs
 
@@ -142,16 +196,55 @@ default** (§10): the general log stream carries the tool name, status,
 duration, and denial reason, never argument or result content. Content
 lives only in `tool_calls`, size-capped, behind the workspace-scoped API.
 
-## Not deployed
+## What is verified, and what is not
 
-Everything above is a specification. There is no metrics backend, no
-dashboard, and no alert manager in this environment, so:
+### Verified
 
-- No metric named here is currently emitted. Instrumenting the boundary
-  to emit them is real work that has not been done.
-- No alert can fire.
-- The runbooks have never been exercised.
+- **The metrics are emitted.** The worker exposes them at
+  `/internal/metrics`; asserted by 12 tests in
+  `apps/worker/tests/tools/test_boundary_metrics.py` and 11 in
+  `packages/python-shared/tests/observability/test_metrics.py`.
+- **Prometheus scrapes them.** `docker compose up worker prometheus`
+  brings the target up; confirmed against the live API —
+  `http://worker:8001/internal/metrics health=up`, 24 distinct
+  `agentverse_*` series in the TSDB.
+- **All seven rules load and evaluate.** Confirmed via
+  `/api/v1/rules`; all `inactive`, which is the correct steady state.
+- **The rules fire when they should, and not when they should not.**
+  `infra/observability/alerts.test.yml` is a `promtool test rules`
+  suite covering a single egress denial paging, an old denial ageing
+  out of the window, a credential unseal failure paging, and — the one
+  that matters most — a flood of refusals *not* reading as an outage.
+  Verified as non-vacuous by mutation: folding `denied` and
+  `circuit_open` back into the failure-rate numerator makes that test
+  fail, as it must.
+- **No alert references a metric that is not emitted.** `promtool`
+  cannot check this — a rule naming a metric that never exists parses,
+  loads, and shows green while being unable to fire. A test in
+  `apps/worker/tests/interface/test_metrics_route.py` cross-checks the
+  rule file against the real exposition output.
+- **Alertable series exist from process start.** Label children are
+  pre-initialised at zero, so `increase(...) > 0` can distinguish "no
+  denials" from "this process is not reporting". Without that, the two
+  look identical on the one metric whose purpose is to be silent.
 
-`CLAUDE.md` §19 item 8 is **not satisfied** by this document. It is the
-design the instrumentation should implement, written now so the
-instrumentation has a target — not evidence that monitoring exists.
+### Not verified
+
+- **No pager is attached.** Alertmanager needs receivers with real
+  routing keys, which do not belong in a checked-in file (Rule 1). The
+  rules evaluate and are visible at `/alerts`; nothing notifies a human
+  yet. This is the remaining gap on §19 item 8.
+- **No Grafana dashboard is provisioned.** The ten panels above are
+  specified, not built. Prometheus' own UI serves the queries in the
+  meantime.
+- **The runbooks have never been exercised.** They are written against
+  the system as built, not against a real incident.
+- **Retention, HA, and long-term storage** are managed-service
+  concerns; the compose Prometheus is a local development stack with
+  15-day local retention, not a model of production.
+
+§19 item 8 asks for RED/USE metrics on a checked-in dashboard and every
+paging alert to have severity, routing, and a runbook. Metrics, rules,
+severities, routes, and runbooks all exist and are tested. **The
+dashboard and the notification path do not.** That is a smaller gap than
+this document described before, and it is still a gap.

@@ -65,8 +65,12 @@ services:
       # that's only correct when running apps/api directly on the host).
       AGENTVERSE_API_REDIS_URL: redis://redis:6379/0
     volumes:
-      - ../apps/api:/app
-      - api_venv:/app/.venv
+      # Mirrors the in-image layout (see infra/docker/api.Dockerfile):
+      # the shared package is resolved by relative path, so mounting the
+      # service alone would shadow it out of existence.
+      - ../apps/api:/src/apps/api
+      - ../packages/python-shared:/src/packages/python-shared
+      - api_venv_src:/src/apps/api/.venv
     depends_on:
       postgres:
         condition: service_healthy
@@ -118,8 +122,11 @@ services:
     cpus: "1.0"
     pids_limit: 200
     volumes:
-      - ../apps/worker:/app
-      - worker_venv:/app/.venv
+      - ../apps/worker:/src/apps/worker
+      # Shared with apps/api above: an edit to the shared package
+      # hot-reloads both services, which is the point of it being shared.
+      - ../packages/python-shared:/src/packages/python-shared
+      - worker_venv_src:/src/apps/worker/.venv
     depends_on:
       postgres:
         condition: service_healthy
@@ -184,10 +191,56 @@ services:
       retries: 10
       start_period: 20s
 
+  # Phase 6: scrapes the worker's `/internal/metrics` and evaluates the
+  # alert rules. Local-stack only — staging and production run a managed
+  # Prometheus rather than this container, but they load the *same* two
+  # config files, so a rule that evaluates here evaluates there.
+  #
+  # No Alertmanager alongside it: receivers need real routing keys,
+  # which do not belong in a checked-in file (Rule 1). Rules still
+  # evaluate and are visible at http://localhost:9090/alerts, so a rule
+  # can be verified locally without a pager attached.
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      # Local retention only. Production retention is a managed-service
+      # setting, not this file's business.
+      - --storage.tsdb.retention.time=15d
+    depends_on:
+      worker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
 volumes:
   postgres_data:
-  api_venv:
-  worker_venv:
+  prometheus_data:
+  # `_src` suffix marks the move from `/app/.venv` to
+  # `/src/apps/<service>/.venv`. A venv records absolute paths in
+  # `pyvenv.cfg` and in every console-script shebang, so the old volume
+  # is not merely stale at the new mount point — it is broken, and the
+  # symptom is `Failed to spawn: uvicorn` rather than anything that
+  # points at the cause.
+  #
+  # Renaming rather than asking everyone to `docker volume rm` makes the
+  # migration automatic: a fresh volume is created on next `up`. The old
+  # ones are left orphaned rather than deleted — reclaiming them is
+  # `docker volume prune`, which is the developer's call to make, not
+  # this file's.
+  api_venv_src:
+  worker_venv_src:
   web_root_node_modules:
   web_app_node_modules:
   contracts_node_modules:

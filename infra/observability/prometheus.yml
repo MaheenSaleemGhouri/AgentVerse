@@ -1,0 +1,43 @@
+# Prometheus scrape configuration for the AgentVerse worker fleet.
+#
+# Only the worker is scraped: every metric the tool-execution surface
+# emits originates there (tool calls, egress validation, MCP attachment,
+# credential unsealing). apps/api seals credentials and never opens
+# them, so it has nothing to report — see the module docstring in
+# `apps/worker/src/agentverse_worker/interface/routes/metrics.py`.
+
+global:
+  # 15s against a 5m alert window gives ~20 samples per evaluation —
+  # enough for `increase()` to be meaningful without paying for
+  # per-second resolution nobody reads.
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    # Set per environment. Without it, a staging alert and a production
+    # alert are indistinguishable in the notification.
+    environment: local
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+      # Deliberately empty here. Receivers need real credentials
+      # (PagerDuty routing key, Slack webhook) which do not belong in a
+      # checked-in file (Rule 1) and differ per environment. The rules
+      # in alerts.yml are complete and will evaluate; wiring them to a
+      # pager is a deployment step, and `phase-6-go-no-go.md` names it
+      # as a condition rather than assuming it.
+
+scrape_configs:
+  - job_name: agentverse-worker
+    metrics_path: /internal/metrics
+    static_configs:
+      # One target per worker container. Metrics are per-process, so
+      # every replica must be listed (or discovered) — scraping one of N
+      # would undercount the fleet by roughly that factor, silently.
+      - targets: ["worker:8001"]
+        labels:
+          service: agentverse-worker

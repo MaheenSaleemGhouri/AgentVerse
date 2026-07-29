@@ -38,6 +38,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from agentverse_shared.observability.metrics import record_egress_denial, record_tool_call
 from agentverse_shared.security.egress_guard import EgressDeniedError
 from agentverse_shared.security.untrusted import truncate_for_context, wrap_untrusted
 
@@ -273,8 +274,28 @@ async def execute_tool(
     """
     started = time.monotonic()
     server_id = grant.installed_server_id
+    #: Wall-clock this call spent *not* executing boundary logic: time
+    #: inside `invoke` (the third party's) plus time asleep in retry
+    #: backoff (a deliberate wait, not slowness).
+    #:
+    #: Subtracted from the total to get boundary overhead, which is the
+    #: split the latency budget is built on. Counting backoff as overhead
+    #: would put an 8-second sleep into a histogram whose p95 budget is
+    #: 25ms, and the resulting alert would fire on every retried call
+    #: while saying "our code got slower" — which would be false.
+    excluded_seconds = 0.0
 
-    async def _record(outcome: ToolOutcome) -> ToolOutcome:
+    async def _record(outcome: ToolOutcome, *, denial_category: str | None = None) -> ToolOutcome:
+        # Metrics first, and never inside a try that the recorder could
+        # skip: a `tool_calls` write failing is exactly when the counter
+        # matters most.
+        elapsed_seconds = time.monotonic() - started
+        record_tool_call(
+            status=outcome.status,
+            duration_seconds=elapsed_seconds,
+            overhead_seconds=elapsed_seconds - excluded_seconds,
+            denial_reason=denial_category,
+        )
         await recorder.record_call(
             workspace_id=context.workspace_id,
             run_id=context.run_id,
@@ -318,18 +339,19 @@ async def execute_tool(
                 "circuit_open",
                 f"the server is temporarily unavailable after repeated failures; "
                 f"retry in {state.retry_after_seconds}s",
-            )
+            ),
+            denial_category="circuit_open",
         )
 
     # 2. Permission — independent of the model's judgment.
     denial = grant.permits(tool)
     if denial is not None:
-        return await _record(_refusal("denied", denial))
+        return await _record(_refusal("denied", denial), denial_category="permission")
 
     # 3. Argument validation — model output is untrusted input.
     invalid = validate_arguments(arguments, tool.input_schema)
     if invalid is not None:
-        return await _record(_refusal("denied", invalid))
+        return await _record(_refusal("denied", invalid), denial_category="invalid_arguments")
 
     # 4. Per-run budget — bounds a tool loop earlier and more cheaply
     #    than the run's own step and cost ceilings would.
@@ -345,7 +367,8 @@ async def execute_tool(
                 _refusal(
                     "denied",
                     f"this run has already made {grant.max_calls_per_run} calls to this server",
-                )
+                ),
+                denial_category="budget_exceeded",
             )
 
     # 5. Cache — only ever populated from successful calls, so a
@@ -368,18 +391,28 @@ async def execute_tool(
     last_error: str | None = None
 
     for attempt in range(1, attempts + 1):
+        attempt_started = time.monotonic()
         try:
             async with asyncio.timeout(timeout):
                 raw = await invoke(arguments)
         except TimeoutError:
+            excluded_seconds += time.monotonic() - attempt_started
             last_error = f"the tool did not respond within {timeout}s"
             await breaker.record_failure(workspace_id=context.workspace_id, server_id=server_id)
         except EgressDeniedError as exc:
             # Not retried and not counted against the breaker: the
             # destination is not going to become permitted, and a denial
             # is the system working rather than the server failing.
-            return await _record(_refusal("denied", exc.reason))
+            #
+            # The time spent getting here is *ours* — DNS resolution and
+            # validation, no third party reached — so it is deliberately
+            # not excluded from overhead. A guard that became slow
+            # should show up as boundary overhead, since that is the path
+            # a probing attacker exercises over and over.
+            record_egress_denial(exc.category)
+            return await _record(_refusal("denied", exc.reason), denial_category="egress")
         except Exception as exc:  # noqa: BLE001 - translated into an outcome, never a crash
+            excluded_seconds += time.monotonic() - attempt_started
             last_error = str(exc)
             logger.warning(
                 "tool_call_failed workspace_id=%s server_id=%s tool=%s attempt=%s",
@@ -390,6 +423,7 @@ async def execute_tool(
             )
             await breaker.record_failure(workspace_id=context.workspace_id, server_id=server_id)
         else:
+            excluded_seconds += time.monotonic() - attempt_started
             # 7. Sanitise before the result re-enters the model context.
             content, result_bytes = sanitize_result(raw)
             await breaker.record_success(workspace_id=context.workspace_id, server_id=server_id)
@@ -413,7 +447,9 @@ async def execute_tool(
             )
 
         if attempt < attempts:
-            await asyncio.sleep(backoff_seconds(attempt))
+            delay = backoff_seconds(attempt)
+            await asyncio.sleep(delay)
+            excluded_seconds += delay
 
     status = "timeout" if last_error and "did not respond" in last_error else "error"
     return await _record(

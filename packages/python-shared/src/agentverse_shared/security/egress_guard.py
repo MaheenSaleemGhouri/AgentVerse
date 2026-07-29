@@ -72,6 +72,50 @@ _DENIED_V6 = (
     ipaddress.ip_network("fd00:ec2::254/128"),
 )
 
+#: Addresses whose *purpose* is holding cloud credentials. Classified
+#: separately from the ranges that contain them — 169.254.169.254 is
+#: inside 169.254.0.0/16, and a metric that reported both as
+#: `link_local` would bury a credential-theft probe among ordinary
+#: misconfigured LAN addresses. Denial itself is unaffected: these are
+#: already denied by the ranges above, and this table only decides which
+#: label the event is counted under.
+_METADATA_ADDRESSES = frozenset(
+    {
+        ipaddress.ip_address("169.254.169.254"),  # AWS, GCP, Azure, DigitalOcean
+        ipaddress.ip_address("100.100.100.200"),  # Alibaba Cloud
+        ipaddress.ip_address("fd00:ec2::254"),  # AWS over IPv6
+    }
+)
+
+#: Network → the bounded label its denials are counted under
+#: (`agentverse_egress_denied_total{range}`). Separate from the tuples
+#: above so the human-readable reason string those produce stays exactly
+#: as it was — it is recorded in `tool_calls.denial_reason` and asserted
+#: by the adversarial egress tests, so it is a contract, not a detail.
+_RANGE_CATEGORIES: dict[str, str] = {
+    "0.0.0.0/8": "reserved",
+    "10.0.0.0/8": "rfc1918",
+    "100.64.0.0/10": "cgnat",
+    "127.0.0.0/8": "loopback",
+    "169.254.0.0/16": "link_local",
+    "172.16.0.0/12": "rfc1918",
+    "192.0.0.0/24": "reserved",
+    "192.0.2.0/24": "documentation",
+    "192.168.0.0/16": "rfc1918",
+    "198.18.0.0/15": "reserved",
+    "198.51.100.0/24": "documentation",
+    "203.0.113.0/24": "documentation",
+    "224.0.0.0/4": "multicast",
+    "240.0.0.0/4": "reserved",
+    "::/128": "reserved",
+    "::1/128": "loopback",
+    "fc00::/7": "rfc1918",
+    "fe80::/10": "link_local",
+    "ff00::/8": "multicast",
+    "2001:db8::/32": "documentation",
+    "fd00:ec2::254/128": "metadata",
+}
+
 #: A redirect chain longer than this is either a misconfiguration or an
 #: attempt to exhaust the validator.
 MAX_REDIRECT_HOPS = 5
@@ -87,10 +131,17 @@ class EgressDeniedError(Exception):
     The message is safe to surface to the user and to record in
     `tool_calls.denial_reason`: it names the rule, never anything an
     attacker could not already determine by trying.
+
+    `category` is the same fact reduced to a bounded label so it can be
+    counted (`agentverse_egress_denied_total{range}`). It is set at the
+    raise site rather than parsed back out of `reason`, because a metric
+    that depends on regexing an English sentence breaks the first time
+    someone improves the wording.
     """
 
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: str, *, category: str = "other") -> None:
         self.reason = reason
+        self.category = category
         super().__init__(reason)
 
 
@@ -161,6 +212,50 @@ def is_denied_address(address: str) -> str | None:
     return None
 
 
+#: One address from every denied network, plus the metadata addresses.
+#: Derived from the tables rather than hand-listed, so adding a range
+#: above without giving it a category in `_RANGE_CATEGORIES` fails the
+#: cross-module test instead of silently producing `other` in a
+#: dashboard months later.
+EGRESS_RANGE_SAMPLES: tuple[str, ...] = tuple(
+    [str(network.network_address) for network in (*_DENIED_V4, *_DENIED_V6)]
+    + [str(ip) for ip in _METADATA_ADDRESSES]
+)
+
+
+def classify_address(address: str) -> str:
+    """Reduces a denied address to the bounded label its denial is counted
+    under. Never raises, and never returns an unbounded value.
+
+    Kept separate from `is_denied_address` on purpose: that function's
+    return value is a human-readable reason recorded in
+    `tool_calls.denial_reason` and asserted by the adversarial tests, so
+    it is a contract. This one answers a different question — "which
+    bucket does the dashboard put this in" — and folding them together
+    would couple a metric label to the wording of a sentence.
+
+    Only meaningful for an address `is_denied_address` rejected; a
+    reachable address classifies as `not_global`, which is unreachable in
+    practice and harmless if it ever is not.
+    """
+    try:
+        ip = _normalize(address)
+    except ValueError:
+        return "unresolvable"
+
+    # Checked before the range tables: the metadata address sits inside
+    # link-local, and the whole reason this table exists is that those
+    # two events mean very different things.
+    if ip in _METADATA_ADDRESSES:
+        return "metadata"
+
+    table = _DENIED_V4 if isinstance(ip, ipaddress.IPv4Address) else _DENIED_V6
+    for network in table:
+        if ip in network:
+            return _RANGE_CATEGORIES.get(str(network), "other")
+    return "not_global"
+
+
 async def _resolve(host: str, port: int) -> list[str]:
     loop = asyncio.get_running_loop()
     try:
@@ -169,9 +264,13 @@ async def _resolve(host: str, port: int) -> list[str]:
             timeout=DNS_TIMEOUT_SECONDS,
         )
     except TimeoutError as exc:
-        raise EgressDeniedError(f"DNS lookup for {host!r} timed out") from exc
+        raise EgressDeniedError(
+            f"DNS lookup for {host!r} timed out", category="unresolvable"
+        ) from exc
     except socket.gaierror as exc:
-        raise EgressDeniedError(f"{host!r} could not be resolved") from exc
+        raise EgressDeniedError(
+            f"{host!r} could not be resolved", category="unresolvable"
+        ) from exc
 
     addresses: list[str] = []
     for info in infos:
@@ -180,7 +279,7 @@ async def _resolve(host: str, port: int) -> list[str]:
         if address not in addresses:
             addresses.append(address)
     if not addresses:
-        raise EgressDeniedError(f"{host!r} resolved to no addresses")
+        raise EgressDeniedError(f"{host!r} resolved to no addresses", category="unresolvable")
     return addresses
 
 
@@ -195,15 +294,18 @@ async def validate_destination(url: str) -> ValidatedDestination:
 
     if parts.scheme.lower() not in ALLOWED_SCHEMES:
         raise EgressDeniedError(
-            f"scheme {parts.scheme!r} is not permitted; only {sorted(ALLOWED_SCHEMES)} are"
+            f"scheme {parts.scheme!r} is not permitted; only {sorted(ALLOWED_SCHEMES)} are",
+            category="scheme",
         )
     host = parts.hostname
     if not host:
-        raise EgressDeniedError("destination URL has no host")
+        raise EgressDeniedError("destination URL has no host", category="unresolvable")
     # Credentials in the URL are both a leak (they land in logs) and a
     # known way to make a hostile URL read as a familiar one.
     if parts.username or parts.password:
-        raise EgressDeniedError("credentials embedded in the URL are not permitted")
+        raise EgressDeniedError(
+            "credentials embedded in the URL are not permitted", category="url_credentials"
+        )
 
     port = parts.port or (443 if parts.scheme.lower() == "https" else 80)
 
@@ -218,7 +320,7 @@ async def validate_destination(url: str) -> ValidatedDestination:
     for address in addresses:
         denial = is_denied_address(address)
         if denial is not None:
-            raise EgressDeniedError(f"{host!r} → {denial}")
+            raise EgressDeniedError(f"{host!r} → {denial}", category=classify_address(address))
 
     return ValidatedDestination(
         url=url,
@@ -237,15 +339,24 @@ async def validate_redirect_chain(urls: list[str]) -> ValidatedDestination:
     follow a `302` to the metadata service without asking this module.
     """
     if not urls:
-        raise EgressDeniedError("empty redirect chain")
+        raise EgressDeniedError("empty redirect chain", category="redirect_chain")
     if len(urls) > MAX_REDIRECT_HOPS:
-        raise EgressDeniedError(f"redirect chain exceeded {MAX_REDIRECT_HOPS} hops")
+        raise EgressDeniedError(
+            f"redirect chain exceeded {MAX_REDIRECT_HOPS} hops", category="redirect_chain"
+        )
 
     validated: ValidatedDestination | None = None
     for hop, url in enumerate(urls, start=1):
         try:
             validated = await validate_destination(url)
         except EgressDeniedError as exc:
-            raise EgressDeniedError(f"redirect hop {hop}: {exc.reason}") from exc
+            # The hop's own category is carried through rather than
+            # replaced with `redirect_chain`. A 302 to the metadata
+            # address is a metadata event that happened to arrive via a
+            # redirect — relabelling it here would hide the one thing
+            # this alert exists to catch.
+            raise EgressDeniedError(
+                f"redirect hop {hop}: {exc.reason}", category=exc.category
+            ) from exc
     assert validated is not None  # non-empty list guaranteed above
     return validated

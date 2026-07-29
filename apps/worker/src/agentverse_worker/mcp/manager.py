@@ -21,10 +21,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from agentverse_shared.observability.metrics import record_egress_denial, record_mcp_connect
 from agentverse_shared.security.egress_guard import EgressDeniedError
 
 from agents.mcp import MCPServer
@@ -213,6 +215,7 @@ class McpConnectionManager:
             display_name=spec.display_name,
             server=None,
         )
+        started = time.monotonic()
         try:
             async with asyncio.timeout(CONNECT_TIMEOUT_SECONDS):
                 server = await build_server(spec)
@@ -223,6 +226,10 @@ class McpConnectionManager:
                 self._open.append(server)
                 raw_tools = await server.list_tools()
         except EgressDeniedError as exc:
+            # Counted here as well as at the tool boundary: an agent whose
+            # *server endpoint* points at the metadata address never
+            # reaches a tool call, so the boundary would never see it.
+            record_egress_denial(exc.category)
             result.health = "unreachable"
             result.error = f"endpoint not permitted: {exc.reason}"
         except TransportNotPermittedError as exc:
@@ -248,6 +255,7 @@ class McpConnectionManager:
                 # servers gate their tool list behind auth — but a user
                 # staring at an empty tool picker deserves the reason.
                 result.error = "connected, but the server advertised no tools"
+        record_mcp_connect(outcome=result.health, duration_seconds=time.monotonic() - started)
         return result
 
     async def connect_all(self, specs: list[ServerConnectionSpec]) -> list[ConnectionResult]:

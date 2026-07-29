@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
+from agentverse_shared.observability.metrics import record_credential_unseal_failure
 from agentverse_shared.security.envelope import (
     CredentialCryptoError,
     CredentialVault,
@@ -175,6 +176,12 @@ class WorkerIntegrationRepository:
                     ),
                 )
             except CredentialCryptoError:
+                # Steady state is zero, which is what makes this alertable
+                # at a single event: the only ways here are a KEK mismatch
+                # between apps/api and apps/worker, or an AAD mismatch —
+                # and an AAD mismatch means a credential row was moved
+                # between workspaces.
+                record_credential_unseal_failure()
                 # Never logs the value, and the exception carries no
                 # detail about why — see `CredentialCryptoError`.
                 logger.warning(
