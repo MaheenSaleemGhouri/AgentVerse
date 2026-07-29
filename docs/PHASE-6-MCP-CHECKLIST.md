@@ -129,8 +129,8 @@ Migration verified against real pg16: `upgrade → downgrade → upgrade`,
 | 5 | Documentation | ✅ 8 documents |
 | 6 | Performance | ⚠️ [Budgets published](./performance/tool-execution-budgets.md) — **no measurement, no load test, no CI gate**, so the item is not satisfied |
 | 7 | Accessibility | ⚠️ [axe gate green, 2 real defects fixed](./accessibility/phase-6-audit.md) — **manual keyboard, screen-reader, contrast, reduced-motion passes not run** |
-| 8 | Monitoring | ⚠️ [9 metrics emitted, scraped by Prometheus, 7 alert rules unit-tested](./observability/tool-execution-monitoring.md) — **no Alertmanager receiver, no Grafana dashboard** |
-| 9 | Deployment ready | ⚠️ additive migration, reversible; KEK documented in both `.env.example` files and compose. **Both container images were unbuildable since Phase 5 (shared package resolved by relative path, never copied into the image) — fixed and verified building here** |
+| 8 | Monitoring | ⚠️ [9 metrics emitted and scraped, 7 alert rules unit-tested, routing + 10-panel dashboard checked in, all gated in CI](./observability/tool-execution-monitoring.md) — **no PagerDuty/Slack receiver provisioned, so nothing pages a human yet** |
+| 9 | Deployment ready | ✅ additive migration, reversible; KEK documented in both `.env.example` files and compose; **both `runtime` images now build and are gated by the `container-build` CI job** (they had been unbuildable since Phase 5 — shared package resolved by relative path, never copied into the image) |
 | 10 | Final review | ⚠️ [Go-with-conditions recorded](./releases/phase-6-go-no-go.md) |
 
 ## Gaps — what is not built

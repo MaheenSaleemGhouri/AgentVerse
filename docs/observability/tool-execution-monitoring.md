@@ -16,7 +16,11 @@ last section says exactly which parts are real.
 | Scrape endpoint | worker `GET /internal/metrics` |
 | Scrape config | `infra/observability/prometheus.yml` |
 | Alert rules | `infra/observability/alerts.yml` |
+| Alert-rule unit tests | `infra/observability/alerts.test.yml` |
+| Alert routing | `infra/observability/alertmanager.yml` |
+| Dashboard | `infra/observability/grafana-dashboard.json` |
 | Local stack | `prometheus` service in `infra/docker-compose.yml` |
+| CI gates | `container-build` and `alert-rules` jobs in `.github/workflows/ci.yml` |
 
 ## What makes this surface different
 
@@ -228,23 +232,39 @@ lives only in `tool_calls`, size-capped, behind the workspace-scoped API.
   denials" from "this process is not reporting". Without that, the two
   look identical on the one metric whose purpose is to be silent.
 
+- **The dashboard is checked in and its queries are verified.** Ten
+  panels in `grafana-dashboard.json`; the same test that guards the
+  alert rules also cross-checks every panel query, because a panel on a
+  metric nobody emits renders an empty graph that reads as "no traffic".
+- **Routing is defined and validated.** `alertmanager.yml` routes p1
+  security to a separate pager from p1 platform, and `amtool
+  check-config` runs in CI. Receivers read credentials from mounted
+  files, never inline (Rule 1).
+- **CI enforces all of it.** The `alert-rules` job runs
+  `promtool check` + `promtool test` + `amtool check-config`; the
+  `container-build` job builds both `runtime` images, which is the gate
+  that would have caught the Dockerfiles being unbuildable for two
+  phases.
+
 ### Not verified
 
-- **No pager is attached.** Alertmanager needs receivers with real
-  routing keys, which do not belong in a checked-in file (Rule 1). The
-  rules evaluate and are visible at `/alerts`; nothing notifies a human
-  yet. This is the remaining gap on §19 item 8.
-- **No Grafana dashboard is provisioned.** The ten panels above are
-  specified, not built. Prometheus' own UI serves the queries in the
-  meantime.
-- **The runbooks have never been exercised.** They are written against
-  the system as built, not against a real incident.
+- **No pager is actually connected.** The routing exists; the secret
+  files it reads do not exist in any environment yet, because no
+  PagerDuty service or Slack webhook has been provisioned. Alertmanager
+  will refuse to start without them, which is deliberate — an alerting
+  stack that comes up unable to notify anyone is worse than one that
+  fails loudly. **This is the one remaining gap on §19 item 8**, and it
+  is a provisioning task, not a code task.
+- **No alert has fired in anger.** Every rule is verified against
+  synthetic series, never against a real incident.
+- **The runbooks have never been exercised.**
+- **A stuck-open circuit breaker is not detectable** — see the caveat
+  in that runbook.
 - **Retention, HA, and long-term storage** are managed-service
   concerns; the compose Prometheus is a local development stack with
   15-day local retention, not a model of production.
 
 §19 item 8 asks for RED/USE metrics on a checked-in dashboard and every
-paging alert to have severity, routing, and a runbook. Metrics, rules,
-severities, routes, and runbooks all exist and are tested. **The
-dashboard and the notification path do not.** That is a smaller gap than
-this document described before, and it is still a gap.
+paging alert to have severity, routing, and a runbook. All of that now
+exists and is tested in CI. What is missing is a receiver on the other
+end of the routing — real, and small, and someone's to provision.

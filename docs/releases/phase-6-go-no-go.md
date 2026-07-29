@@ -17,21 +17,29 @@ deployment defect was found. The verdict is unchanged; the reasons for
 it are not.*
 
 The code is complete and correct as far as the gates that ran can
-establish. Monitoring is no longer the blocker — metrics are emitted,
-scraped, and alert-tested. Two things now hold production back:
+establish. Monitoring and deployment are both closed as engineering
+work: metrics are emitted and scraped, alert rules are unit-tested,
+routing and a ten-panel dashboard are checked in, and CI now builds
+both `runtime` images and validates the whole observability config.
 
-1. **No notification path.** Alert rules evaluate; nothing pages. An
-   egress denial would be visible in Prometheus and seen by nobody.
-2. **The container images had never been built.** Both
-   `api.Dockerfile` and `worker.Dockerfile` copied only their own
-   service directory while both `pyproject.toml` files resolve
-   `agentverse-shared` by relative path, so `uv sync` failed inside
-   every image. This was introduced in Phase 5 and went unnoticed
-   because the local stack was always run with `uv run` on the host.
-   It is fixed and both images now build, but "deployment ready" was
-   asserted in this checklist for a release with no deployable
-   artifact, and that is worth recording rather than quietly
-   correcting.
+**One thing holds production back, and it is not code: no alert
+receiver is provisioned.** The routing exists and reads its credentials
+from mounted secret files; no PagerDuty service or Slack webhook has
+been created, so those files exist nowhere and Alertmanager cannot
+start. Until someone provisions them, an egress denial is a row in
+Prometheus that nobody is told about — and the security controls this
+phase is built around are only as good as the notice they generate.
+
+Recorded because it was found here rather than in an incident: **both
+container images had never been built successfully.** `api.Dockerfile`
+and `worker.Dockerfile` copied only their own service directory while
+both `pyproject.toml` files resolve `agentverse-shared` by relative
+path, so `uv sync` failed inside every image from Phase 5 onward. It
+went unnoticed because every green pipeline and every local stack ran
+the services with `uv run` on the host. Fixed, and CI now builds the
+`runtime` target on every PR so it cannot recur — but "deployment
+ready ✅" had been asserted for two phases with no deployable artifact,
+and that is a gate that was not actually being checked.
 
 ## Gate roll-up
 
@@ -44,8 +52,8 @@ scraped, and alert-tested. Two things now hold production back:
 | 5 Documentation | `documentation-engineer` | ✅ |
 | 6 Performance | `performance-engineer` | ❌ Budgets only — nothing measured |
 | 7 Accessibility | `accessibility-expert` | ⚠️ Automated gate green; manual passes not run |
-| 8 Monitoring | `observability-engineer` | ⚠️ Instrumented, scraped, alert-tested; no pager, no dashboard |
-| 9 Deployment | `deployment-engineer` | ⚠️ Additive migration with tested downgrade; **images did not build until this change** |
+| 8 Monitoring | `observability-engineer` | ⚠️ Instrumented, scraped, alert-tested, dashboard + routing checked in and CI-gated; **no receiver provisioned** |
+| 9 Deployment | `deployment-engineer` | ✅ Additive migration with tested downgrade; both `runtime` images build and are CI-gated (**they had not built since Phase 5**) |
 | 10 Final | `final-qa-reviewer` | This document |
 
 ## What ran, and what it proves
@@ -74,11 +82,12 @@ tooltip guarding credential requirements was also fixed.
 
 ## Conditions on this GO
 
-1. **Staging deployment only.** The metrics condition is met — all three
-   named counters are emitted, scraped, and covered by alert-rule unit
-   tests. What remains is an Alertmanager with real receivers, so the
-   two P1 rules reach a human. Until then the security controls work
-   and nobody would be told when they fire.
+1. **Staging deployment only, until an alert receiver exists.** The
+   metrics condition is met. What remains is provisioning a PagerDuty
+   service and a Slack webhook and mounting their credentials at
+   `/etc/alertmanager/secrets/` — after which the two P1 rules reach a
+   human and this condition lifts. This is the single item standing
+   between the release and production.
 2. **`AGENTVERSE_CREDENTIAL_KEK_V1` must be set for both apps/api and
    apps/worker, to the same value.** Startup fails loudly without it.
    Divergent values produce credentials one service cannot read — the
@@ -88,11 +97,14 @@ tooltip guarding credential requirements was also fixed.
    authorize and token-exchange endpoints are not built. Marketing or
    docs claiming these work would be a false claim (`CLAUDE.md` §2,
    transparency).
-4. **CI must set `AGENTVERSE_{API,WORKER,SHARED}_DATABASE_URL`.** Without
-   them the Python suites skip 67 tests and still report green — and the
-   skipped set is precisely the tenant-isolation and persistence
-   coverage. A pipeline that omits them is not testing the thing this
-   release is riskiest about.
+4. ~~**CI must set `AGENTVERSE_{API,WORKER,SHARED}_DATABASE_URL`.**~~
+   **Withdrawn — it already does.** This was raised after a local run
+   skipped 67 tests without them, and stated as a condition without
+   checking the pipeline. `.github/workflows/ci.yml` gives every matrix
+   leg its own pgvector service, sets all three variables, and applies
+   the migrations first. The concern was real; the condition was not.
+   Left visible rather than deleted, because a withdrawn finding is
+   part of the record.
 5. **A load test before any workspace exceeds roughly 100k tool calls.**
    The metrics endpoint aggregates live over `tool_calls`; the
    `tool_metrics` rollup job does not exist.

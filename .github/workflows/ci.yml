@@ -113,6 +113,62 @@ jobs:
         run: uv sync --frozen && uv run alembic upgrade head
       - run: uv run pytest -q
 
+  # Builds the images CI has never built. Added after both service
+  # Dockerfiles were found to be unbuildable — they copied only their own
+  # service directory while both pyproject.toml files resolve
+  # `agentverse-shared` by relative path, so `uv sync` failed inside every
+  # image. That went unnoticed from Phase 5 to Phase 6 because every
+  # green pipeline and every local stack ran the services with `uv run`
+  # on the host, and nothing ever built the artifact that ships.
+  #
+  # The `runtime` target specifically: `dev` would pass while the
+  # production stage stayed broken, which is the failure mode worth
+  # guarding.
+  container-build:
+    name: container build / ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, worker]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+      - uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: infra/docker/${{ matrix.service }}.Dockerfile
+          target: runtime
+          push: false
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,scope=${{ matrix.service }},mode=max
+
+  # Alert rules are code. `promtool check` proves the PromQL parses;
+  # `promtool test` proves it fires — and, for the failure-rate rule,
+  # that a flood of refusals does not read as an outage. A rule naming a
+  # metric nobody emits parses, loads, shows green, and can never fire,
+  # so the metric-name cross-check lives in the worker test suite.
+  alert-rules:
+    name: alert rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate and unit-test the alert rules
+        working-directory: infra/observability
+        run: |
+          docker run --rm -v "$PWD:/cfg:ro" -w /cfg \
+            --entrypoint promtool prom/prometheus:v3.1.0 \
+            check rules alerts.yml
+          docker run --rm -v "$PWD:/cfg:ro" -w /cfg \
+            --entrypoint promtool prom/prometheus:v3.1.0 \
+            test rules alerts.test.yml
+      - name: Validate the Alertmanager routing
+        working-directory: infra/observability
+        run: |
+          docker run --rm -v "$PWD:/cfg:ro" \
+            --entrypoint amtool prom/alertmanager:v0.28.1 \
+            check-config /cfg/alertmanager.yml
+
   # Dependency-vulnerability scan (CLAUDE.md §10): pnpm's built-in audit
   # for the JS side, pip-audit for each Python service. Findings are
   # triaged, not ignored — this job is required, not advisory.
@@ -154,7 +210,7 @@ jobs:
   ci-gate:
     name: CI gate
     if: always()
-    needs: [node-checks, python-checks, dependency-audit]
+    needs: [node-checks, python-checks, container-build, alert-rules, dependency-audit]
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any dependency job failed or was cancelled

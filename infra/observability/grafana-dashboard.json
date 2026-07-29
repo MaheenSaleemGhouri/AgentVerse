@@ -1,0 +1,284 @@
+{
+  "uid": "mcp-tool-execution",
+  "title": "MCP tool execution",
+  "tags": ["agentverse", "phase-6", "mcp"],
+  "timezone": "utc",
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "time": { "from": "now-6h", "to": "now" },
+  "description": "RED/USE for the tool-execution boundary. Panels are ordered the way an on-call engineer reads them: shape of traffic, then what broke, then whether it was us or a third party, then what was refused. Per-tenant attribution is deliberately absent — see docs/observability/tool-execution-monitoring.md on why workspace_id is not a label; the workspace-scoped integrations API answers that question instead.",
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Traffic",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Call rate by status",
+      "description": "The shape of normal traffic. Refusals (denied, circuit_open) are shown alongside successes rather than hidden: they are the system working, and a change in their share is the signal.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "stacking": { "mode": "normal" }, "fillOpacity": 40 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(agentverse_tool_calls_total[5m]))",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Failure rate (refusals excluded)",
+      "description": "error + timeout over total. Refusals are excluded on purpose — counting them would make every successfully blocked attack look like an outage. The 25% line is the ToolFailureRateHigh threshold.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.25 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(agentverse_tool_calls_total{status=~\"error|timeout\"}[15m])) / sum(rate(agentverse_tool_calls_total[15m]))",
+          "legendFormat": "failure rate",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "row",
+      "title": "Latency — ours vs theirs",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Boundary overhead (ours)",
+      "description": "Excludes the external call AND retry backoff, so a breach here is our code and nobody else's. Budget: p95 25ms (docs/performance/tool-execution-budgets.md).",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.025 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(agentverse_tool_boundary_overhead_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(agentverse_tool_boundary_overhead_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(agentverse_tool_boundary_overhead_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "End-to-end duration (third-party-dominated)",
+      "description": "Includes the external call. Informational, not an SLO — this is mostly someone else's network, and optimising our code because this number rose is the mistake the split exists to prevent.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(agentverse_tool_call_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(agentverse_tool_call_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(agentverse_tool_call_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "row",
+      "title": "Security",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Egress denials by range",
+      "description": "Expected to be empty. Any line here is an agent-initiated call to a non-routable destination; a `metadata` line is a cloud-credential probe until proven otherwise and pages at a single event.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 19 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "fillOpacity": 80 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (range) (increase(agentverse_egress_denied_total[5m])) > 0",
+          "legendFormat": "{{range}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Credential unseal failures (24h)",
+      "description": "Steady state is zero. Non-zero means a KEK mismatch between apps/api and apps/worker, or an AAD mismatch — and an AAD mismatch means a credential row moved between workspaces.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 19 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(agentverse_credential_unseal_failures_total[24h]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Denials by control",
+      "description": "Which control refused, not the free-text reason. `permission` rising sharply is either a permission change with a wider blast radius than intended, or an agent acting on injected content and reaching for tools it does not hold.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(agentverse_tool_calls_denied_total[5m]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "row",
+      "title": "Downstream health",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "MCP attachment outcomes",
+      "description": "unreachable is expected to be non-zero — customer servers go down and that is their business. Sustained above half suggests our egress policy or DNS rather than their uptime.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 28 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "stacking": { "mode": "normal" }, "fillOpacity": 40 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(agentverse_mcp_connect_total[10m]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Circuit breaker opens",
+      "description": "Open transitions, not failures — one dead server contributes one event per open window rather than one per failed call. A stuck-open breaker is NOT visible here; that gap is recorded in the runbook.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 28 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "fillOpacity": 80 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(agentverse_circuit_breaker_opened_total[10m]))",
+          "legendFormat": "opens",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Cache hit ratio",
+      "description": "A collapse here explains a latency rise without anything else having changed.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 28 },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "min": 0, "max": 1 },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(agentverse_tool_calls_total{status=\"cached\"}[15m])) / sum(rate(agentverse_tool_calls_total{status=~\"cached|success\"}[15m]))",
+          "legendFormat": "hit ratio",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

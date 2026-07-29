@@ -7,9 +7,15 @@ from pathlib import Path
 
 from httpx import AsyncClient
 
+_OBSERVABILITY = Path(__file__).resolve().parents[4] / "infra" / "observability"
+
 #: Checked-in alert rules, evaluated by the Prometheus in
 #: `infra/docker-compose.yml` and by whatever runs them in staging.
-ALERTS_FILE = Path(__file__).resolve().parents[4] / "infra" / "observability" / "alerts.yml"
+ALERTS_FILE = _OBSERVABILITY / "alerts.yml"
+#: The Grafana board. Same failure mode as a bad rule, quieter symptom:
+#: a panel querying a metric nobody emits renders an empty graph, which
+#: is indistinguishable from "no traffic".
+DASHBOARD_FILE = _OBSERVABILITY / "grafana-dashboard.json"
 
 
 async def test_metrics_endpoint_serves_the_exposition_format(client: AsyncClient) -> None:
@@ -38,7 +44,7 @@ async def test_metrics_endpoint_exposes_the_alertable_series(client: AsyncClient
     assert 'agentverse_tool_calls_total{status="denied"} 0.0' in body
 
 
-async def test_every_metric_named_in_an_alert_rule_is_actually_emitted(
+async def test_every_metric_named_in_a_rule_or_panel_is_actually_emitted(
     client: AsyncClient,
 ) -> None:
     """The gap `promtool` cannot close.
@@ -54,24 +60,20 @@ async def test_every_metric_named_in_an_alert_rule_is_actually_emitted(
 
     So the rules are checked against the real exposition output.
     """
-    assert ALERTS_FILE.exists(), ALERTS_FILE
-
-    referenced = set(re.findall(r"agentverse_[a-z_]+", ALERTS_FILE.read_text()))
-    assert referenced, "no agentverse_* metric referenced — the regex or the file moved"
-
     body = (await client.get("/internal/metrics")).text
     exposed = set(re.findall(r"^(agentverse_[a-z_]+)", body, re.M))
 
-    missing = {
-        name
-        for name in referenced
+    for source in (ALERTS_FILE, DASHBOARD_FILE):
+        assert source.exists(), source
+        referenced = set(re.findall(r"agentverse_[a-z_]+", source.read_text()))
+        assert referenced, f"no agentverse_* metric referenced in {source.name}"
+
         # `foo_bucket`/`_sum`/`_count` are histogram-derived series that
         # appear in the exposition under those exact names, so they need
-        # no special handling — but `foo_total` for a counter appears as
+        # no special handling — a counter's `foo_total` appears as
         # written too. Anything left unmatched is a genuine typo.
-        if name not in exposed
-    }
-    assert not missing, f"alert rules reference metrics that are never emitted: {sorted(missing)}"
+        missing = {name for name in referenced if name not in exposed}
+        assert not missing, f"{source.name} references metrics never emitted: {sorted(missing)}"
 
 
 async def test_metrics_endpoint_is_absent_from_the_public_schema(client: AsyncClient) -> None:
