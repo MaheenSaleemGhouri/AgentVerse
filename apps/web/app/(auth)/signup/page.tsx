@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 
-import { SignupForm } from "./signup-form";
+import { AuthShell } from "@/components/auth/auth-shell";
+import { enabledSocialProviders } from "@/lib/social-providers";
 
-export const metadata: Metadata = { title: "Sign up — AgentVerse" };
+export const metadata: Metadata = {
+  title: "Sign up — AgentVerse",
+  description: "Create your AgentVerse account — the AI Workforce Operating System.",
+};
 
 export default function SignupPage(): React.JSX.Element {
-  const githubEnabled = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET);
-
-  return <SignupForm githubEnabled={githubEnabled} />;
+  return <AuthShell active="signup" socialProviders={enabledSocialProviders()} />;
 }

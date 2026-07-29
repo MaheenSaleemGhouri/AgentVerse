@@ -71,20 +71,19 @@ export const auth = betterAuth({
     },
   },
 
-  // GitHub only in Phase 1 — one real provider, not every conceivable
-  // one (ADR-0005). Unset client credentials leave the provider
-  // registered but non-functional rather than crashing startup; the
-  // login UI only shows the button when both env vars are present
-  // (see app/(auth)/login/page.tsx).
-  socialProviders:
-    env.githubClientId && env.githubClientSecret
-      ? {
-          github: {
-            clientId: env.githubClientId,
-            clientSecret: env.githubClientSecret,
-          },
-        }
-      : undefined,
+  // GitHub since Phase 1 (ADR-0005); Google added with the auth UI
+  // rebuild, which shows both buttons. Each is registered only when its
+  // credentials are present, and the pages ask `enabledSocialProviders()`
+  // what to render — so a provider without keys is absent from the UI
+  // rather than being a button that fails on click.
+  socialProviders: {
+    ...(env.githubClientId && env.githubClientSecret
+      ? { github: { clientId: env.githubClientId, clientSecret: env.githubClientSecret } }
+      : {}),
+    ...(env.googleClientId && env.googleClientSecret
+      ? { google: { clientId: env.googleClientId, clientSecret: env.googleClientSecret } }
+      : {}),
+  },
 
   // apps/api verifies these against Better Auth's JWKS endpoint
   // (ADR-0005) — no shared secret between the two services.

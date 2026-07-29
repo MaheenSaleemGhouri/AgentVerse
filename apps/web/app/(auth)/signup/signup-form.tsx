@@ -1,139 +1,194 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AnimatePresence, motion } from "framer-motion";
+import { Lock, Mail, User, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
+import { AgentVerseLockup } from "@/components/auth/agentverse-mark";
+import { GradientButton, OrDivider, SocialButton } from "@/components/auth/auth-buttons";
+import { AuthField } from "@/components/auth/auth-field";
+import { GlassPanel } from "@/components/auth/glass-panel";
+import { PasswordRequirements, satisfiesAllRules } from "@/components/auth/password-requirements";
 import { authClient } from "@/lib/auth-client";
+import type { SocialProvider } from "@/lib/social-providers";
 
-export function SignupForm({ githubEnabled }: { githubEnabled: boolean }): React.JSX.Element {
+const signupSchema = z
+  .object({
+    name: z.string().min(1, "Name is required.").max(80, "Name is too long."),
+    email: z.string().min(1, "Email is required.").email("Enter a valid email address."),
+    // The rule list is the source; this refinement reads it rather than
+    // restating it, so the checklist and the validator cannot disagree
+    // (Rule 3).
+    password: z.string().refine(satisfiesAllRules, "Password does not meet all requirements."),
+    confirmPassword: z.string().min(1, "Confirm your password."),
+  })
+  .refine((values) => values.password === values.confirmPassword, {
+    message: "Passwords do not match.",
+    path: ["confirmPassword"],
+  });
+type SignupValues = z.infer<typeof signupSchema>;
+
+export function SignupForm({
+  socialProviders,
+}: {
+  socialProviders: SocialProvider[];
+}): React.JSX.Element {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [socialPending, setSocialPending] = useState(false);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    setError(null);
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<SignupValues>({
+    resolver: zodResolver(signupSchema),
+    // Validates as the user types *after* the first blur, so the
+    // checklist and the field errors agree instead of the list ticking
+    // green while an untouched field still shows nothing.
+    mode: "onTouched",
+    defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
+  });
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
+  const password = watch("password");
 
-    setIsSubmitting(true);
-    const { error: signUpError } = await authClient.signUp.email({ name, email, password });
-    setIsSubmitting(false);
+  async function onSubmit(values: SignupValues): Promise<void> {
+    setFormError(null);
+    const { error } = await authClient.signUp.email({
+      name: values.name,
+      email: values.email,
+      password: values.password,
+    });
 
-    if (signUpError) {
-      setError(signUpError.message ?? "Could not create your account.");
+    if (error) {
+      setFormError(error.message ?? "Could not create your account.");
       return;
     }
     router.push("/dashboard");
   }
 
-  async function handleGithubSignIn(): Promise<void> {
-    await authClient.signIn.social({ provider: "github", callbackURL: "/dashboard" });
+  async function handleSocial(provider: SocialProvider): Promise<void> {
+    setSocialPending(true);
+    setFormError(null);
+    const { error } = await authClient.signIn.social({ provider, callbackURL: "/dashboard" });
+    if (error) {
+      setSocialPending(false);
+      setFormError(error.message ?? `Could not continue with ${provider}.`);
+    }
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold">Create your AgentVerse account</h1>
+    <GlassPanel tilt="right">
+      <AgentVerseLockup className="mb-6" />
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="name" className="text-sm font-medium">
-            Name
-          </label>
-          <input
-            id="name"
-            name="name"
-            type="text"
-            autoComplete="name"
-            required
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-neutral-700 dark:bg-neutral-900"
-          />
-        </div>
+      <h1 className="text-2xl font-semibold tracking-tight text-white">
+        Create Your Account{" "}
+        <span role="img" aria-label="rocket">
+          🚀
+        </span>
+      </h1>
+      <p className="mt-1 text-sm text-[#a8a2c8]">Start your AI journey today</p>
 
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="email" className="text-sm font-medium">
-            Email
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-neutral-700 dark:bg-neutral-900"
-          />
-        </div>
+      <form onSubmit={handleSubmit(onSubmit)} className="mt-6 flex flex-col gap-4" noValidate>
+        <AuthField
+          label="Full Name"
+          icon={User}
+          autoComplete="name"
+          placeholder="Enter your full name"
+          error={errors.name?.message}
+          {...register("name")}
+        />
 
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="password" className="text-sm font-medium">
-            Password
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={8}
-            aria-describedby="password-hint"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-neutral-700 dark:bg-neutral-900"
-          />
-          <p id="password-hint" className="text-xs text-neutral-500">
-            At least 8 characters.
-          </p>
-        </div>
+        <AuthField
+          label="Email"
+          icon={Mail}
+          type="email"
+          autoComplete="email"
+          placeholder="Enter your email"
+          error={errors.email?.message}
+          {...register("email")}
+        />
 
-        {error && (
-          <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-            {error}
-          </p>
-        )}
+        <AuthField
+          label="Password"
+          icon={Lock}
+          revealable
+          autoComplete="new-password"
+          placeholder="Create a password"
+          // The checklist below already names exactly what is missing, so
+          // repeating "does not meet all requirements" under the field
+          // would be the same information twice.
+          error={errors.password && password.length === 0 ? errors.password.message : undefined}
+          {...register("password")}
+        />
 
-        <button
+        <AuthField
+          label="Confirm Password"
+          icon={Lock}
+          revealable
+          autoComplete="new-password"
+          placeholder="Confirm your password"
+          error={errors.confirmPassword?.message}
+          {...register("confirmPassword")}
+        />
+
+        <PasswordRequirements value={password} />
+
+        <AnimatePresence mode="wait">
+          {formError && (
+            <motion.p
+              key={formError}
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              role="alert"
+              className="rounded-lg border border-[#f4655b]/30 bg-[#f4655b]/10 px-3 py-2 text-xs text-[#f4655b]"
+            >
+              {formError}
+            </motion.p>
+          )}
+        </AnimatePresence>
+
+        <GradientButton
           type="submit"
-          disabled={isSubmitting}
-          className="rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          icon={UserPlus}
+          pending={isSubmitting}
+          pendingLabel="Creating account…"
+          className="mt-1"
         >
-          {isSubmitting ? "Creating account…" : "Sign up"}
-        </button>
+          Create Account
+        </GradientButton>
       </form>
 
-      {githubEnabled && (
-        <>
-          <div className="flex items-center gap-3 text-xs text-neutral-500">
-            <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
-            or
-            <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
-          </div>
-          <button
-            type="button"
-            onClick={handleGithubSignIn}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900"
-          >
-            Continue with GitHub
-          </button>
-        </>
+      {socialProviders.length > 0 && (
+        <div className="mt-5 flex flex-col gap-3">
+          <OrDivider />
+          {socialProviders.map((provider) => (
+            <SocialButton
+              key={provider}
+              provider={provider}
+              disabled={socialPending || isSubmitting}
+              onClick={() => void handleSocial(provider)}
+            />
+          ))}
+        </div>
       )}
 
-      <p className="text-sm text-neutral-500">
+      <p className="mt-6 text-center text-[13px] text-[#a8a2c8]">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-brand-600 hover:underline">
-          Log in
+        <Link
+          href="/login"
+          className="rounded font-medium text-[#c084fc] transition-colors hover:text-[#d8b4fe] focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#a855f7]/40"
+        >
+          Login
         </Link>
       </p>
-    </div>
+    </GlassPanel>
   );
 }

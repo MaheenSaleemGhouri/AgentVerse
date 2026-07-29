@@ -1,20 +1,20 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 
-import { LoginForm } from "./login-form";
+import { AuthShell } from "@/components/auth/auth-shell";
+import { enabledSocialProviders } from "@/lib/social-providers";
 
-export const metadata: Metadata = { title: "Log in — AgentVerse" };
+export const metadata: Metadata = {
+  title: "Log in — AgentVerse",
+  description: "Log in to AgentVerse — the AI Workforce Operating System.",
+};
 
 export default function LoginPage(): React.JSX.Element {
-  // Server Component: reads server-only env directly, no NEXT_PUBLIC_*
-  // variable needed just to know whether GitHub OAuth is configured.
-  const githubEnabled = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET);
-
-  // LoginForm's useSearchParams() (reading ?redirect=) requires a
-  // Suspense boundary for this otherwise-static page to prerender.
-  return (
-    <Suspense>
-      <LoginForm githubEnabled={githubEnabled} />
-    </Suspense>
-  );
+  // Server Component: reads the server-only secrets directly, so no
+  // NEXT_PUBLIC_* mirror is needed just to know which OAuth buttons are
+  // usable (§10 audits every NEXT_PUBLIC_ addition — it ships to the
+  // browser, and this decision does not need to).
+  //
+  // The Suspense boundary LoginForm's useSearchParams() needs lives in
+  // AuthShell, next to the component that requires it.
+  return <AuthShell active="login" socialProviders={enabledSocialProviders()} />;
 }

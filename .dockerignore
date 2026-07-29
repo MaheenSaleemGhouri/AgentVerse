@@ -8,6 +8,12 @@
 
 **/node_modules/
 **/.next/
+# Same reason as the .venv paths below: the glob above is not applied
+# early enough to stop the context walker descending into a build output
+# full of symlinks, and a Next standalone bundle contains node_modules
+# links (argon2) that Docker Desktop on Windows cannot open.
+apps/web/.next/
+apps/web/node_modules/
 **/.turbo/
 **/dist/
 

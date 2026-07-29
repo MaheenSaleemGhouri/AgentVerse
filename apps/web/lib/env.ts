@@ -20,4 +20,11 @@ export const env = {
   internalApiSecret: requireEnv("INTERNAL_API_SECRET"),
   githubClientId: process.env.GITHUB_CLIENT_ID,
   githubClientSecret: process.env.GITHUB_CLIENT_SECRET,
+  // Optional, exactly like GitHub: a provider is registered only when
+  // both halves are present, and the auth UI only renders a button for a
+  // provider that is registered. An unconfigured Google button would be
+  // a control that fails on click, which is the same defect as mock
+  // authentication regardless of how real it looks.
+  googleClientId: process.env.GOOGLE_CLIENT_ID,
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
 } as const;
