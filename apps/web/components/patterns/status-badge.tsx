@@ -18,10 +18,10 @@ const statusVariants = cva(
     variants: {
       tone: {
         neutral: "border-border bg-muted text-muted-foreground",
-        info: "border-info/30 bg-info-soft text-info",
-        success: "border-success/30 bg-success-soft text-success",
-        warning: "border-warning/30 bg-warning-soft text-warning",
-        danger: "border-destructive/30 bg-destructive-soft text-destructive",
+        info: "border-info/30 bg-info-soft text-info-strong",
+        success: "border-success/30 bg-success-soft text-success-strong",
+        warning: "border-warning/30 bg-warning-soft text-warning-strong",
+        danger: "border-destructive/30 bg-destructive-soft text-destructive-strong",
         brand: "border-primary/30 bg-accent text-accent-foreground",
       },
     },

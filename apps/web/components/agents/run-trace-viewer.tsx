@@ -106,7 +106,7 @@ export function RunTraceViewer({
               key={step.sequence}
               className={cn(
                 "flex items-start gap-2 rounded-md px-2 py-1.5 text-sm",
-                isFailure ? "bg-destructive-soft text-destructive" : "text-foreground"
+                isFailure ? "bg-destructive-soft text-destructive-strong" : "text-foreground"
               )}
             >
               <Icon className={cn("mt-0.5 size-3.5 shrink-0", isFailure && "text-destructive")} />

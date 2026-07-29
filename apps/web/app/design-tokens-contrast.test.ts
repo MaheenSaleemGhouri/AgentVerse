@@ -119,73 +119,54 @@ const TEXT_PAIRS: ReadonlyArray<{ fg: string; bg: string; where: string }> = [
  * the page background by design.
  */
 const STATUS_ON_SOFT: ReadonlyArray<{ fg: string; bg: string; where: string }> = [
-  { fg: "success", bg: "success-soft", where: "StatusBadge success" },
-  { fg: "warning", bg: "warning-soft", where: "StatusBadge warning" },
-  { fg: "destructive", bg: "destructive-soft", where: "StatusBadge denied / error" },
-  { fg: "info", bg: "info-soft", where: "StatusBadge info" },
+  { fg: "success-strong", bg: "success-soft", where: "StatusBadge success" },
+  { fg: "warning-strong", bg: "warning-soft", where: "StatusBadge warning" },
+  { fg: "destructive-strong", bg: "destructive-soft", where: "StatusBadge danger" },
+  { fg: "info-strong", bg: "info-soft", where: "StatusBadge info" },
+  // Alert keeps body text in --foreground and tints only its icon, so
+  // this is a different pair from the badges above and needs its own row.
+  { fg: "foreground", bg: "success-soft", where: "Alert success body text" },
+  { fg: "foreground", bg: "warning-soft", where: "Alert warning body text" },
+  { fg: "foreground", bg: "info-soft", where: "Alert info body text" },
+  { fg: "foreground", bg: "destructive-soft", where: "Alert danger body text" },
 ];
 
-/**
- * Pairs that are rendered today and do NOT meet AA, with the ratio
- * measured when this suite was written.
- *
- * These are real WCAG 2.2 AA failures in the shared AVDS palette, not
- * Phase 6 additions — `StatusBadge`, `Button`, and the knowledge-base
- * count badge all predate it. Fixing them means changing status colours
- * across the whole product, which is a `design-system-architect`
- * decision and not something to slip into an integrations phase.
- *
- * They are pinned rather than skipped. The assertion is that each is
- * still failing *at its known ratio*: if someone darkens a token the
- * test tells them to delete the entry, and if someone makes it worse the
- * test fails. A plain `it.skip` would let the palette drift further
- * while reporting green.
- *
- * Tracked as the blocking item on `CLAUDE.md` §19 gate 7 in
- * `docs/accessibility/phase-6-audit.md`.
- */
-const KNOWN_AA_FAILURES: Record<string, Record<string, number>> = {
-  light: {
-    "primary-foreground/primary": 4.35,
-    "destructive-foreground/destructive": 3.76,
-    "success/success-soft": 2.52,
-    "warning/warning-soft": 2.14,
-    "destructive/destructive-soft": 3.29,
-    "info/info-soft": 2.82,
-  },
-  dark: {
-    "primary-foreground/primary": 4.35,
-    "destructive-foreground/destructive": 3.76,
-    // Closest to passing of the lot — the dark soft tints are already
-    // much darker than the light ones, which is why success, warning,
-    // and info clear AA in this theme and only danger does not.
-    "destructive/destructive-soft": 4.37,
-  },
-};
+// The vivid `--success` / `--warning` / `--info` / `--destructive` hues
+// survive as the *dot* colour in `StatusBadge` and the icon tint in
+// `Alert`, and they are deliberately NOT asserted at 3:1 here.
+//
+// WCAG 1.4.11 covers graphics "required to identify user interface
+// components and states". These are not: the dot is `aria-hidden` and
+// always sits beside a text label, and the Alert icon likewise
+// accompanies text. The state is carried by the words, so the dot is
+// decoration reinforcing it rather than the indicator itself. Holding
+// decoration to 3:1 would have pushed the palette darker for no
+// accessibility gain.
+//
+// This is a judgement call, so it is written down rather than expressed
+// as a missing test. What guards the underlying rule is the assertion in
+// `components/integrations/integrations-a11y.test.tsx` that a status is
+// never colour-only — if the text label were ever dropped, the dot would
+// become required and this reasoning would stop holding.
 
 describe.each([
   ["light", LIGHT],
   ["dark", DARK],
 ])("%s theme", (themeName, theme) => {
-  const known = KNOWN_AA_FAILURES[themeName] ?? {};
-
-  /** AA for body text, unless this pair is a pinned known failure. */
-  function expectAA(fg: string, bg: string): void {
+  /** 4.5:1, WCAG 1.4.3 — body text. No exemptions. */
+  function expectTextAA(fg: string, bg: string): void {
     const ratio = contrast(resolve(theme, fg), resolve(theme, bg));
-    const pinned = known[`${fg}/${bg}`];
-    const detail = `--${fg} on --${bg} in ${themeName} is ${ratio.toFixed(2)}:1`;
-
-    if (pinned === undefined) {
-      expect(ratio, detail).toBeGreaterThanOrEqual(4.5);
-      return;
-    }
-    // Still broken, and by the same amount. Either direction of change
-    // is a signal worth failing on.
-    expect(ratio, `${detail} — pinned at ${pinned}:1. If you fixed it, delete the entry.`).toBeCloseTo(
-      pinned,
-      1,
+    expect(ratio, `--${fg} on --${bg} in ${themeName} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(
+      4.5,
     );
-    expect(ratio, `${detail} — pinned failures must stay below AA or be un-pinned`).toBeLessThan(4.5);
+  }
+
+  /** 3:1, WCAG 1.4.11 — icons, borders, and other non-text indicators. */
+  function expectGraphicAA(fg: string, bg: string): void {
+    const ratio = contrast(resolve(theme, fg), resolve(theme, bg));
+    expect(ratio, `--${fg} on --${bg} in ${themeName} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(
+      3,
+    );
   }
   it("parsed real tokens from globals.css", () => {
     // Guards the parser: an empty map would make every assertion below
@@ -194,16 +175,15 @@ describe.each([
     expect(theme["background"]).toMatch(/^#/);
   });
 
-  it.each(TEXT_PAIRS)("$where", ({ fg, bg }) => expectAA(fg, bg));
+  it.each(TEXT_PAIRS)("$where", ({ fg, bg }) => expectTextAA(fg, bg));
 
-  it.each(STATUS_ON_SOFT)("$where", ({ fg, bg }) => expectAA(fg, bg));
+  it.each(STATUS_ON_SOFT)("$where", ({ fg, bg }) => expectTextAA(fg, bg));
 
-  it("the focus ring is distinguishable from the surface it sits on (3:1, WCAG 1.4.11)", () => {
-    // A non-text UI indicator, so 3:1 rather than 4.5:1. Checked because
-    // §15 forbids suppressing the focus ring, and a ring that meets the
-    // letter of that while being invisible against the page meets none
-    // of its intent.
-    const ratio = contrast(resolve(theme, "ring"), resolve(theme, "background"));
-    expect(ratio, `--ring on --background in ${themeName} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(3);
+
+  it("the focus ring is distinguishable from the surface it sits on", () => {
+    // Checked because §15 forbids suppressing the focus ring, and a ring
+    // that meets the letter of that while being invisible against the
+    // page meets none of its intent.
+    expectGraphicAA("ring", "background");
   });
 });

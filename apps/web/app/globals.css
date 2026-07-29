@@ -32,7 +32,11 @@
   --card-foreground: #15131f;
   --popover: #ffffff;
   --popover-foreground: #15131f;
-  --primary: #7c5cff;
+  /* 3% darker than the #7c5cff brand purple. White label text on the
+   * default Button measured 4.35:1 against a 4.5:1 requirement — the
+   * smallest change that clears it, and visually indistinguishable.
+   * --brand-500 keeps the original hue, so the brand ramp is unchanged. */
+  --primary: #7859f7;
   --primary-foreground: #ffffff;
   --secondary: #f7f8fb;
   --secondary-foreground: #15131f;
@@ -40,23 +44,44 @@
   --muted-foreground: #6b677e;
   --accent: #f1edff;
   --accent-foreground: #7c5cff;
-  --destructive: #f04438;
+  /* Deepened from #f04438: white text on it measured 3.76:1. */
+  --destructive: #d83d32;
   --destructive-foreground: #ffffff;
   --border: #e5e7eb;
   --input: #e5e7eb;
-  --ring: #7c5cff;
+  --ring: #7859f7;
 
-  /* Status extensions — not part of shadcn's default set */
+  /* Status extensions — not part of shadcn's default set.
+   *
+   * Each status has three roles, and they are separate tokens because
+   * they are held to different WCAG thresholds:
+   *   --success         the vivid hue, for dots, borders, and icons.
+   *                     Non-text, so 3:1 (WCAG 1.4.11) is the bar.
+   *   --success-soft    the tinted background a badge sits on.
+   *   --success-strong  the hue darkened until *text* on -soft reaches
+   *                     4.5:1 (WCAG 1.4.3).
+   * ...and the same triple for warning, info, and destructive.
+   *
+   * The -strong tokens exist because measuring found status text at
+   * 2.14:1–3.29:1 in this theme — see docs/accessibility/phase-6-audit.md.
+   * Darkening --success itself would have fixed the text and dulled every
+   * dot and border along with it, so the roles were split instead.
+   * Verified by app/design-tokens-contrast.test.ts, which fails if any
+   * of these drifts below its threshold. */
   --success: #17b26a;
   --success-foreground: #ffffff;
   --success-soft: #e7f9f0;
+  --success-strong: #11804c;
   --warning: #f79009;
   --warning-foreground: #ffffff;
   --warning-soft: #fef3e2;
+  --warning-strong: #a35f06;
   --info: #4c8dff;
   --info-foreground: #ffffff;
   --info-soft: #eaf1ff;
+  --info-strong: #3a6bc2;
   --destructive-soft: #fdecea;
+  --destructive-strong: #c7382e;
   --accent-2: #9b7bff;
   --magenta: #d946a8;
 
@@ -92,7 +117,11 @@
   --card-foreground: #f1effb;
   --popover: #171722;
   --popover-foreground: #f1effb;
-  --primary: #7c5cff;
+  /* 3% darker than the #7c5cff brand purple. White label text on the
+   * default Button measured 4.35:1 against a 4.5:1 requirement — the
+   * smallest change that clears it, and visually indistinguishable.
+   * --brand-500 keeps the original hue, so the brand ramp is unchanged. */
+  --primary: #7859f7;
   --primary-foreground: #ffffff;
   --secondary: #11111a;
   --secondary-foreground: #f1effb;
@@ -100,22 +129,32 @@
   --muted-foreground: #9c97b8;
   --accent: #221c3b;
   --accent-foreground: #9b7bff;
-  --destructive: #f04438;
+  /* Deepened from #f04438: white text on it measured 3.76:1. */
+  --destructive: #d83d32;
   --destructive-foreground: #ffffff;
   --border: rgba(255, 255, 255, 0.08);
   --input: rgba(255, 255, 255, 0.08);
-  --ring: #7c5cff;
+  --ring: #7859f7;
 
+  /* Dark's soft tints are far darker than light's, so the vivid hue
+   * already clears 4.5:1 on three of the four (success 5.01, warning
+   * 6.44, info 4.87) and -strong is simply the base. Only danger fell
+   * short at 4.37:1, and it is lightened rather than darkened here —
+   * the direction that increases contrast against a dark background. */
   --success: #17b26a;
   --success-foreground: #ffffff;
   --success-soft: #113321;
+  --success-strong: #17b26a;
   --warning: #f79009;
   --warning-foreground: #ffffff;
   --warning-soft: #332310;
+  --warning-strong: #f79009;
   --info: #4c8dff;
   --info-foreground: #ffffff;
   --info-soft: #16233f;
+  --info-strong: #4c8dff;
   --destructive-soft: #341714;
+  --destructive-strong: #f4655b;
   --accent-2: #9b7bff;
   --magenta: #d946a8;
 }
@@ -149,13 +188,17 @@
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-success-soft: var(--success-soft);
+  --color-success-strong: var(--success-strong);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-warning-soft: var(--warning-soft);
+  --color-warning-strong: var(--warning-strong);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-info-soft: var(--info-soft);
+  --color-info-strong: var(--info-strong);
   --color-destructive-soft: var(--destructive-soft);
+  --color-destructive-strong: var(--destructive-strong);
   --color-accent-2: var(--accent-2);
   --color-magenta: var(--magenta);
 

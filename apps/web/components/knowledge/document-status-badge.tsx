@@ -25,17 +25,17 @@ const STATUS: Record<string, StatusStyle> = {
   pending: PENDING,
   processing: {
     label: "Indexing",
-    className: "bg-warning-soft text-warning border-transparent",
+    className: "bg-warning-soft text-warning-strong border-transparent",
     Icon: Loader2,
   },
   indexed: {
     label: "Indexed",
-    className: "bg-success-soft text-success border-transparent",
+    className: "bg-success-soft text-success-strong border-transparent",
     Icon: CheckCircle2,
   },
   failed: {
     label: "Failed",
-    className: "bg-destructive-soft text-destructive border-transparent",
+    className: "bg-destructive-soft text-destructive-strong border-transparent",
     Icon: AlertCircle,
   },
 };

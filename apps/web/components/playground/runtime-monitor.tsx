@@ -151,9 +151,9 @@ export function RuntimeMonitor({
                     className={cn(
                       "relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full border",
                       isFailure
-                        ? "border-destructive/30 bg-destructive-soft text-destructive"
+                        ? "border-destructive/30 bg-destructive-soft text-destructive-strong"
                         : step.type === "run_completed"
-                          ? "border-success/30 bg-success-soft text-success"
+                          ? "border-success/30 bg-success-soft text-success-strong"
                           : "border-border bg-card text-muted-foreground"
                     )}
                   >

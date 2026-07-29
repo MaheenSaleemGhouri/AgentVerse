@@ -109,7 +109,7 @@ has run.
 None of these are blocked — they need a browser session and a person at
 the keyboard, which this audit did not include.
 
-## Contrast — measured, and failing
+## Contrast — measured, and fixed
 
 `app/design-tokens-contrast.test.ts` parses the real tokens out of
 `globals.css` and computes WCAG ratios for the pairs the components
@@ -118,6 +118,8 @@ actually render. It runs on every `pnpm test`.
 This section previously said contrast was "not run" but that the tokens
 were "very likely already compliant". **That guess was wrong.** Six
 rendered pairs fail AA in light theme and three in dark:
+
+The failures found, all since fixed:
 
 | Pair | Light | Dark | Rendered by |
 | --- | --- | --- | --- |
@@ -133,23 +135,58 @@ allowance. Everything else measured — body text, muted text on both
 page and card, secondary surfaces, and the focus ring against the page
 (1.4.11) — passes in both themes.
 
-**These are not Phase 6 defects.** `StatusBadge`, `Button`, and the
-count badge all predate it; Phase 6 renders `StatusBadge` and therefore
-inherits the failure. Fixing it means changing status colours across the
-entire product, which is a `design-system-architect` decision and not
-something to slip into an integrations phase.
+**These were not Phase 6 defects.** `StatusBadge`, `Button`, and the
+count badge all predate it; Phase 6 renders `StatusBadge` and inherited
+the failure.
 
-The failures are **pinned, not skipped**: the test asserts each is still
-failing at its measured ratio, so darkening a token tells you to remove
-the entry and letting it drift further fails the build. A plain skip
-would have let the palette rot while reporting green.
+### The fix
 
-Three things this measurement does *not* establish: it checks token
-pairs found by reading the components, so a future component pairing two
-tokens nobody anticipated is uncovered; it computes ratios rather than
-rendering them, so an opacity modifier applied in a class
-(`bg-destructive-soft/30`, which the runtime view uses) is not accounted
-for; and it says nothing about non-text contrast beyond the focus ring.
+Splitting the role, rather than darkening the hue. Each status now has
+three tokens held to different thresholds:
+
+| Token | Used for | Threshold |
+| --- | --- | --- |
+| `--success` | the badge dot, the Alert icon | decorative — see below |
+| `--success-soft` | the tinted background | — |
+| `--success-strong` | **text** on that background | 4.5:1 |
+
+Darkening `--success` itself would have fixed the text and dulled every
+dot and border with it. The new `-strong` tokens are the smallest
+darkening that clears AA — `#17b26a → #11804c` and so on — and in dark
+theme three of the four already passed, so `-strong` is simply the base
+there. Only danger needed lightening (`#f04438 → #f4655b`), the
+direction that raises contrast against a dark surface.
+
+Two tokens changed globally, both by the minimum that clears AA:
+
+- `--primary` `#7c5cff → #7859f7` (3% darker; white button text was
+  4.35:1). `--brand-500` keeps the original hue, so the brand ramp is
+  untouched.
+- `--destructive` `#f04438 → #d83d32` (white text was 3.76:1).
+
+All 34 contrast assertions now pass in both themes, and the production
+build is clean.
+
+### The dots are deliberately not held to 3:1
+
+WCAG 1.4.11 covers graphics *required* to identify a state. The
+`StatusBadge` dot is `aria-hidden` and always sits beside a text label,
+so the state is carried by the words and the dot reinforces it. Same for
+the `Alert` icon. Holding decoration to 3:1 would have pushed the palette
+darker for no accessibility gain.
+
+That is a judgement call, so it is written down rather than left as a
+missing test — and what keeps it honest is the existing assertion that a
+status is never colour-only. If the text label were ever dropped, the
+dot would become the indicator and this reasoning would stop holding.
+
+### What the measurement still does not establish
+
+It checks token pairs found by reading the components, so a future
+component pairing two tokens nobody anticipated is uncovered; and it
+computes ratios rather than rendering them, so an opacity modifier
+applied in a class (`bg-destructive-soft/30`, which the runtime view
+uses) is not accounted for.
 
 ## Target size
 
@@ -162,7 +199,9 @@ internal standard rather than passed over silently.
 
 ## Verdict
 
-**Not a full WCAG 2.2 AA sign-off.** What this audit establishes:
+**Not a full WCAG 2.2 AA sign-off**, but closer than it was: contrast has
+moved from an unverified guess to a measured, fixed, CI-gated property.
+What this audit establishes:
 
 - The automated scan passes with zero violations, and is now a permanent
   CI gate.

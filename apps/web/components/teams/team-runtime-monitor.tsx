@@ -190,7 +190,7 @@ export function TeamRuntimeMonitor({
                       className={cn(
                         "flex size-6 shrink-0 items-center justify-center rounded-full border",
                         event.type === "agent_failed" || event.type === "session_failed"
-                          ? "border-destructive/30 bg-destructive-soft text-destructive"
+                          ? "border-destructive/30 bg-destructive-soft text-destructive-strong"
                           : event.type === "handoff"
                             ? "border-primary/30 bg-accent text-accent-foreground"
                             : "border-border bg-muted text-muted-foreground"
