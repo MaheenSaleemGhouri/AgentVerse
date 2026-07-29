@@ -78,12 +78,24 @@ fails the TypeScript build.
 
 | Suite | Result |
 | --- | --- |
-| `packages/python-shared` | 246 passed, 10 skipped |
-| `apps/api` | 434 passed, 6 skipped |
+| `packages/python-shared` | 256 passed |
+| `apps/api` | 440 passed |
 | `apps/worker` | 242 passed |
-| `apps/web` | 23 passed |
+| `apps/web` | 33 passed |
 | ruff + mypy (3 packages) | clean |
 | tsc + eslint + next build | clean |
+
+**971 tests, zero skipped.** The Python suites were re-run against a
+real pgvector pg16 at revision `c4e81f3d9b27` with
+`AGENTVERSE_{API,WORKER,SHARED}_DATABASE_URL` set, so the integration
+layer — tenant isolation on `kb_chunks`, shared-memory and session
+persistence, workspace/RBAC repositories — actually executed instead of
+being deselected. Without those variables the same suites report 191 /
+434 / 246 passing with 67 skips, which is the shape a CI run gives if it
+forgets them: green, and missing exactly the coverage that matters most.
+
+All four suites were re-run after the `cryptography` 46.0.7 → 48.0.1
+bump, since that library seals every MCP credential.
 
 **Security tests specifically:**
 

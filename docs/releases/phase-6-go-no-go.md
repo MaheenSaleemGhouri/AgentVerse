@@ -26,7 +26,7 @@ until someone looked at a database table.
 | 1 Requirements | `product-manager` | ✅ brief + roadmap Phase 6 |
 | 2 Architecture | `architecture-reviewer` | ✅ ADR-0010 |
 | 3 Security | `security-reviewer` | ⚠️ Pass, no blocking finding; `owasp-expert` audit not run |
-| 4 Tests | `testing-architect` | ✅ 945 tests green across four suites; lint/type clean |
+| 4 Tests | `testing-architect` | ✅ 971 tests green across four suites, zero skipped; lint/type clean |
 | 5 Documentation | `documentation-engineer` | ✅ |
 | 6 Performance | `performance-engineer` | ❌ Budgets only — nothing measured |
 | 7 Accessibility | `accessibility-expert` | ⚠️ Automated gate green; manual passes not run |
@@ -36,9 +36,10 @@ until someone looked at a database table.
 
 ## What ran, and what it proves
 
-**Tests (gate 4).** 246 + 434 + 242 + 23 across shared, api, worker, and
-web. Migration verified on real pg16 through `upgrade → downgrade →
-upgrade`, not a mocked database. 32 adversarial egress tests, 35 crypto
+**Tests (gate 4).** 256 + 440 + 242 + 33 across shared, api, worker, and
+web, with the database-backed integration layer actually running rather
+than deselected. Migration verified on real pg16 through `upgrade →
+downgrade → upgrade`, not a mocked database. 32 adversarial egress tests, 35 crypto
 tests including AAD row-binding, 35 boundary tests including a
 read-only grant refusing a mutating tool before execution. This is the
 strongest gate in the set and it is genuinely green.
@@ -73,7 +74,12 @@ tooltip guarding credential requirements was also fixed.
    authorize and token-exchange endpoints are not built. Marketing or
    docs claiming these work would be a false claim (`CLAUDE.md` §2,
    transparency).
-4. **A load test before any workspace exceeds roughly 100k tool calls.**
+4. **CI must set `AGENTVERSE_{API,WORKER,SHARED}_DATABASE_URL`.** Without
+   them the Python suites skip 67 tests and still report green — and the
+   skipped set is precisely the tenant-isolation and persistence
+   coverage. A pipeline that omits them is not testing the thing this
+   release is riskiest about.
+5. **A load test before any workspace exceeds roughly 100k tool calls.**
    The metrics endpoint aggregates live over `tool_calls`; the
    `tool_metrics` rollup job does not exist.
 

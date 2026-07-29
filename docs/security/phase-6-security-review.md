@@ -91,7 +91,7 @@ Run on the actual lockfiles, not on the declared ranges.
 
 | Package | Version | Advisory | Disposition |
 | --- | --- | --- | --- |
-| `cryptography` | 46.0.7 | GHSA-537c-gmf6-5ccf | **Fixed.** Bumped to `>=48.0.1,<49` in `packages/python-shared`. This is the library that seals every MCP credential, so it is not one to leave lagging. `uv sync` + full shared suite re-run green (246 passed, 10 skipped) on the new version |
+| `cryptography` | 46.0.7 | GHSA-537c-gmf6-5ccf | **Fixed.** Bumped to `>=48.0.1,<49` in `packages/python-shared`. This is the library that seals every MCP credential, so it is not one to leave lagging. Both services re-synced onto 48.0.1 and all four suites re-run green (971 passed, zero skipped, against a real Postgres) on the new version |
 | `starlette` | 0.46.2 | 8 advisories | **Open, accepted for this release.** Transitive through the `fastapi>=0.115,<0.116` pin in both apps/api and apps/worker. The fixed lines (0.47.2 / 0.49.1 / 1.x) require a FastAPI major bump, which is a cross-service upgrade with its own test and contract surface — not a Phase 6 change. Tracked below as the one open security item |
 | `pytest` | 8.4.2 | PYSEC-2026-1845 | **Open, dev-only.** Test-runner dependency; not present in any shipped image. Bump to 9.0.3 folded into the same upgrade pass |
 
