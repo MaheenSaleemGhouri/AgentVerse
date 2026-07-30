@@ -20,7 +20,6 @@ from typing import Any
 
 import pytest
 from fakeredis.aioredis import FakeRedis
-from mcp.types import CallToolResult, TextContent
 
 from agentverse_worker.mcp.attach import MAX_ATTACHED_SERVERS, attach_integrations
 from agentverse_worker.mcp.factory import ServerConnectionSpec
@@ -33,6 +32,7 @@ from agentverse_worker.tools.boundary import (
     ToolGrant,
 )
 from agentverse_worker.tools.policy import CallBudget, CircuitBreaker, ResultCache
+from mcp.types import CallToolResult, TextContent
 
 READ_TOOL = ToolDefinition(
     name="list_issues",
@@ -86,6 +86,38 @@ class StubMcpServer:
         )
 
 
+class RoutingStubMcpServer:
+    """Responds per `tool_name` — needed for the fallback tests, where
+    the primary and the fallback tool must behave differently on the
+    same stub server."""
+
+    def __init__(self, responses: dict[str, CallToolResult]) -> None:
+        self.name = "stub"
+        self.calls: list[tuple[str, dict[str, Any] | None]] = []
+        self._responses = responses
+
+    async def connect(self) -> None:
+        return None
+
+    async def cleanup(self) -> None:
+        return None
+
+    async def list_tools(self, *_: Any) -> list[Any]:
+        return []
+
+    async def list_prompts(self) -> Any:
+        return []
+
+    async def get_prompt(self, name: str, arguments: dict[str, Any] | None = None) -> Any:
+        return None
+
+    async def call_tool(
+        self, tool_name: str, arguments: dict[str, Any] | None, meta: dict[str, Any] | None = None
+    ) -> CallToolResult:
+        self.calls.append((tool_name, arguments))
+        return self._responses[tool_name]
+
+
 class FakeRecorder:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
@@ -115,7 +147,7 @@ def _deps(redis: Any, recorder: FakeRecorder) -> BoundaryDeps:
 
 
 def _governed(
-    inner: StubMcpServer,
+    inner: StubMcpServer | RoutingStubMcpServer,
     redis: Any,
     recorder: FakeRecorder,
     *,
@@ -232,6 +264,83 @@ class TestServerErrors:
         result = await server.call_tool("list_issues", {"repo": "x"})
         assert result.isError is True
         assert "failed" in result.content[0].text  # type: ignore[union-attr]
+
+
+class TestFallbackTool:
+    """Gap #2: `ToolGrant.fallback_tools` resolved through this server's
+    own discovery (`tools_by_name`), same-server only.
+    """
+
+    SEARCH_TOOL = ToolDefinition(
+        name="search_issues",
+        description="Searches issues.",
+        input_schema={"type": "object", "properties": {"repo": {"type": "string"}}},
+        is_mutating=False,
+    )
+
+    async def test_a_failed_call_falls_through_to_the_configured_fallback(
+        self, redis: Any
+    ) -> None:
+        recorder = FakeRecorder()
+        inner = RoutingStubMcpServer(
+            {
+                "list_issues": CallToolResult(
+                    content=[TextContent(type="text", text="down")], isError=True
+                ),
+                "search_issues": CallToolResult(
+                    content=[TextContent(type="text", text="found via search")], isError=False
+                ),
+            }
+        )
+        server = _governed(
+            inner,
+            redis,
+            recorder,
+            grant=ToolGrant(
+                installed_server_id="srv-1",
+                level="read_write",
+                max_retries=0,
+                fallback_tools={"list_issues": "search_issues"},
+            ),
+            tools={"list_issues": READ_TOOL, "search_issues": self.SEARCH_TOOL},
+        )
+
+        result = await server.call_tool("list_issues", {"repo": "x"})
+
+        assert result.isError is False
+        assert "found via search" in result.content[0].text  # type: ignore[union-attr]
+        assert [name for name, _ in inner.calls] == ["list_issues", "search_issues"]
+
+    async def test_a_fallback_name_the_server_never_discovered_is_not_attempted(
+        self, redis: Any
+    ) -> None:
+        """A stale or misconfigured mapping degrades to no fallback,
+        never a crash — the original tool's own failure still returns."""
+        recorder = FakeRecorder()
+        inner = RoutingStubMcpServer(
+            {
+                "list_issues": CallToolResult(
+                    content=[TextContent(type="text", text="down")], isError=True
+                ),
+            }
+        )
+        server = _governed(
+            inner,
+            redis,
+            recorder,
+            grant=ToolGrant(
+                installed_server_id="srv-1",
+                level="read_write",
+                max_retries=0,
+                fallback_tools={"list_issues": "renamed_or_removed_tool"},
+            ),
+            tools={"list_issues": READ_TOOL},
+        )
+
+        result = await server.call_tool("list_issues", {"repo": "x"})
+
+        assert result.isError is True
+        assert [name for name, _ in inner.calls] == ["list_issues"]
 
 
 class TestDelegation:

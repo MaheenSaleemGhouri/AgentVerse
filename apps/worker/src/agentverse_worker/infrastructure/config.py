@@ -69,6 +69,28 @@ class Settings(BaseSettings):
     # reads. In Docker that is a shared volume.
     document_storage_root: str = "/var/lib/agentverse/documents"
 
+    # Phase 6 gap-closure — scheduled MCP health sweep (previously
+    # on-demand only via `check_health`, which nothing called). A whole
+    # sweep cycle, not a per-server cadence: simpler to reason about, and
+    # 38 catalog entries plus custom registrations is nowhere near enough
+    # volume for one sweep to threaten the interval.
+    mcp_health_sweep_interval_seconds: float = 300.0
+    #: Bounds how many servers this replica probes at once — a handful
+    #: of slow/unreachable servers must not serialize behind each other
+    #: and stretch one sweep into the next.
+    mcp_health_sweep_concurrency: int = 5
+    #: Per-server cap, independent of whatever timeout the SDK's own
+    #: transport applies internally (CLAUDE.md Rule 17: every loop needs
+    #: its own explicit bound, not just a hoped-for one from a dependency).
+    mcp_health_sweep_check_timeout_seconds: float = 20.0
+
+    # Phase 6 gap-closure — `tool_metrics` rollup (previously an unused
+    # table with no writer). Every 15 minutes re-aggregates the last two
+    # complete hourly buckets; the trailing window is self-healing, not
+    # a cadence claim, so this can run far less often than an hour and
+    # still stay correct.
+    tool_metrics_aggregation_interval_seconds: float = 900.0
+
 
 @lru_cache
 def get_settings() -> Settings:

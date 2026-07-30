@@ -26,8 +26,6 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from mcp.types import CallToolResult, TextContent
-
 from agents.agent import AgentBase
 from agents.mcp import MCPServer
 from agents.run_context import RunContextWrapper
@@ -38,6 +36,7 @@ from agentverse_worker.tools.boundary import (
     ToolGrant,
     execute_tool,
 )
+from mcp.types import CallToolResult, TextContent
 
 logger = logging.getLogger(__name__)
 
@@ -144,26 +143,40 @@ class GovernedMcpServer(MCPServer):
             await self._emit("mcp_tool_unknown", {"tool": tool_name, "reason": reason})
             return _error_result(f"This tool call was not permitted: {reason}")
 
-        async def _invoke(args: dict[str, Any]) -> str:
-            result = await self._inner.call_tool(tool_name, args, meta)
-            if result.isError:
-                # Surfaced as an exception so the boundary's retry and
-                # circuit-breaker paths treat it as the failure it is —
-                # returning it as content would make a broken server look
-                # healthy to every policy above.
-                raise McpToolError(_text_of(result) or "the tool reported an error")
-            return _text_of(result)
+        def _invoker(name: str) -> Callable[[dict[str, Any]], Awaitable[str]]:
+            async def _invoke(args: dict[str, Any]) -> str:
+                result = await self._inner.call_tool(name, args, meta)
+                if result.isError:
+                    # Surfaced as an exception so the boundary's retry and
+                    # circuit-breaker paths treat it as the failure it is —
+                    # returning it as content would make a broken server look
+                    # healthy to every policy above.
+                    raise McpToolError(_text_of(result) or "the tool reported an error")
+                return _text_of(result)
+
+            return _invoke
+
+        # Same-server tool equivalence only, and only ever what a
+        # workspace admin configured on the grant — this module has no
+        # basis to guess two tools are interchangeable. A configured name
+        # this server never discovered (renamed, removed, misconfigured)
+        # is silently not attempted rather than failing the whole call;
+        # the original tool's own failure is still returned.
+        fallback_name = self._grant.fallback_tools.get(tool_name)
+        fallback_definition = self._tools.get(fallback_name) if fallback_name else None
 
         outcome = await execute_tool(
             tool=definition,
             arguments=arguments or {},
             grant=self._grant,
             context=self._context,
-            invoke=_invoke,
+            invoke=_invoker(tool_name),
             recorder=self._deps.recorder,
             breaker=self._deps.breaker,
             cache=self._deps.cache,
             budget=self._deps.budget,
+            fallback=fallback_definition,
+            fallback_invoke=_invoker(fallback_definition.name) if fallback_definition else None,
         )
 
         await self._emit(
@@ -174,6 +187,7 @@ class GovernedMcpServer(MCPServer):
                 "status": outcome.status,
                 "duration_ms": outcome.duration_ms,
                 "denial_reason": outcome.denial_reason,
+                "substituted_from": outcome.substituted_from,
             },
         )
 

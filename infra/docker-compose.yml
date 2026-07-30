@@ -64,6 +64,24 @@ services:
       # instance, container-network hostname (not the "localhost" default
       # that's only correct when running apps/api directly on the host).
       AGENTVERSE_API_REDIS_URL: redis://redis:6379/0
+      # Phase 6 gap-closure: this service's own browser-reachable origin.
+      # Every OAuth provider's redirect_uri points here, not at the
+      # container-network hostname — the user's browser lands on this
+      # callback directly, the same way it would on a Stripe webhook.
+      AGENTVERSE_API_API_PUBLIC_URL: http://localhost:${API_PORT:-8000}
+      # Each pair is optional (see apps/api/.env.example) — a provider
+      # missing either half is simply absent from the OAuth registry,
+      # not a button that fails on click.
+      AGENTVERSE_API_NOTION_OAUTH_CLIENT_ID: ${NOTION_OAUTH_CLIENT_ID:-}
+      AGENTVERSE_API_NOTION_OAUTH_CLIENT_SECRET: ${NOTION_OAUTH_CLIENT_SECRET:-}
+      AGENTVERSE_API_LINEAR_OAUTH_CLIENT_ID: ${LINEAR_OAUTH_CLIENT_ID:-}
+      AGENTVERSE_API_LINEAR_OAUTH_CLIENT_SECRET: ${LINEAR_OAUTH_CLIENT_SECRET:-}
+      AGENTVERSE_API_JIRA_OAUTH_CLIENT_ID: ${JIRA_OAUTH_CLIENT_ID:-}
+      AGENTVERSE_API_JIRA_OAUTH_CLIENT_SECRET: ${JIRA_OAUTH_CLIENT_SECRET:-}
+      AGENTVERSE_API_HUBSPOT_OAUTH_CLIENT_ID: ${HUBSPOT_OAUTH_CLIENT_ID:-}
+      AGENTVERSE_API_HUBSPOT_OAUTH_CLIENT_SECRET: ${HUBSPOT_OAUTH_CLIENT_SECRET:-}
+      AGENTVERSE_API_CLOUDFLARE_OAUTH_CLIENT_ID: ${CLOUDFLARE_OAUTH_CLIENT_ID:-}
+      AGENTVERSE_API_CLOUDFLARE_OAUTH_CLIENT_SECRET: ${CLOUDFLARE_OAUTH_CLIENT_SECRET:-}
     volumes:
       # Mirrors the in-image layout (see infra/docker/api.Dockerfile):
       # the shared package is resolved by relative path, so mounting the

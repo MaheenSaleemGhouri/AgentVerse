@@ -93,6 +93,34 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     embedding_model_version: str = "1"
 
+    # Phase 6 gap-closure — OAuth2 completion. This service's own
+    # browser-reachable origin: the redirect_uri registered with every
+    # OAuth provider below points here, never at auth_internal_url (that
+    # is apps/web's server-to-server hostname, which the user's browser
+    # cannot reach). Required, no default, for the same reason
+    # auth_public_url is: a wrong value fails a redirect, not a request.
+    api_public_url: str
+
+    # Per-provider OAuth2 app credentials, one pair per catalog entry
+    # whose auth_scheme is oauth2 (Notion, Linear, Jira, HubSpot,
+    # Cloudflare). Each is optional and independent — deliberately not a
+    # single "oauth configured" flag — because a workspace should be able
+    # to use whichever of these AgentVerse has actually registered an
+    # app with, exactly the pattern apps/web already uses for GitHub/
+    # Google (`lib/social-providers.ts`): a provider without both halves
+    # of its pair is absent from `build_oauth_providers`, not a button
+    # that fails on click.
+    notion_oauth_client_id: str | None = None
+    notion_oauth_client_secret: str | None = None
+    linear_oauth_client_id: str | None = None
+    linear_oauth_client_secret: str | None = None
+    jira_oauth_client_id: str | None = None
+    jira_oauth_client_secret: str | None = None
+    hubspot_oauth_client_id: str | None = None
+    hubspot_oauth_client_secret: str | None = None
+    cloudflare_oauth_client_id: str | None = None
+    cloudflare_oauth_client_secret: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:

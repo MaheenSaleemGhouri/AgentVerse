@@ -231,6 +231,7 @@ class WorkerIntegrationRepository:
             max_retries=int(permission["max_retries"]),
             cache_ttl_seconds=int(permission["cache_ttl_seconds"]),
             max_calls_per_run=int(permission["max_calls_per_run"]),
+            fallback_tools=dict(permission["fallback_tools"] or {}),
         )
         return ResolvedIntegration(
             spec=spec, grant=grant, tools=_to_tool_definitions(row["discovered_tools"])
@@ -295,6 +296,7 @@ class WorkerIntegrationRepository:
                 permission.c.max_calls_per_run,
                 permission.c.priority,
                 permission.c.agent_id,
+                permission.c.fallback_tools,
             )
             .join(
                 permission,
@@ -357,6 +359,7 @@ class WorkerIntegrationRepository:
                 permission.c.max_retries,
                 permission.c.cache_ttl_seconds,
                 permission.c.max_calls_per_run,
+                permission.c.fallback_tools,
             )
             .join(team_link, team_link.c.installed_server_id == installed_servers_table.c.id)
             .join(
@@ -447,5 +450,91 @@ class WorkerIntegrationRepository:
                 message=message,
                 context=context or {},
             )
+        )
+        await self._session.commit()
+
+    async def list_active_installations(self) -> list[ServerConnectionSpec]:
+        """Every install the scheduled health sweep should probe.
+
+        Deliberately platform-wide, not `workspace_id`-scoped like every
+        other query in this file: a health sweep's job is "is this server
+        reachable", which is a fact about the server, not about which
+        workspace is asking. `workspace_id` is still carried on every
+        returned spec (Rule 11) — nothing here reads or returns
+        cross-tenant data, it just reads across tenants by design, the
+        same exemption ADR-0010 already grants the `mcp_servers` catalog.
+
+        No permission join: connecting to probe reachability is not the
+        same operation as a grant-scoped tool call, and one server with a
+        missing/misconfigured permission row must not disappear from
+        health reporting because of it.
+        """
+        installed = installed_servers_table
+        catalog = mcp_servers_table
+        result = await self._session.execute(
+            select(
+                installed.c.id.label("installed_server_id"),
+                installed.c.workspace_id,
+                installed.c.mcp_server_id,
+                installed.c.display_name,
+                installed.c.transport,
+                installed.c.endpoint_url,
+                catalog.c.command.label("catalog_command"),
+                catalog.c.command_args.label("catalog_command_args"),
+                catalog.c.endpoint_url.label("catalog_endpoint_url"),
+            )
+            .select_from(installed.outerjoin(catalog, catalog.c.id == installed.c.mcp_server_id))
+            .where(installed.c.status == "active", installed.c.deleted_at.is_(None))
+        )
+
+        specs: list[ServerConnectionSpec] = []
+        for row in result.mappings():
+            workspace_id = str(row["workspace_id"])
+            installed_id = str(row["installed_server_id"])
+            env, headers = await self._load_credentials(
+                workspace_id=workspace_id, installed_server_id=installed_id
+            )
+            is_catalog = row["mcp_server_id"] is not None
+            specs.append(
+                ServerConnectionSpec(
+                    installed_server_id=installed_id,
+                    workspace_id=workspace_id,
+                    display_name=row["display_name"],
+                    transport=str(row["transport"]),
+                    command=row["catalog_command"] if is_catalog else None,
+                    command_args=(
+                        tuple(row["catalog_command_args"] or ()) if is_catalog else ()
+                    ),
+                    env=env,
+                    endpoint_url=(
+                        row["catalog_endpoint_url"] if is_catalog else row["endpoint_url"]
+                    ),
+                    headers=headers,
+                    is_catalog_entry=is_catalog,
+                )
+            )
+        return specs
+
+    async def record_health_check(
+        self,
+        *,
+        installed_server_id: str,
+        health: str,
+        checked_at: datetime,
+        error: str | None,
+    ) -> None:
+        """Persists one `check_health` result.
+
+        Writes `health`/`last_health_check_at`/`last_error` only — never
+        `status`. A server the sweep finds unreachable stays `active`
+        with `health="unreachable"`: those are different facts (whether
+        the workspace wants it enabled vs. whether it currently answers),
+        and collapsing them would silently disable a server a transient
+        network blip made unreachable for one sweep.
+        """
+        await self._session.execute(
+            installed_servers_table.update()
+            .where(installed_servers_table.c.id == installed_server_id)
+            .values(health=health, last_health_check_at=checked_at, last_error=error)
         )
         await self._session.commit()

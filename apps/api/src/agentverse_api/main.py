@@ -26,6 +26,9 @@ from agentverse_api.orchestration_service.interface.routers.internal_provider_te
 from agentverse_api.orchestration_service.interface.routers.knowledge import (
     router as knowledge_router,
 )
+from agentverse_api.orchestration_service.interface.routers.oauth_callback import (
+    router as oauth_callback_router,
+)
 from agentverse_api.orchestration_service.interface.routers.run_stream import (
     router as run_stream_router,
 )
@@ -54,6 +57,7 @@ def create_app() -> FastAPI:
     app.include_router(run_stream_router)
     app.include_router(teams_router)
     app.include_router(integrations_router)
+    app.include_router(oauth_callback_router)
     app.include_router(team_session_stream_router)
     app.include_router(api_keys_router)
     app.include_router(internal_auth_events_router)

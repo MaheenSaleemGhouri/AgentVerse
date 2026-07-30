@@ -4,6 +4,7 @@ import { ArrowLeft, ExternalLink, Trash2, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
+import { toast } from "sonner";
 
 import type { Agent } from "@/lib/api/agents";
 import type { InstalledServer } from "@/lib/api/integrations";
@@ -49,6 +50,30 @@ export function ServerDetail({
   const update = useUpdateInstalled(workspaceId, server.id);
   const uninstall = useUninstall(workspaceId);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+
+  // Reads `?oauth=` via `window.location` rather than `useSearchParams()`
+  // deliberately: that hook requires a Suspense boundary this page does
+  // not have (the same requirement `login-form.tsx` needed one for), and
+  // a one-time "you're back from the provider" toast does not need the
+  // reactivity `useSearchParams` exists for. The param is stripped
+  // immediately after so a refresh does not re-show it.
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauth = params.get("oauth");
+    if (oauth === "success") {
+      toast.success("Connected. Agents can use this integration now.");
+    } else if (oauth === "error") {
+      toast.error("The connection could not be completed — try again.");
+    }
+    if (oauth) {
+      params.delete("oauth");
+      const query = params.toString();
+      router.replace(query ? `?${query}` : window.location.pathname);
+    }
+    // Runs once on mount only — this is a one-shot reaction to how the
+    // page was navigated to, not a state the component tracks over time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const status = INSTALL_STATUS[server.status];
   const health = HEALTH[server.health];

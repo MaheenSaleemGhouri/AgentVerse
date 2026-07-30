@@ -80,6 +80,8 @@ async def _run(
     grant: ToolGrant | None = None,
     invoke: Any = None,
     context: ExecutionContext | None = None,
+    fallback: ToolDefinition | None = None,
+    fallback_invoke: Any = None,
 ) -> Any:
     async def _default(_: dict[str, Any]) -> str:
         return "three issues found"
@@ -94,6 +96,8 @@ async def _run(
         breaker=CircuitBreaker(redis),
         cache=ResultCache(redis),
         budget=CallBudget(redis),
+        fallback=fallback,
+        fallback_invoke=fallback_invoke,
     )
 
 
@@ -339,6 +343,165 @@ class TestRetryAndTimeout:
         )
         assert "failed" in outcome.content
         assert "upstream 503" in outcome.content
+
+
+class TestFallbackTool:
+    """Gap #2 in `docs/PHASE-6-MCP-CHECKLIST.md`: no automatic
+    substitution when a tool fails. The fallback is workspace-admin
+    configured (`ToolGrant.fallback_tools`), never inferred — AgentVerse
+    has no way to know two third-party tools are actually equivalent.
+    """
+
+    FALLBACK_TOOL = ToolDefinition(
+        name="search_issues", description="Searches issues.", input_schema=SCHEMA
+    )
+
+    async def test_a_genuine_failure_falls_through_to_the_configured_fallback(
+        self, redis: Any, recorder: FakeRecorder
+    ) -> None:
+        async def _primary(_: dict[str, Any]) -> str:
+            raise RuntimeError("primary is down")
+
+        async def _fallback(_: dict[str, Any]) -> str:
+            return "found via fallback"
+
+        outcome = await _run(
+            redis,
+            recorder,
+            invoke=_primary,
+            fallback=self.FALLBACK_TOOL,
+            fallback_invoke=_fallback,
+            grant=ToolGrant(installed_server_id="srv-1", level="read_write", max_retries=0),
+        )
+
+        assert outcome.status == "success"
+        assert outcome.substituted_from == "list_issues"
+        assert "found via fallback" in outcome.content
+        # Both attempts are audited — the failure and the substitution —
+        # not merged into one row that hides what actually happened.
+        assert len(recorder.calls) == 2
+        assert recorder.calls[0]["tool_name"] == "list_issues"
+        assert recorder.calls[0]["status"] == "error"
+        assert recorder.calls[1]["tool_name"] == "search_issues"
+        assert recorder.calls[1]["status"] == "success"
+
+    async def test_a_denial_never_triggers_a_fallback(
+        self, redis: Any, recorder: FakeRecorder
+    ) -> None:
+        """A denial is the system working as configured, not the tool
+        being broken — falling through here would let a fallback route
+        around a permission the admin deliberately set."""
+        fallback_called = False
+
+        async def _fallback(_: dict[str, Any]) -> str:
+            nonlocal fallback_called
+            fallback_called = True
+            return "should never run"
+
+        outcome = await _run(
+            redis,
+            recorder,
+            tool=WRITE_TOOL,
+            fallback=self.FALLBACK_TOOL,
+            fallback_invoke=_fallback,
+            grant=ToolGrant(installed_server_id="srv-1", level="read_only"),
+        )
+
+        assert outcome.status == "denied"
+        assert fallback_called is False
+        assert len(recorder.calls) == 1
+
+    async def test_a_fallback_whose_schema_rejects_the_arguments_is_not_attempted(
+        self, redis: Any, recorder: FakeRecorder
+    ) -> None:
+        """The arguments are reused verbatim, never guessed — if they
+        don't fit the fallback's own declared schema, there is no safe
+        substitution, and the original failure is returned instead."""
+        incompatible_fallback = ToolDefinition(
+            name="search_issues",
+            description="Searches issues.",
+            input_schema={
+                "type": "object",
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"],
+                "additionalProperties": False,
+            },
+        )
+
+        async def _primary(_: dict[str, Any]) -> str:
+            raise RuntimeError("primary is down")
+
+        fallback_called = False
+
+        async def _fallback(_: dict[str, Any]) -> str:
+            nonlocal fallback_called
+            fallback_called = True
+            return "should never run"
+
+        outcome = await _run(
+            redis,
+            recorder,
+            invoke=_primary,
+            fallback=incompatible_fallback,
+            fallback_invoke=_fallback,
+            grant=ToolGrant(installed_server_id="srv-1", level="read_write", max_retries=0),
+        )
+
+        assert outcome.status == "denied"
+        assert fallback_called is False
+
+    async def test_a_fallback_is_not_attempted_against_a_server_the_failure_just_opened(
+        self, redis: Any, recorder: FakeRecorder
+    ) -> None:
+        """If the primary's failure was itself the one that tripped the
+        breaker, burning the fallback against a server just confirmed
+        dead defeats the point of having a breaker."""
+        fallback_called = False
+
+        async def _primary(_: dict[str, Any]) -> str:
+            raise RuntimeError("dead")
+
+        async def _fallback(_: dict[str, Any]) -> str:
+            nonlocal fallback_called
+            fallback_called = True
+            return "should never run"
+
+        breaker = CircuitBreaker(redis, failure_threshold=1)
+        # Pre-arrange so this single call's failure is the one that opens it.
+        outcome = await execute_tool(
+            tool=READ_TOOL,
+            arguments={"repo": "agentverse"},
+            grant=ToolGrant(installed_server_id="srv-1", level="read_write", max_retries=0),
+            context=ExecutionContext(workspace_id="ws-1", run_id="run-1"),
+            invoke=_primary,
+            recorder=recorder,
+            breaker=breaker,
+            cache=ResultCache(redis),
+            budget=CallBudget(redis),
+            fallback=self.FALLBACK_TOOL,
+            fallback_invoke=_fallback,
+        )
+
+        assert outcome.status == "error"
+        assert fallback_called is False
+        state = await breaker.state(workspace_id="ws-1", server_id="srv-1")
+        assert state.is_open
+
+    async def test_no_fallback_configured_behaves_exactly_as_before(
+        self, redis: Any, recorder: FakeRecorder
+    ) -> None:
+        async def _primary(_: dict[str, Any]) -> str:
+            raise RuntimeError("still broken")
+
+        outcome = await _run(
+            redis,
+            recorder,
+            invoke=_primary,
+            grant=ToolGrant(installed_server_id="srv-1", level="read_write", max_retries=0),
+        )
+        assert outcome.status == "error"
+        assert outcome.substituted_from is None
+        assert len(recorder.calls) == 1
 
 
 class TestCircuitBreaker:

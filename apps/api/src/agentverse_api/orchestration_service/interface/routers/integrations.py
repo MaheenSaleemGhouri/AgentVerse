@@ -30,6 +30,10 @@ from agentverse_api.auth_service.interface.dependencies.require_role import (
     require_member,
     require_viewer,
 )
+from agentverse_api.orchestration_service.application.oauth_flow import (
+    OAuthFlowError,
+    OAuthFlowService,
+)
 from agentverse_api.orchestration_service.domain.integration_entities import (
     AuthScheme,
     CredentialRef,
@@ -47,6 +51,7 @@ from agentverse_api.orchestration_service.domain.ports.integration_repository im
 from agentverse_api.orchestration_service.interface.dependencies.services import (
     get_credential_vault,
     get_integration_repository,
+    get_oauth_flow_service,
 )
 from agentverse_api.orchestration_service.interface.schemas.integrations import (
     CredentialResponse,
@@ -55,6 +60,7 @@ from agentverse_api.orchestration_service.interface.schemas.integrations import 
     InstallFromCatalogRequest,
     IntegrationMetricsResponse,
     McpServerResponse,
+    OauthStartResponse,
     PermissionResponse,
     PutCredentialRequest,
     RegisterCustomServerRequest,
@@ -248,6 +254,33 @@ async def install_from_catalog_route(
         installed_by_user_id=context.user_id,
     )
     return _installed_response(server)
+
+
+@router.post("/{installed_server_id}/oauth/start", response_model=OauthStartResponse)
+async def start_oauth_route(
+    installed_server_id: str,
+    context: WorkspaceContext = Depends(require_admin),
+    repo: IntegrationRepository = Depends(get_integration_repository),
+    oauth: OAuthFlowService = Depends(get_oauth_flow_service),
+) -> OauthStartResponse:
+    """Where to send the browser to authorise this OAuth2 catalog entry.
+
+    Admin-gated, same as installing and writing a credential — starting
+    an OAuth grant is itself an authorization decision about which third
+    party a workspace's agents may reach.
+    """
+    await _require_installed(repo, context, installed_server_id)
+    try:
+        start = await oauth.start(
+            workspace_id=context.workspace_id,
+            installed_server_id=installed_server_id,
+            user_id=context.user_id,
+        )
+    except OAuthFlowError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return OauthStartResponse(
+        authorization_url=start.authorization_url, state=start.state, expires_at=start.expires_at
+    )
 
 
 @router.post("/custom", response_model=InstalledServerResponse, status_code=201)

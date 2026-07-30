@@ -1,11 +1,17 @@
 "use client";
 
-import { KeyRound, ShieldCheck, Trash2 } from "lucide-react";
+import { ExternalLink, KeyRound, ShieldCheck, Trash2 } from "lucide-react";
 import * as React from "react";
 
 import type { AuthScheme, InstalledServer } from "@/lib/api/integrations";
 import { formatRelativeTime } from "@/lib/format";
-import { useCredentials, useDeleteCredential, usePutCredential } from "@/lib/queries/integrations";
+import {
+  useCatalog,
+  useCredentials,
+  useDeleteCredential,
+  usePutCredential,
+  useStartOauth,
+} from "@/lib/queries/integrations";
 
 import { EmptyState } from "@/components/patterns/empty-state";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -30,6 +36,71 @@ const SCHEMES: ReadonlyArray<{ value: AuthScheme; label: string }> = [
 ];
 
 /**
+ * The catalog's own auth_scheme decides which form this panel shows —
+ * an OAuth2 entry (Notion, Linear, Jira, HubSpot, Cloudflare) has no
+ * key/value pair for a user to paste, so a manual credential form would
+ * be asking for something that does not exist. `register-custom-server-
+ * dialog.tsx`'s own scheme enum has no "oauth2" option, which is what
+ * makes this catalog-only: a custom server can never reach this branch.
+ */
+function OauthConnectCard({
+  workspaceId,
+  server,
+  providerName,
+}: {
+  workspaceId: string;
+  server: InstalledServer;
+  providerName: string;
+}): React.JSX.Element {
+  const start = useStartOauth(workspaceId, server.id);
+  const connected = server.status !== "pending_auth";
+
+  function onConnect(): void {
+    start.mutate(undefined, {
+      // A full-page navigation, not a fetch: the provider's authorize
+      // page is not something this app can render inline, and the
+      // eventual callback lands on apps/api directly (see
+      // oauth_callback.py), outside this SPA's router entirely.
+      onSuccess: (result) => {
+        window.location.href = result.authorization_url;
+      },
+    });
+  }
+
+  return (
+    <Card className="gap-3 p-5">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
+          <ShieldCheck className="size-4" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-medium">
+            {connected ? `Connected to ${providerName}` : `Connect with ${providerName}`}
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {connected
+              ? "Your access token is stored and encrypted. Reconnect if it stops working or you revoked it on the provider's side."
+              : `You'll be taken to ${providerName} to authorize AgentVerse, then brought back here.`}
+          </p>
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <Button onClick={onConnect} disabled={start.isPending} variant={connected ? "outline" : "default"}>
+          {start.isPending ? (
+            "Redirecting…"
+          ) : (
+            <>
+              {connected ? "Reconnect" : `Connect with ${providerName}`}
+              <ExternalLink aria-hidden="true" />
+            </>
+          )}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+/**
  * Credentials for one installed server.
  *
  * There is no reveal control and no copy button, because there is
@@ -48,6 +119,11 @@ export function CredentialsPanel({
   const { data, isLoading } = useCredentials(workspaceId, server.id);
   const put = usePutCredential(workspaceId, server.id);
   const remove = useDeleteCredential(workspaceId, server.id);
+  // Cached 5 minutes and almost certainly already primed by the
+  // marketplace page — this is a lookup against data already in memory,
+  // not a fresh network round trip on every credentials tab open.
+  const { data: catalog } = useCatalog(workspaceId);
+  const catalogEntry = catalog?.find((entry) => entry.id === server.mcp_server_id);
 
   const [key, setKey] = React.useState("");
   const [value, setValue] = React.useState("");
@@ -68,6 +144,8 @@ export function CredentialsPanel({
     );
   }
 
+  const isOauth = catalogEntry?.auth_scheme === "oauth2";
+
   return (
     <div className="flex flex-col gap-4">
       <Alert tone="info">
@@ -80,6 +158,10 @@ export function CredentialsPanel({
         </AlertDescription>
       </Alert>
 
+      {isOauth && (
+        <OauthConnectCard workspaceId={workspaceId} server={server} providerName={catalogEntry.name} />
+      )}
+
       {isLoading ? (
         <Skeleton className="h-24 rounded-lg" />
       ) : (data ?? []).length === 0 ? (
@@ -87,9 +169,11 @@ export function CredentialsPanel({
           icon={KeyRound}
           title="No credentials stored"
           description={
-            server.status === "pending_auth"
-              ? "This server needs a credential before agents can use it."
-              : "This server does not require a credential."
+            isOauth
+              ? "Connect above to obtain one — nothing to paste here."
+              : server.status === "pending_auth"
+                ? "This server needs a credential before agents can use it."
+                : "This server does not require a credential."
           }
         />
       ) : (
@@ -122,70 +206,72 @@ export function CredentialsPanel({
         </ul>
       )}
 
-      <Card className="gap-4 p-5">
-        <h3 className="text-sm font-medium">
-          {(data ?? []).length > 0 ? "Add or replace a credential" : "Add a credential"}
-        </h3>
+      {!isOauth && (
+        <Card className="gap-4 p-5">
+          <h3 className="text-sm font-medium">
+            {(data ?? []).length > 0 ? "Add or replace a credential" : "Add a credential"}
+          </h3>
 
-        {server.mcp_server_id !== null && (
-          <p className="text-xs text-muted-foreground">
-            Use the exact key name this server expects — the marketplace card lists it.
-          </p>
-        )}
+          {server.mcp_server_id !== null && (
+            <p className="text-xs text-muted-foreground">
+              Use the exact key name this server expects — the marketplace card lists it.
+            </p>
+          )}
 
-        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="credential-key">Key name</Label>
+              <Input
+                id="credential-key"
+                value={key}
+                onChange={(event) => setKey(event.target.value)}
+                placeholder="GITHUB_PERSONAL_ACCESS_TOKEN"
+                autoComplete="off"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="credential-scheme">Type</Label>
+              <Select value={scheme} onValueChange={(next) => setScheme(next as AuthScheme)}>
+                <SelectTrigger id="credential-scheme">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SCHEMES.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="grid gap-2">
-            <Label htmlFor="credential-key">Key name</Label>
+            <Label htmlFor="credential-value">Value</Label>
             <Input
-              id="credential-key"
-              value={key}
-              onChange={(event) => setKey(event.target.value)}
-              placeholder="GITHUB_PERSONAL_ACCESS_TOKEN"
+              id="credential-value"
+              type="password"
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              placeholder="Paste the secret"
+              // Password managers should not offer to save a third-party
+              // API key as if it were a login for this site.
               autoComplete="off"
+              spellCheck={false}
             />
+            <p className="text-xs text-muted-foreground">
+              You will not be able to view this again after saving.
+            </p>
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="credential-scheme">Type</Label>
-            <Select value={scheme} onValueChange={(next) => setScheme(next as AuthScheme)}>
-              <SelectTrigger id="credential-scheme">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SCHEMES.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex justify-end">
+            <Button onClick={onSave} disabled={!key.trim() || !value || put.isPending}>
+              {put.isPending ? "Saving…" : "Save credential"}
+            </Button>
           </div>
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="credential-value">Value</Label>
-          <Input
-            id="credential-value"
-            type="password"
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            placeholder="Paste the secret"
-            // Password managers should not offer to save a third-party
-            // API key as if it were a login for this site.
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <p className="text-xs text-muted-foreground">
-            You will not be able to view this again after saving.
-          </p>
-        </div>
-
-        <div className="flex justify-end">
-          <Button onClick={onSave} disabled={!key.trim() || !value || put.isPending}>
-            {put.isPending ? "Saving…" : "Save credential"}
-          </Button>
-        </div>
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }

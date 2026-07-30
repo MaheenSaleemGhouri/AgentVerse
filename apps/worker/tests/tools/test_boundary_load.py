@@ -35,7 +35,12 @@ from agentverse_worker.tools.boundary import (
     ToolGrant,
     execute_tool,
 )
-from agentverse_worker.tools.policy import CallBudget, CircuitBreaker, ResultCache
+from agentverse_worker.tools.policy import (
+    DEFAULT_FAILURE_THRESHOLD,
+    CallBudget,
+    CircuitBreaker,
+    ResultCache,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -258,3 +263,92 @@ async def test_a_refusal_is_cheaper_than_a_permitted_call(redis: Any) -> None:
         f"a refused call ({refused * 1000:.2f}ms) cost more than a permitted one "
         f"({permitted * 1000:.2f}ms) — the cheapest-first check ordering has regressed"
     )
+
+
+class TestCircuitBreakerConcurrency:
+    """`policy.py`'s own module docstring is the claim under test here:
+    a per-process breaker would let a fleet hammer a dying server eight
+    times over before each replica's copy independently opened. The
+    Redis-backed breaker is supposed to fix that — but every existing
+    test (`test_boundary.py::TestCircuitBreaker`) drives failures one at
+    a time, which cannot show whether the `SET ... GET` transition that
+    opens the breaker stays correct when many failures race it at once,
+    or whether an already-open breaker actually stops a concurrent wave
+    rather than merely reducing it.
+    """
+
+    async def test_a_wave_after_opening_is_fully_blocked_and_opens_exactly_once(
+        self, redis: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import agentverse_worker.tools.policy as policy_module
+
+        opened_count = 0
+
+        def _count_opened() -> None:
+            nonlocal opened_count
+            opened_count += 1
+
+        monkeypatch.setattr(policy_module, "record_breaker_opened", _count_opened)
+
+        breaker = CircuitBreaker(redis)
+        cache = ResultCache(redis)
+        budget = CallBudget(redis)
+        recorder = NullRecorder()
+        run_tag = uuid.uuid4().hex[:8]
+        # `max_retries=0` so each `execute_tool` call records exactly one
+        # failure — otherwise a single call's own internal retries would
+        # be indistinguishable from separate concurrent callers racing.
+        grant = ToolGrant(
+            installed_server_id=f"srv-dead-{run_tag}", level="read_write", max_retries=0
+        )
+        context = ExecutionContext(workspace_id=f"ws-dead-{run_tag}", run_id=f"run-dead-{run_tag}")
+
+        invoke_calls = 0
+
+        async def _dying_invoke(_: dict[str, Any]) -> str:
+            nonlocal invoke_calls
+            invoke_calls += 1
+            raise RuntimeError("server is down")
+
+        async def _call() -> Any:
+            return await execute_tool(
+                tool=TOOL,
+                arguments={"repo": "agentverse"},
+                grant=grant,
+                context=context,
+                invoke=_dying_invoke,
+                recorder=recorder,
+                breaker=breaker,
+                cache=cache,
+                budget=budget,
+            )
+
+        # Wave 1: 20 concurrent failures against the same server, all
+        # racing the same threshold crossing at once — the scenario a
+        # sequential unit test cannot produce.
+        first_wave = await asyncio.gather(*(_call() for _ in range(20)))
+        assert all(outcome.status == "error" for outcome in first_wave)
+
+        state = await breaker.state(
+            workspace_id=context.workspace_id, server_id=grant.installed_server_id
+        )
+        assert state.is_open
+
+        # However many of the 20 raced past the closed-breaker check
+        # before it opened, the open transition itself must have fired
+        # exactly once — a race in the `SET ... get=True` pattern would
+        # show up here as more than one.
+        assert opened_count == 1
+
+        invoke_calls_after_first_wave = invoke_calls
+        assert invoke_calls_after_first_wave >= DEFAULT_FAILURE_THRESHOLD
+
+        # Wave 2, fired only once the breaker is confirmed open: this is
+        # the guarantee that actually matters — a dying server sees zero
+        # further calls from a wave that arrives after the breaker has
+        # opened, not just fewer of them.
+        second_wave = await asyncio.gather(*(_call() for _ in range(20)))
+        assert all(outcome.status == "circuit_open" for outcome in second_wave)
+        assert invoke_calls == invoke_calls_after_first_wave, (
+            "the open breaker let a call through to the dead server after opening"
+        )

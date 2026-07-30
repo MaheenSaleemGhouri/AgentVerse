@@ -120,6 +120,7 @@ permissions_table = Table(
     Column("cache_ttl_seconds", Integer),
     Column("max_calls_per_run", Integer),
     Column("priority", Integer),
+    Column("fallback_tools", JSONB),
 )
 
 workspace_integrations_table = Table(
@@ -161,6 +162,22 @@ tool_calls_table = Table(
     Column("error_message", Text),
     Column("denial_reason", Text),
     Column("attempt", Integer),
+)
+
+tool_metrics_table = Table(
+    "tool_metrics",
+    metadata,
+    Column("id", UUID(as_uuid=False), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=False)),
+    Column("installed_server_id", UUID(as_uuid=False)),
+    Column("tool_name", Text),
+    Column("bucket_start", DateTime(timezone=True)),
+    Column("call_count", Integer),
+    Column("error_count", Integer),
+    Column("denied_count", Integer),
+    Column("timeout_count", Integer),
+    Column("total_duration_ms", BigInteger),
+    Column("p95_duration_ms", Integer),
 )
 
 tool_logs_table = Table(

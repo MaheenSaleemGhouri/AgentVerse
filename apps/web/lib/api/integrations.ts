@@ -200,3 +200,20 @@ export async function getIntegrationMetrics(
     : "";
   return apiFetch<IntegrationMetrics>(`${base(workspaceId)}/runtime/metrics${query}`);
 }
+
+export type OauthStart = components["schemas"]["OauthStartResponse"];
+
+/**
+ * Starts an OAuth2 connection for a catalog install (Notion, Linear,
+ * Jira, HubSpot, Cloudflare). The caller's job is just to redirect the
+ * browser to `authorization_url` — everything else (PKCE, the
+ * in-flight session, the callback) is server-side.
+ */
+export async function startOauth(
+  workspaceId: string,
+  installedServerId: string
+): Promise<OauthStart> {
+  return apiFetch<OauthStart>(`${base(workspaceId)}/${installedServerId}/oauth/start`, {
+    method: "POST",
+  });
+}

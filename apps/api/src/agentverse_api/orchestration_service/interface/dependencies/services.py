@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+import httpx
 from agentverse_shared.embeddings.openai_provider import OpenAIEmbeddingProvider
 from agentverse_shared.embeddings.port import EmbeddingProvider
 from agentverse_shared.locks.distributed_lock import DistributedLock
@@ -23,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentverse_api.infrastructure.config import get_settings
 from agentverse_api.infrastructure.db import get_db_session
+from agentverse_api.orchestration_service.application.oauth_flow import OAuthFlowService
 from agentverse_api.orchestration_service.application.provider_test_service import (
     ProviderTestService,
 )
@@ -42,6 +44,9 @@ from agentverse_api.orchestration_service.infrastructure.integration_repository 
 )
 from agentverse_api.orchestration_service.infrastructure.knowledge_repository import (
     SqlKnowledgeRepository,
+)
+from agentverse_api.orchestration_service.infrastructure.oauth.providers import (
+    build_oauth_providers,
 )
 from agentverse_api.orchestration_service.infrastructure.providers.openai_adapter import (
     OpenAIProviderAdapter,
@@ -180,3 +185,31 @@ def get_token_counter() -> TokenCounter:
     the BPE encoding — that must not happen per request.
     """
     return TiktokenCounter()
+
+
+@lru_cache
+def get_oauth_http_client() -> httpx.AsyncClient:
+    """Process-wide singleton, same rationale as the provider adapter and
+    Redis client — this is a connection pool, not per-request state.
+
+    Points only at each provider's own token endpoint (a fixed, known
+    host from the registry in `oauth.providers`, never a user-supplied
+    URL), so this does not need the agent-tool-call egress guard —
+    that guard exists for outbound calls whose destination an attacker
+    influences, which this is not.
+    """
+    return httpx.AsyncClient()
+
+
+def get_oauth_flow_service(
+    repo: IntegrationRepository = Depends(get_integration_repository),
+    vault: CredentialVault = Depends(get_credential_vault),
+) -> OAuthFlowService:
+    settings = get_settings()
+    return OAuthFlowService(
+        repo=repo,
+        vault=vault,
+        providers=build_oauth_providers(settings),
+        callback_url=f"{settings.api_public_url}/api/v1/integrations/oauth/callback",
+        http_client=get_oauth_http_client(),
+    )

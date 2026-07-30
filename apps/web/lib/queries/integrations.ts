@@ -17,6 +17,7 @@ import {
   putCredentialAction,
   registerCustomServerAction,
   revokePermissionAction,
+  startOauthAction,
   uninstallAction,
   updateInstalledAction,
 } from "@/lib/api/actions";
@@ -218,6 +219,19 @@ export function usePutCredential(workspaceId: string, installedServerId: string)
       toast.success("Credential saved. It is encrypted and cannot be read back.");
     },
     onError: () => toast.error("Could not save the credential — try again."),
+  });
+}
+
+/**
+ * Starts an OAuth2 connection. The mutation's only job is to hand back
+ * `authorization_url` for the caller to navigate to — there is nothing
+ * to invalidate yet, because nothing changes until the provider's
+ * callback lands and the server flips from `pending_auth` to `active`.
+ */
+export function useStartOauth(workspaceId: string, installedServerId: string) {
+  return useMutation({
+    mutationFn: () => startOauthAction(workspaceId, installedServerId),
+    onError: () => toast.error("Could not start the connection — try again."),
   });
 }
 

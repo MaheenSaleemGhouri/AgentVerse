@@ -55,12 +55,14 @@ import {
   listPermissions as listPermissionsApi,
   listToolCalls as listToolCallsApi,
   type McpServer,
+  type OauthStart,
   type Permission,
   type PutCredentialRequest,
   putCredential as putCredentialApi,
   type RegisterCustomServerRequest,
   registerCustomServer as registerCustomServerApi,
   revokePermission as revokePermissionApi,
+  startOauth as startOauthApi,
   type ToolCallPage,
   uninstall as uninstallApi,
   type UpdateInstalledServerRequest,
@@ -454,6 +456,13 @@ export async function putCredentialAction(
   body: PutCredentialRequest
 ): Promise<Credential> {
   return putCredentialApi(workspaceId, installedServerId, body);
+}
+
+export async function startOauthAction(
+  workspaceId: string,
+  installedServerId: string
+): Promise<OauthStart> {
+  return startOauthApi(workspaceId, installedServerId);
 }
 
 export async function listCredentialsAction(

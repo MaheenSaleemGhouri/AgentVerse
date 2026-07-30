@@ -314,14 +314,35 @@ class FakeIntegrationRepository:
 
     # --- oauth -----------------------------------------------------------
 
-    async def create_oauth_session(self, *, state: str, **kwargs: Any) -> None:
-        self.oauth_sessions[state] = {"state": state, **kwargs}
+    async def create_oauth_session(
+        self, *, state: str, verifier_ciphertext: bytes, expires_at: datetime, **kwargs: Any
+    ) -> None:
+        # Keyed exactly as `SqlIntegrationRepository.consume_oauth_session`
+        # returns it (`code_verifier_ciphertext`, not the port parameter's
+        # `verifier_ciphertext`) — a fake with a different shape than the
+        # real repository would let a test pass here and break against
+        # real Postgres, which is the false-confidence failure mode
+        # fakes exist to prevent.
+        self.oauth_sessions[state] = {
+            "state": state,
+            "code_verifier_ciphertext": verifier_ciphertext,
+            "expires_at": expires_at,
+            **kwargs,
+        }
 
     async def consume_oauth_session(self, *, state: str) -> dict[str, Any] | None:
-        return self.oauth_sessions.pop(state, None)
+        session = self.oauth_sessions.get(state)
+        if session is None:
+            return None
+        if session["expires_at"] <= datetime.now(UTC):
+            return None
+        return self.oauth_sessions.pop(state)
 
     async def purge_expired_oauth_sessions(self) -> int:
-        return 0
+        expired = [s for s, session in self.oauth_sessions.items() if session["expires_at"] <= datetime.now(UTC)]
+        for s in expired:
+            del self.oauth_sessions[s]
+        return len(expired)
 
     # --- runtime ---------------------------------------------------------
 

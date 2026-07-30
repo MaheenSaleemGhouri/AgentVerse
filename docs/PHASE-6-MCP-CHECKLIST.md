@@ -32,8 +32,8 @@ where Phase 7 is Billing. Same convention as ADR-0009.
 | Connection Manager | ✅ | `mcp/manager.py`, per-run lifecycle |
 | Marketplace | ✅ | Browse, search, filter, install, enable/disable, remove |
 | Permissions | ✅ | 3 levels × per-tool × agent/team/workspace |
-| Authentication | ✅ | API key, bearer, basic, custom header, JWT; **OAuth2 partial — see below** |
-| Health monitoring | ✅ | `check_health`, status per install |
+| Authentication | ✅ | API key, bearer, basic, custom header, JWT, OAuth2 (full PKCE flow) |
+| Health monitoring | ✅ | `check_health` on-connect, plus a scheduled background sweep |
 | Logs | ✅ | `tool_calls` + `tool_logs`, both partitioned |
 | Versioning | ✅ | `server_versions` + `diff_tool_surface` |
 | Configuration | ✅ | Per-install non-secret config |
@@ -86,7 +86,13 @@ fails the TypeScript build.
 | ruff + mypy (3 packages) | clean |
 | tsc + eslint + next build | clean |
 
-**995 tests, zero skipped.** The Python suites were re-run against a
+**995 tests, zero skipped**, at the time this checklist was first
+written. Closing gaps 1/4/5/6 (above) since added: 12 OAuth flow tests,
+6 health-sweep tests, 7 tool-metrics tests (3 pure-logic + 4 real-SQL
+integration), and 1 real-Redis circuit-breaker concurrency test to
+`apps/worker` and `apps/api` — re-run and passing, exact combined totals
+not re-snapshotted here since the api/web suites are otherwise
+unchanged from the count below. The Python suites were re-run against a
 real pgvector pg16 at revision `c4e81f3d9b27` with
 `AGENTVERSE_{API,WORKER,SHARED}_DATABASE_URL` set, so the integration
 layer — tenant isolation on `kb_chunks`, shared-memory and session
@@ -135,42 +141,80 @@ Migration verified against real pg16: `upgrade → downgrade → upgrade`,
 
 ## Gaps — what is not built
 
-Listed plainly rather than implied by omission.
+Listed plainly rather than implied by omission. Four of the original
+seven have since been closed (below); the remaining three are
+documented as still open, not silently dropped.
 
-1. **OAuth2 is scaffolded, not finished.** `oauth_sessions` exists with
-   PKCE storage and single-use `DELETE … RETURNING` consumption; the
-   repository methods and the state/expiry helpers are written and
-   tested. **The authorize-redirect and token-exchange endpoints are
-   not.** OAuth catalog entries (Notion, Linear, Jira, HubSpot,
-   Cloudflare) install but cannot complete their flow. Servers using
-   API keys or bearer tokens work end to end today.
+1. ~~OAuth2 is scaffolded, not finished.~~ **Closed.** `OAuthFlowService`
+   (`orchestration_service/application/oauth_flow.py`) implements the
+   full PKCE authorization-code flow — `start()` builds the
+   authorize-redirect with a per-attempt `code_verifier`/`state` sealed
+   into `oauth_sessions`, and the new public
+   `GET /api/v1/integrations/oauth/callback`
+   (`interface/routers/oauth_callback.py`) exchanges the code, seals the
+   access/refresh tokens through the same `CredentialVault` as every
+   other auth scheme, and redirects into the workspace's integration
+   detail page. `OAuthProviderConfig` (a registry keyed by catalog slug,
+   `infrastructure/oauth/providers.py`) exposes only providers whose
+   client id/secret are actually configured — Notion, Linear, Jira,
+   HubSpot, and Cloudflare now install and complete their flow
+   end-to-end; 12 tests in `test_oauth_flow.py`, all passing.
 
-2. **No fallback tool.** If a tool fails, the agent is told and adapts.
-   Automatic substitution of a different tool is not implemented — it
-   needs a notion of tool equivalence that does not exist yet.
+2. ~~No fallback tool.~~ **Closed.** `ToolGrant.fallback_tools`
+   (migration `45501a9a09d6`) is an admin-configured `{tool: fallback}`
+   map, same server only. `execute_tool` tries it once, only after a
+   genuine failure (not a denial, not against a just-opened breaker),
+   through the same permission/schema/budget/cache checks. Tested: 7
+   unit tests, 2 `GovernedMcpServer` tests, 1 real-Postgres test.
 
-3. **Streaming tool results.** Results are returned whole. MCP supports
-   streaming; the boundary's size-cap and untrusted-wrapping logic
-   assumes a complete string, and making it incremental is a real design
-   change rather than a flag.
+3. **Streaming tool results.** Still open, for the same reason: the
+   boundary's size-cap and untrusted-wrapping logic
+   (`sanitize_result`/`wrap_untrusted`) assumes a complete string, and
+   making it incremental changes that contract, not just this feature.
+   Not started.
 
-4. **Health monitoring is on-demand, not scheduled.** `check_health`
-   works and runs on connect; there is no background sweep, so a server
-   that dies between runs shows its last known state until something
-   uses it.
+4. ~~Health monitoring is on-demand, not scheduled.~~ **Closed.**
+   `HealthSweeper` (`apps/worker/src/agentverse_worker/mcp/health_sweep.py`)
+   runs as a third background task in the worker's lifespan, sweeping
+   every active installation on a configurable interval
+   (`mcp_health_sweep_interval_seconds`, default 300s) with bounded
+   concurrency and a Redis `DistributedLock` so N worker replicas
+   produce one sweep, not N. 6 tests, all passing.
 
-5. **`tool_metrics` is written but never populated.** The table and its
-   rollup target exist; the aggregation job does not. Metrics today are
-   computed live from `tool_calls`, which is correct but will not scale
-   to a large workspace's dashboard.
+5. ~~`tool_metrics` is written but never populated.~~ **Closed.**
+   `ToolMetricsAggregator` (`apps/worker/src/agentverse_worker/mcp/metrics_aggregation.py`)
+   runs as a fourth background task, re-aggregating the last 2 trailing
+   hourly buckets every `tool_metrics_aggregation_interval_seconds`
+   (default 900s) via a Postgres `ON CONFLICT` upsert keyed to
+   `uq_tool_metric_bucket`, coordinated the same way as the health
+   sweep. Verified against real Postgres: upsert-not-duplicate on
+   re-aggregation, `[start, end)` bucket-boundary exclusion, and
+   `percentile_cont` p95 — 4 integration tests plus 3 pure-logic
+   scheduling tests, all passing. **`/runtime/metrics` still reads live
+   from `tool_calls`, deliberately** — cutting the read path over to the
+   rollup is a separate, dedicated change (see the module's own
+   docstring), not bundled into populating the table.
 
-6. **No load or stress test.** The circuit breaker and budget are
-   unit-tested for behaviour, not measured under concurrency.
+6. ~~No load or stress test.~~ **Closed.**
+   `test_boundary_load.py::TestCircuitBreakerConcurrency` fires 20
+   concurrent failures against the same dying server and confirms the
+   breaker opens exactly once despite the race (no double-count on the
+   `SET … get=True` transition), then fires a second 20-call wave after
+   the breaker is confirmed open and confirms it is fully blocked —
+   zero further calls reach the dead server, not just fewer of them.
+   Runs against real Redis, marked `integration`.
 
-7. **Partition rotation.** `tool_calls` and `tool_logs` have a single
-   DEFAULT partition. Time-bounded partitions created ahead of need are
-   an operational task, matching the existing `agent_run_steps` and
-   `execution_events` position.
+7. **Partition rotation.** Still open. `tool_calls` and `tool_logs` have
+   a single DEFAULT partition. Time-bounded partitions created ahead of
+   need are an operational task spanning `agent_run_steps` and
+   `execution_events` too, not unique to Phase 6 — treated as
+   cross-cutting and out of this checklist's scope rather than fixed
+   inconsistently for two tables out of four.
+
+**Still not actionable by an engineering change alone:** the DoD item 8
+gap (no PagerDuty/Slack receiver — needs account provisioning) and the
+DoD item 7 gap (manual keyboard/screen-reader pass — needs a human in a
+browser) remain open for those reasons.
 
 ## Backward compatibility
 

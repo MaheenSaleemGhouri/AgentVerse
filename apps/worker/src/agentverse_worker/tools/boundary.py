@@ -102,6 +102,13 @@ class ToolGrant:
     max_retries: int = 2
     cache_ttl_seconds: int = 0
     max_calls_per_run: int = 50
+    #: Workspace-admin-configured tool equivalence, same server only:
+    #: `{"list_issues": "search_issues"}` means "if `list_issues` fails
+    #: outright, try `search_issues` once with the same arguments." Never
+    #: inferred — AgentVerse has no way to verify two third-party tools
+    #: are actually interchangeable, so this is only ever what a human
+    #: configured, same as `allowed_tools`.
+    fallback_tools: dict[str, str] = field(default_factory=dict)
 
     def permits(self, tool: ToolDefinition) -> str | None:
         """Returns the denial reason, or None if permitted.
@@ -134,6 +141,10 @@ class ToolOutcome:
     denial_reason: str | None = None
     error_message: str | None = None
     attempts: int = 1
+    #: Set when the tool actually invoked was a configured fallback, not
+    #: the one the model asked for — the name of the original tool that
+    #: failed. `None` means the model's own choice ran.
+    substituted_from: str | None = None
 
 
 class ToolCallRecorder(Protocol):
@@ -264,6 +275,8 @@ async def execute_tool(
     breaker: CircuitBreaker,
     cache: ResultCache,
     budget: CallBudget,
+    fallback: ToolDefinition | None = None,
+    fallback_invoke: Callable[[dict[str, Any]], Awaitable[str]] | None = None,
 ) -> ToolOutcome:
     """The choke point. Nothing calls a tool without going through here.
 
@@ -271,30 +284,265 @@ async def execute_tool(
     tool's coroutine. Injected rather than constructed here so this
     module governs execution without knowing how any particular tool
     executes, and so it is testable without a live MCP server.
-    """
-    started = time.monotonic()
-    server_id = grant.installed_server_id
-    #: Wall-clock this call spent *not* executing boundary logic: time
-    #: inside `invoke` (the third party's) plus time asleep in retry
-    #: backoff (a deliberate wait, not slowness).
-    #:
-    #: Subtracted from the total to get boundary overhead, which is the
-    #: split the latency budget is built on. Counting backoff as overhead
-    #: would put an 8-second sleep into a histogram whose p95 budget is
-    #: 25ms, and the resulting alert would fire on every retried call
-    #: while saying "our code got slower" — which would be false.
-    excluded_seconds = 0.0
 
-    async def _record(outcome: ToolOutcome, *, denial_category: str | None = None) -> ToolOutcome:
-        # Metrics first, and never inside a try that the recorder could
-        # skip: a `tool_calls` write failing is exactly when the counter
-        # matters most.
-        elapsed_seconds = time.monotonic() - started
+    `fallback`/`fallback_invoke` are the tool `grant.fallback_tools` names
+    as the equivalent of `tool`, resolved by the caller (which has the
+    server's discovered tool catalogue; this module does not). They are
+    only ever attempted once, and only after `tool` itself has genuinely
+    failed — never for a denial, and never against a server whose
+    breaker just opened, since a fallback is still the same server.
+    """
+    server_id = grant.installed_server_id
+
+    async def _attempt(
+        current: ToolDefinition,
+        current_invoke: Callable[[dict[str, Any]], Awaitable[str]],
+        *,
+        substituted_from: str | None,
+    ) -> ToolOutcome:
+        """Steps 2 through 7 for one (tool, invoke) pair.
+
+        A plain function rather than closing over `tool`/`invoke`, so it
+        runs once for the model's chosen tool and, if that fails outright,
+        a second time for its configured fallback — each with its own
+        timing, its own `tool_calls` row, and its own permission/argument/
+        budget/cache checks, because a fallback is a different tool with
+        its own schema and its own mutation classification.
+        """
+        started = time.monotonic()
+        #: Wall-clock this attempt spent *not* executing boundary logic:
+        #: time inside `current_invoke` (the third party's) plus time
+        #: asleep in retry backoff (a deliberate wait, not slowness).
+        #:
+        #: Subtracted from the total to get boundary overhead, which is
+        #: the split the latency budget is built on. Counting backoff as
+        #: overhead would put an 8-second sleep into a histogram whose
+        #: p95 budget is 25ms, and the resulting alert would fire on every
+        #: retried call while saying "our code got slower" — which would
+        #: be false.
+        excluded_seconds = 0.0
+
+        async def _record(
+            outcome: ToolOutcome, *, denial_category: str | None = None
+        ) -> ToolOutcome:
+            # Metrics first, and never inside a try that the recorder
+            # could skip: a `tool_calls` write failing is exactly when the
+            # counter matters most.
+            elapsed_seconds = time.monotonic() - started
+            record_tool_call(
+                status=outcome.status,
+                duration_seconds=elapsed_seconds,
+                overhead_seconds=elapsed_seconds - excluded_seconds,
+                denial_reason=denial_category,
+            )
+            await recorder.record_call(
+                workspace_id=context.workspace_id,
+                run_id=context.run_id,
+                team_session_id=context.team_session_id,
+                agent_id=context.agent_id,
+                installed_server_id=server_id,
+                tool_name=current.name,
+                status=outcome.status,
+                arguments=arguments,
+                result_preview=outcome.content[:MAX_PREVIEW_CHARS] if outcome.content else None,
+                result_bytes=outcome.result_bytes,
+                duration_ms=outcome.duration_ms,
+                error_message=outcome.error_message,
+                denial_reason=outcome.denial_reason,
+                attempt=outcome.attempts,
+            )
+            return outcome
+
+        def _elapsed() -> int:
+            return int((time.monotonic() - started) * 1000)
+
+        def _refusal(status: str, reason: str) -> ToolOutcome:
+            """A denial the model can read and adapt to.
+
+            Surfaced as content rather than raised: an agent told *why* a
+            tool was refused can pick another approach, where an
+            exception ends the run.
+            """
+            return ToolOutcome(
+                status=status,
+                content=f"This tool call was not permitted: {reason}",
+                duration_ms=_elapsed(),
+                denial_reason=reason,
+                substituted_from=substituted_from,
+            )
+
+        # 2. Permission — independent of the model's judgment. A
+        #    fallback is checked exactly like a directly-called tool: a
+        #    read-only grant cannot fall through to a mutating tool any
+        #    more than it could call one directly.
+        denial = grant.permits(current)
+        if denial is not None:
+            return await _record(_refusal("denied", denial), denial_category="permission")
+
+        # 3. Argument validation — model output is untrusted input, and a
+        #    fallback reuses those same arguments verbatim; if they don't
+        #    fit the fallback's own declared schema, there is no safe
+        #    substitution to make, and this is refused rather than guessed.
+        invalid = validate_arguments(arguments, current.input_schema)
+        if invalid is not None:
+            return await _record(_refusal("denied", invalid), denial_category="invalid_arguments")
+
+        # 4. Per-run budget — bounds a tool loop earlier and more cheaply
+        #    than the run's own step and cost ceilings would.
+        if context.run_id is not None:
+            within = await budget.consume(
+                run_id=context.run_id,
+                server_id=server_id,
+                limit=grant.max_calls_per_run,
+                ttl_seconds=context.budget_ttl_seconds,
+            )
+            if not within:
+                return await _record(
+                    _refusal(
+                        "denied",
+                        f"this run has already made {grant.max_calls_per_run} calls "
+                        "to this server",
+                    ),
+                    denial_category="budget_exceeded",
+                )
+
+        # 5. Cache — only ever populated from successful calls, so a
+        #    transient failure never becomes sticky for the whole TTL.
+        #    Keyed on `current.name`, so the fallback's cache entry is
+        #    never confused with the tool it substituted for.
+        if grant.cache_ttl_seconds > 0:
+            cached = await cache.get(
+                workspace_id=context.workspace_id,
+                server_id=server_id,
+                tool_name=current.name,
+                arguments=arguments,
+            )
+            if cached is not None:
+                return await _record(
+                    ToolOutcome(
+                        status="cached",
+                        content=cached,
+                        duration_ms=_elapsed(),
+                        substituted_from=substituted_from,
+                    )
+                )
+
+        # 6. Execute, bounded.
+        timeout = min(max(1, grant.timeout_seconds), MAX_TIMEOUT_SECONDS)
+        attempts = grant.max_retries + 1
+        last_error: str | None = None
+
+        for attempt in range(1, attempts + 1):
+            attempt_started = time.monotonic()
+            try:
+                async with asyncio.timeout(timeout):
+                    raw = await current_invoke(arguments)
+            except TimeoutError:
+                excluded_seconds += time.monotonic() - attempt_started
+                last_error = f"the tool did not respond within {timeout}s"
+                await breaker.record_failure(
+                    workspace_id=context.workspace_id, server_id=server_id
+                )
+            except EgressDeniedError as exc:
+                # Not retried and not counted against the breaker: the
+                # destination is not going to become permitted, and a
+                # denial is the system working rather than the server
+                # failing.
+                #
+                # The time spent getting here is *ours* — DNS resolution
+                # and validation, no third party reached — so it is
+                # deliberately not excluded from overhead. A guard that
+                # became slow should show up as boundary overhead, since
+                # that is the path a probing attacker exercises over and
+                # over.
+                record_egress_denial(exc.category)
+                return await _record(_refusal("denied", exc.reason), denial_category="egress")
+            except Exception as exc:  # noqa: BLE001 - translated into an outcome, never a crash
+                excluded_seconds += time.monotonic() - attempt_started
+                last_error = str(exc)
+                logger.warning(
+                    "tool_call_failed workspace_id=%s server_id=%s tool=%s attempt=%s",
+                    context.workspace_id,
+                    server_id,
+                    current.name,
+                    attempt,
+                )
+                await breaker.record_failure(
+                    workspace_id=context.workspace_id, server_id=server_id
+                )
+            else:
+                excluded_seconds += time.monotonic() - attempt_started
+                # 7. Sanitise before the result re-enters the model
+                #    context.
+                content, result_bytes = sanitize_result(raw)
+                if substituted_from is not None:
+                    content = (
+                        f"[Automatically retried with '{current.name}' after "
+                        f"'{substituted_from}' failed.]\n{content}"
+                    )
+                await breaker.record_success(
+                    workspace_id=context.workspace_id, server_id=server_id
+                )
+                if grant.cache_ttl_seconds > 0:
+                    await cache.put(
+                        workspace_id=context.workspace_id,
+                        server_id=server_id,
+                        tool_name=current.name,
+                        arguments=arguments,
+                        result=content,
+                        ttl_seconds=grant.cache_ttl_seconds,
+                    )
+                return await _record(
+                    ToolOutcome(
+                        status="success",
+                        content=content,
+                        duration_ms=_elapsed(),
+                        result_bytes=result_bytes,
+                        attempts=attempt,
+                        substituted_from=substituted_from,
+                    )
+                )
+
+            if attempt < attempts:
+                delay = backoff_seconds(attempt)
+                await asyncio.sleep(delay)
+                excluded_seconds += delay
+
+        status = "timeout" if last_error and "did not respond" in last_error else "error"
+        return await _record(
+            ToolOutcome(
+                status=status,
+                # The model is told the tool failed, in terms it can act
+                # on, rather than being handed a stack trace or nothing
+                # at all.
+                content=f"This tool call failed after {attempts} attempt(s): {last_error}",
+                duration_ms=_elapsed(),
+                error_message=last_error,
+                attempts=attempts,
+                substituted_from=substituted_from,
+            )
+        )
+
+    # 1. Circuit breaker — cheapest check first, and shared: the
+    #    fallback is the same server, so a known-dead server refuses both,
+    #    and this check never runs a second time for the fallback tool.
+    state = await breaker.state(workspace_id=context.workspace_id, server_id=server_id)
+    if state.is_open:
+        reason = (
+            f"the server is temporarily unavailable after repeated failures; "
+            f"retry in {state.retry_after_seconds}s"
+        )
+        outcome = ToolOutcome(
+            status="circuit_open",
+            content=f"This tool call was not permitted: {reason}",
+            duration_ms=0,
+            denial_reason=reason,
+        )
         record_tool_call(
             status=outcome.status,
-            duration_seconds=elapsed_seconds,
-            overhead_seconds=elapsed_seconds - excluded_seconds,
-            denial_reason=denial_category,
+            duration_seconds=0.0,
+            overhead_seconds=0.0,
+            denial_reason="circuit_open",
         )
         await recorder.record_call(
             workspace_id=context.workspace_id,
@@ -305,164 +553,33 @@ async def execute_tool(
             tool_name=tool.name,
             status=outcome.status,
             arguments=arguments,
-            result_preview=outcome.content[:MAX_PREVIEW_CHARS] if outcome.content else None,
-            result_bytes=outcome.result_bytes,
+            result_preview=None,
+            result_bytes=None,
             duration_ms=outcome.duration_ms,
-            error_message=outcome.error_message,
+            error_message=None,
             denial_reason=outcome.denial_reason,
             attempt=outcome.attempts,
         )
         return outcome
 
-    def _elapsed() -> int:
-        return int((time.monotonic() - started) * 1000)
+    outcome = await _attempt(tool, invoke, substituted_from=None)
 
-    def _refusal(status: str, reason: str) -> ToolOutcome:
-        """A denial the model can read and adapt to.
-
-        Surfaced as content rather than raised: an agent told *why* a
-        tool was refused can pick another approach, where an exception
-        ends the run.
-        """
-        return ToolOutcome(
-            status=status,
-            content=f"This tool call was not permitted: {reason}",
-            duration_ms=_elapsed(),
-            denial_reason=reason,
+    if (
+        outcome.status in ("error", "timeout")
+        and fallback is not None
+        and fallback_invoke is not None
+    ):
+        # Re-check rather than assume: the failure just recorded above
+        # may itself have been the one that opened the breaker, and
+        # burning a fallback call against a server just confirmed dead
+        # defeats the point of having a breaker at all.
+        post_failure_state = await breaker.state(
+            workspace_id=context.workspace_id, server_id=server_id
         )
+        if not post_failure_state.is_open:
+            return await _attempt(fallback, fallback_invoke, substituted_from=tool.name)
 
-    # 1. Circuit breaker — cheapest check first.
-    state = await breaker.state(workspace_id=context.workspace_id, server_id=server_id)
-    if state.is_open:
-        return await _record(
-            _refusal(
-                "circuit_open",
-                f"the server is temporarily unavailable after repeated failures; "
-                f"retry in {state.retry_after_seconds}s",
-            ),
-            denial_category="circuit_open",
-        )
-
-    # 2. Permission — independent of the model's judgment.
-    denial = grant.permits(tool)
-    if denial is not None:
-        return await _record(_refusal("denied", denial), denial_category="permission")
-
-    # 3. Argument validation — model output is untrusted input.
-    invalid = validate_arguments(arguments, tool.input_schema)
-    if invalid is not None:
-        return await _record(_refusal("denied", invalid), denial_category="invalid_arguments")
-
-    # 4. Per-run budget — bounds a tool loop earlier and more cheaply
-    #    than the run's own step and cost ceilings would.
-    if context.run_id is not None:
-        within = await budget.consume(
-            run_id=context.run_id,
-            server_id=server_id,
-            limit=grant.max_calls_per_run,
-            ttl_seconds=context.budget_ttl_seconds,
-        )
-        if not within:
-            return await _record(
-                _refusal(
-                    "denied",
-                    f"this run has already made {grant.max_calls_per_run} calls to this server",
-                ),
-                denial_category="budget_exceeded",
-            )
-
-    # 5. Cache — only ever populated from successful calls, so a
-    #    transient failure never becomes sticky for the whole TTL.
-    if grant.cache_ttl_seconds > 0:
-        cached = await cache.get(
-            workspace_id=context.workspace_id,
-            server_id=server_id,
-            tool_name=tool.name,
-            arguments=arguments,
-        )
-        if cached is not None:
-            return await _record(
-                ToolOutcome(status="cached", content=cached, duration_ms=_elapsed())
-            )
-
-    # 6. Execute, bounded.
-    timeout = min(max(1, grant.timeout_seconds), MAX_TIMEOUT_SECONDS)
-    attempts = grant.max_retries + 1
-    last_error: str | None = None
-
-    for attempt in range(1, attempts + 1):
-        attempt_started = time.monotonic()
-        try:
-            async with asyncio.timeout(timeout):
-                raw = await invoke(arguments)
-        except TimeoutError:
-            excluded_seconds += time.monotonic() - attempt_started
-            last_error = f"the tool did not respond within {timeout}s"
-            await breaker.record_failure(workspace_id=context.workspace_id, server_id=server_id)
-        except EgressDeniedError as exc:
-            # Not retried and not counted against the breaker: the
-            # destination is not going to become permitted, and a denial
-            # is the system working rather than the server failing.
-            #
-            # The time spent getting here is *ours* — DNS resolution and
-            # validation, no third party reached — so it is deliberately
-            # not excluded from overhead. A guard that became slow
-            # should show up as boundary overhead, since that is the path
-            # a probing attacker exercises over and over.
-            record_egress_denial(exc.category)
-            return await _record(_refusal("denied", exc.reason), denial_category="egress")
-        except Exception as exc:  # noqa: BLE001 - translated into an outcome, never a crash
-            excluded_seconds += time.monotonic() - attempt_started
-            last_error = str(exc)
-            logger.warning(
-                "tool_call_failed workspace_id=%s server_id=%s tool=%s attempt=%s",
-                context.workspace_id,
-                server_id,
-                tool.name,
-                attempt,
-            )
-            await breaker.record_failure(workspace_id=context.workspace_id, server_id=server_id)
-        else:
-            excluded_seconds += time.monotonic() - attempt_started
-            # 7. Sanitise before the result re-enters the model context.
-            content, result_bytes = sanitize_result(raw)
-            await breaker.record_success(workspace_id=context.workspace_id, server_id=server_id)
-            if grant.cache_ttl_seconds > 0:
-                await cache.put(
-                    workspace_id=context.workspace_id,
-                    server_id=server_id,
-                    tool_name=tool.name,
-                    arguments=arguments,
-                    result=content,
-                    ttl_seconds=grant.cache_ttl_seconds,
-                )
-            return await _record(
-                ToolOutcome(
-                    status="success",
-                    content=content,
-                    duration_ms=_elapsed(),
-                    result_bytes=result_bytes,
-                    attempts=attempt,
-                )
-            )
-
-        if attempt < attempts:
-            delay = backoff_seconds(attempt)
-            await asyncio.sleep(delay)
-            excluded_seconds += delay
-
-    status = "timeout" if last_error and "did not respond" in last_error else "error"
-    return await _record(
-        ToolOutcome(
-            status=status,
-            # The model is told the tool failed, in terms it can act on,
-            # rather than being handed a stack trace or nothing at all.
-            content=f"This tool call failed after {attempts} attempt(s): {last_error}",
-            duration_ms=_elapsed(),
-            error_message=last_error,
-            attempts=attempts,
-        )
-    )
+    return outcome
 
 
 @dataclass(slots=True)
