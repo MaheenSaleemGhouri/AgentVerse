@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, ForeignKey, Text, UniqueConstraint
+from sqlalchemy import JSON, ForeignKey, LargeBinary, Text, UniqueConstraint
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -42,6 +42,16 @@ class User(Base):
     image: Mapped[str | None] = mapped_column(Text, default=None)
     created_at: Mapped[datetime] = mapped_column(index=True)
     updated_at: Mapped[datetime]
+    # Better Auth's `twoFactor()` plugin adds this to its `user` model
+    # (Increment 7.2) — Alembic authors it, same as every other Better
+    # Auth-owned column (ADR-0005).
+    two_factor_enabled: Mapped[bool] = mapped_column(default=False)
+    # apps/web-owned account locking (Increment 7.5), enforced inside the
+    # already-customized `password.verify` override in
+    # `apps/web/lib/password-hashing.ts` — the same extension point
+    # ADR-0005 used for Argon2id. Not a Better Auth field.
+    failed_login_count: Mapped[int] = mapped_column(default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(default=None)
 
 
 class Session(Base):
@@ -82,10 +92,36 @@ class Verification(Base):
 
     id: Mapped[str] = mapped_column(Text, primary_key=True)
     identifier: Mapped[str] = mapped_column(Text, index=True)
-    value: Mapped[str] = mapped_column(Text)
+    value: Mapped[str] = mapped_column(Text, index=True)
     expires_at: Mapped[datetime]
     created_at: Mapped[datetime]
     updated_at: Mapped[datetime]
+    # apps/api-only (Increment 5): enforces invitation tokens are
+    # single-use. Better Auth's own rows (reset-password, email
+    # verification) never populate this — it manages their lifecycle
+    # itself and is never queried by anything that reads this column.
+    consumed_at: Mapped[datetime | None] = mapped_column(default=None)
+
+
+class TwoFactor(Base):
+    """Better Auth's `twoFactor()` plugin table (Increment 7.2), authored
+    by Alembic in snake_case — the same precedent `jwks` set: the plugin
+    documents its schema, we create it, and `apps/web/lib/auth.ts`'s
+    `schema.twoFactor.fields` mapping points at these exact columns.
+
+    `secret`/`backup_codes` are Better Auth-encrypted at rest (it never
+    returns them over the API — `returned: false` in its own schema).
+    """
+
+    __tablename__ = "two_factor"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    secret: Mapped[str] = mapped_column(Text, index=True)
+    backup_codes: Mapped[str] = mapped_column(Text)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    verified: Mapped[bool] = mapped_column(default=True)
+    failed_verification_count: Mapped[int] = mapped_column(default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(default=None)
 
 
 class Jwk(Base):
@@ -117,6 +153,16 @@ class Workspace(Base):
     name: Mapped[str] = mapped_column(Text)
     slug: Mapped[str] = mapped_column(Text, unique=True, index=True)
     created_at: Mapped[datetime]
+    # Nullable, `ON DELETE SET NULL`: an organization groups workspaces for
+    # billing/SSO/branding only (ADR-0006) — it is never the isolation
+    # boundary, so deleting the organization detaches, never deletes, the
+    # workspace.
+    organization_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        index=True,
+        default=None,
+    )
 
     members: Mapped[list[WorkspaceMember]] = relationship(
         back_populates="workspace", cascade="all, delete-orphan"
@@ -140,6 +186,42 @@ class WorkspaceMember(Base):
     workspace: Mapped[Workspace] = relationship(back_populates="members")
 
 
+class Organization(Base):
+    """Additive grouping layer over `workspaces` (ADR-0006) — never an
+    isolation boundary. `workspace_members` remains the sole source of
+    workspace authorization regardless of organization membership.
+    """
+
+    __tablename__ = "organizations"
+
+    id: Mapped[str] = _uuid_pk()
+    name: Mapped[str] = mapped_column(Text)
+    slug: Mapped[str] = mapped_column(Text, unique=True, index=True)
+    created_at: Mapped[datetime]
+
+
+class OrganizationMember(Base):
+    __tablename__ = "organization_members"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "user_id", name="uq_organization_member"),
+    )
+
+    id: Mapped[str] = _uuid_pk()
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # Reuses the `workspace_role` Postgres ENUM (same four values/semantics)
+    # rather than a second, near-identical type — DRY (CLAUDE.md §16).
+    role: Mapped[Role] = mapped_column(
+        SqlEnum(Role, name="workspace_role", values_callable=lambda enum: [e.value for e in enum])
+    )
+    # Mirrors `ApiKey.revoked_at`: suspending keeps the row (audit-followable)
+    # instead of deleting it. `None` means active.
+    suspended_at: Mapped[datetime | None] = mapped_column(default=None)
+    created_at: Mapped[datetime]
+
+
 class ApiKey(Base):
     __tablename__ = "api_keys"
 
@@ -154,6 +236,41 @@ class ApiKey(Base):
     created_at: Mapped[datetime]
     last_used_at: Mapped[datetime | None] = mapped_column(default=None)
     revoked_at: Mapped[datetime | None] = mapped_column(default=None)
+    # Plain TEXT, not a Postgres ENUM: `ApiKeyScope` is app-validated at
+    # the Pydantic boundary, and a TEXT column never needs a migration to
+    # add a new allowed value (an ENUM's values aren't cleanly reversible
+    # to drop, the same reasoning the `protocol_config` design elsewhere
+    # in this codebase already applies).
+    scope: Mapped[str] = mapped_column(Text, server_default="full")
+    tier: Mapped[str] = mapped_column(Text, server_default="standard")
+    rotated_from_id: Mapped[str | None] = mapped_column(
+        ForeignKey("api_keys.id", ondelete="SET NULL"), default=None
+    )
+
+
+class WorkspaceSettings(Base):
+    """1:1 with `Workspace` — `workspace_id` is both the primary key and
+    the foreign key, so a workspace can have at most one settings row and
+    a `get_or_default` read (no row yet) is a real, expected state rather
+    than an integrity concern.
+    """
+
+    __tablename__ = "workspace_settings"
+
+    workspace_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    logo_url: Mapped[str | None] = mapped_column(Text, default=None)
+    brand_color: Mapped[str | None] = mapped_column(Text, default=None)
+    custom_domain: Mapped[str | None] = mapped_column(Text, unique=True, default=None)
+    retention_days: Mapped[int | None] = mapped_column(default=None)
+    storage_limit_mb: Mapped[int | None] = mapped_column(default=None)
+    updated_at: Mapped[datetime]
+    updated_by_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), default=None
+    )
 
 
 class AuditLog(Base):
@@ -163,6 +280,14 @@ class AuditLog(Base):
     # Nullable: pre-workspace events (e.g. raw signup) have no workspace yet.
     workspace_id: Mapped[str | None] = mapped_column(
         ForeignKey("workspaces.id", ondelete="SET NULL"), index=True, default=None
+    )
+    # Nullable: set only for organization-level events (e.g.
+    # `organization.created`) that have no single workspace to attribute to.
+    organization_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        index=True,
+        default=None,
     )
     # Nullable: system-initiated entries have no human actor.
     actor_user_id: Mapped[str | None] = mapped_column(
@@ -178,3 +303,117 @@ class AuditLog(Base):
         "metadata", JSONB().with_variant(JSON, "sqlite")
     )
     created_at: Mapped[datetime] = mapped_column(index=True)
+
+
+class WorkspaceIpAllowlist(Base):
+    """Opt-in per-workspace IP restriction (Increment 7.4).
+
+    Empty = unrestricted, which is why every pre-existing workspace is
+    unaffected by default: the enforcing dependency treats "no rows" as
+    "allow everything" rather than "deny everything". Fail-open is
+    correct *here specifically* — an empty allowlist means the feature
+    was never configured, not that access was revoked.
+    """
+
+    __tablename__ = "workspace_ip_allowlist"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "cidr", name="uq_workspace_ip_allowlist_cidr"),
+    )
+
+    id: Mapped[str] = _uuid_pk()
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    #: Stored as TEXT, validated as an IPv4/IPv6 network by the
+    #: application layer — Postgres has a native `cidr` type, but the
+    #: value has to round-trip through Python's `ipaddress` module for
+    #: the match check anyway, so TEXT keeps one validation path.
+    cidr: Mapped[str] = mapped_column(Text)
+    label: Mapped[str | None] = mapped_column(Text, default=None)
+    created_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime]
+
+
+class SsoConfiguration(Base):
+    """Org-scoped SSO configuration (Increment 8). See migration
+    `f4b8d1e6c037` for why `protocol`/`preset` are TEXT and
+    `protocol_config` is JSONB.
+
+    The client secret is sealed with the existing `CredentialVault`
+    envelope (never plaintext, never logged) — the three columns below
+    mirror the MCP integration-credential shape exactly.
+    """
+
+    __tablename__ = "sso_configurations"
+
+    id: Mapped[str] = _uuid_pk()
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    protocol: Mapped[str] = mapped_column(Text)
+    preset: Mapped[str] = mapped_column(Text, server_default="generic")
+    issuer_url: Mapped[str | None] = mapped_column(Text, default=None)
+    client_id: Mapped[str | None] = mapped_column(Text, default=None)
+    client_secret_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary, default=None)
+    wrapped_dek: Mapped[bytes | None] = mapped_column(LargeBinary, default=None)
+    key_version: Mapped[str | None] = mapped_column(Text, default=None)
+    protocol_config: Mapped[dict[str, str]] = mapped_column(
+        JSONB().with_variant(JSON, "sqlite")
+    )
+    enabled: Mapped[bool] = mapped_column(default=False)
+    created_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime]
+    updated_at: Mapped[datetime]
+
+
+class ScimToken(Base):
+    """Bearer credential an identity provider presents to the SCIM 2.0
+    endpoints. Organization-scoped, and deliberately not an `api_keys`
+    row — see the migration for why.
+    """
+
+    __tablename__ = "scim_tokens"
+
+    id: Mapped[str] = _uuid_pk()
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(Text)
+    token_prefix: Mapped[str] = mapped_column(Text)
+    hashed_token: Mapped[str] = mapped_column(Text, unique=True)
+    created_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime]
+    last_used_at: Mapped[datetime | None] = mapped_column(default=None)
+    revoked_at: Mapped[datetime | None] = mapped_column(default=None)
+
+
+class ResourcePermission(Base):
+    """An orthogonal grant on top of the four base workspace roles
+    (Increment 6) — see the domain entity's docstring for why this exists
+    instead of widening `workspace_role`.
+    """
+
+    __tablename__ = "resource_permissions"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "resource_type",
+            "resource_id",
+            "principal_type",
+            "principal_id",
+            "permission",
+            name="uq_resource_permission",
+        ),
+    )
+
+    id: Mapped[str] = _uuid_pk()
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    resource_type: Mapped[str] = mapped_column(Text)
+    resource_id: Mapped[str] = mapped_column(Text, server_default="")
+    principal_type: Mapped[str] = mapped_column(Text, server_default="user")
+    principal_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    permission: Mapped[str] = mapped_column(Text)
+    granted_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime]

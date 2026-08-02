@@ -3,13 +3,17 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { listAuditLogs } from "@/lib/api/audit-logs";
+import { listIpAllowlist } from "@/lib/api/ip-allowlist";
 import { listApiKeys, listMyWorkspaces } from "@/lib/api/workspaces";
 import { auth } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { ROLE_DESCRIPTIONS } from "@/lib/roles";
 
-import { IntegrationPending } from "@/components/patterns/integration-pending";
 import { StatusBadge } from "@/components/patterns/status-badge";
+import { IpAllowlistPanel } from "@/components/settings/ip-allowlist-panel";
+import { SessionsPanel } from "@/components/settings/sessions-panel";
+import { TwoFactorPanel } from "@/components/settings/two-factor-panel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -18,8 +22,8 @@ import { Separator } from "@/components/ui/separator";
  * Security posture for this workspace and session.
  *
  * Everything shown is derived from real state — the live session, actual
- * issued keys, the caller's real role. The audit trail is the one part
- * with no backend yet, and says so.
+ * issued keys, the caller's real role, and (for admins/owners) real
+ * recent audit events.
  */
 export default async function SecurityPage({
   params,
@@ -36,6 +40,23 @@ export default async function SecurityPage({
 
   const activeKeys = keys.filter((key) => !key.revoked_at);
   const staleKeys = activeKeys.filter((key) => key.last_used_at === null);
+
+  // The read route is admin-gated (audit visibility sits above ordinary
+  // workspace reads), so a member/viewer never issues this call — a
+  // 403 here would be the wrong failure mode for a page every role
+  // otherwise sees.
+  const canViewAuditTrail = current.role === "owner" || current.role === "admin";
+  const recentEvents = canViewAuditTrail
+    ? (await listAuditLogs(workspaceId, { limit: 5 })).data
+    : [];
+
+  // Admin-gated on the API too, so members/viewers never issue the call.
+  const ipAllowlist = canViewAuditTrail ? await listIpAllowlist(workspaceId) : [];
+
+  // `twoFactorEnabled` comes from the live session's user record — the
+  // column the `twoFactor()` plugin maintains (Increment 7.2).
+  const twoFactorEnabled =
+    (session.user as { twoFactorEnabled?: boolean | null }).twoFactorEnabled === true;
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -56,6 +77,10 @@ export default async function SecurityPage({
         <Row label="Signed in as" value={session.user.email} />
         <Row label="Session expires" value={formatDateTime(String(session.session.expiresAt))} />
       </Card>
+
+      <TwoFactorPanel enabled={twoFactorEnabled} />
+
+      <SessionsPanel currentSessionToken={session.session.token} />
 
       <Card className="gap-4 p-6">
         <div className="flex items-start gap-3">
@@ -110,10 +135,43 @@ export default async function SecurityPage({
         )}
       </Card>
 
-      <div className="space-y-3">
-        <h2 className="text-sm font-medium text-muted-foreground">Audit trail</h2>
-        <IntegrationPending feature="auditLogs" />
-      </div>
+      {canViewAuditTrail && (
+        <Card className="p-6">
+          <IpAllowlistPanel workspaceId={workspaceId} initialEntries={ipAllowlist} />
+        </Card>
+      )}
+
+      <Card className="gap-4 p-6">
+        <div className="flex items-start justify-between gap-4">
+          <h2 className="font-medium">Audit trail</h2>
+          {canViewAuditTrail && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/dashboard/${workspaceId}/audit-logs`}>View all</Link>
+            </Button>
+          )}
+        </div>
+        <Separator />
+        {!canViewAuditTrail ? (
+          <p className="text-sm text-muted-foreground">
+            Only workspace admins and owners can view the audit trail.
+          </p>
+        ) : recentEvents.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Nothing has been recorded for this workspace yet.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {recentEvents.map((entry) => (
+              <li key={entry.id} className="flex items-center justify-between gap-3 text-sm">
+                <span className="font-mono text-xs text-muted-foreground">{entry.action}</span>
+                <span className="whitespace-nowrap text-xs text-muted-foreground">
+                  {formatDateTime(entry.created_at)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
     </div>
   );
 }

@@ -83,13 +83,6 @@ export const PENDING_INTEGRATIONS = {
     capability:
       "View and change the workspace subscription, track usage against quota, and download invoices.",
   },
-  auditLogs: {
-    phase: 12,
-    phaseName: "Open Marketplace, Enterprise Compliance & Own MCP Surface",
-    endpoints: ["GET /api/v1/workspaces/{workspace_id}/audit-logs"],
-    capability:
-      "Search the append-only record of authentication events, permission changes, and destructive operations.",
-  },
   notifications: {
     phase: 11,
     phaseName: "Growth Loops & Multi-Provider Breadth",

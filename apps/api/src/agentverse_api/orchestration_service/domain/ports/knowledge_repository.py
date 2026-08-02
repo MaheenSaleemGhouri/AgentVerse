@@ -56,6 +56,13 @@ class KnowledgeRepository(Protocol):
 
     async def get_document(self, *, workspace_id: str, document_id: str) -> KbDocument | None: ...
 
+    async def sum_stored_bytes(self, *, workspace_id: str) -> int:
+        """Total bytes of the workspace's live documents, for quota
+        admission. Soft-deleted documents are excluded — an admin who
+        deletes a file expects the space back.
+        """
+        ...
+
     async def soft_delete_document(self, *, workspace_id: str, document_id: str) -> bool: ...
 
     async def reset_document_for_reindex(self, *, workspace_id: str, document_id: str) -> bool:

@@ -29,6 +29,7 @@ from agentverse_worker.interface.routes.queue_metrics import router as queue_met
 from agentverse_worker.mcp.health_sweep import build_health_sweeper
 from agentverse_worker.mcp.metrics_aggregation import build_tool_metrics_aggregator
 from agentverse_worker.queue.factory import build_queue  # noqa: F401 - re-exported for tests
+from agentverse_worker.retention.sweep import build_retention_sweeper
 
 __all__ = ["app", "build_queue", "create_app", "lifespan"]
 
@@ -41,7 +42,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     consumer_task = asyncio.create_task(queue.run_forever())
 
-    # Second and third background tasks, same shutdown discipline as the
+    # The remaining background tasks, same shutdown discipline as the
     # queue consumer above: cancelled and awaited, never just dropped, so
     # a cycle mid-flight does not leave a DB session dangling on redeploy.
     sweeper = build_health_sweeper(redis_client, get_settings())
@@ -49,6 +50,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     aggregator = build_tool_metrics_aggregator(redis_client, get_settings())
     aggregation_task = asyncio.create_task(aggregator.run_forever())
+
+    retention = build_retention_sweeper(redis_client, get_settings())
+    retention_task = asyncio.create_task(retention.run_forever())
 
     try:
         yield
@@ -65,6 +69,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         aggregation_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await aggregation_task
+        retention.stop()
+        retention_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await retention_task
         await redis_client.aclose()
 
 

@@ -68,6 +68,12 @@ extend-immutable-calls = [
 # correctness (not hand-formatted), regenerating on every schema change
 # — holding them to line-length/import-sort style is churn without value.
 "src/agentverse_api/infrastructure/migrations/versions/*.py" = ["E501", "I001", "UP007", "UP035"]
+# SCIM 2.0 wire schemas: RFC 7643/7644 fixes these attribute names as
+# camelCase (`userName`, `displayName`, `totalResults`). Identity
+# providers validate against them literally, so snake_case here would
+# not be a style improvement — it would be a non-conforming API.
+# Scoped to this one file so the naming rule stays enforced everywhere else.
+"src/agentverse_api/auth_service/interface/schemas/scim.py" = ["N815"]
 
 [tool.mypy]
 python_version = "3.12"

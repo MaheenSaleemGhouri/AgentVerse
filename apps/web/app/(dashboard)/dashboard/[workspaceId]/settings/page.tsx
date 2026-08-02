@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 
+import { getWorkspaceSettings } from "@/lib/api/workspace-settings";
 import { listMembers, listMyWorkspaces } from "@/lib/api/workspaces";
 import { formatDateTime } from "@/lib/format";
 import { ROLE_DESCRIPTIONS } from "@/lib/roles";
 
 import { CopyButton } from "@/components/patterns/copy-button";
 import { StatusBadge } from "@/components/patterns/status-badge";
+import { WorkspaceSettingsForm } from "@/components/settings/workspace-settings-form";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
@@ -15,9 +17,15 @@ export default async function WorkspaceSettingsPage({
   params: Promise<{ workspaceId: string }>;
 }): Promise<React.JSX.Element> {
   const { workspaceId } = await params;
-  const [workspaces, members] = await Promise.all([listMyWorkspaces(), listMembers(workspaceId)]);
+  const [workspaces, members, settings] = await Promise.all([
+    listMyWorkspaces(),
+    listMembers(workspaceId),
+    getWorkspaceSettings(workspaceId),
+  ]);
   const current = workspaces.find((workspace) => workspace.id === workspaceId);
   if (!current) notFound();
+
+  const canManage = current.role === "owner" || current.role === "admin";
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -50,6 +58,12 @@ export default async function WorkspaceSettingsPage({
           <p className="text-sm text-muted-foreground">{ROLE_DESCRIPTIONS[current.role]}</p>
         </div>
       </Card>
+
+      <WorkspaceSettingsForm
+        workspaceId={workspaceId}
+        initialSettings={settings}
+        canManage={canManage}
+      />
     </div>
   );
 }

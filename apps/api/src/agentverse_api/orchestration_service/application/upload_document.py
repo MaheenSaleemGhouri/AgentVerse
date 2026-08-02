@@ -124,12 +124,31 @@ async def upload_document(
     repo: KnowledgeRepository,
     store: DocumentStore,
     producer: JobQueueProducer,
+    workspace_quota_bytes: int | None = None,
 ) -> UploadResult:
+    """`max_bytes` caps a *single* file (a platform safety limit);
+    `workspace_quota_bytes` caps the workspace's total stored bytes from
+    its configured `storage_limit_mb`, or is `None` when the admin has
+    set no limit. Both are checked before any byte is written.
+    """
     if len(data) > max_bytes:
         raise UploadRejectedError(
             f"The file is {len(data) // (1024 * 1024)} MB. "
             f"The limit is {max_bytes // (1024 * 1024)} MB."
         )
+
+    if workspace_quota_bytes is not None:
+        used = await repo.sum_stored_bytes(workspace_id=workspace_id)
+        if used + len(data) > workspace_quota_bytes:
+            # Admission, not enforcement-after-the-fact: rejecting here
+            # means the quota can never be exceeded, whereas a background
+            # reconciler would let it be breached first.
+            raise UploadRejectedError(
+                f"This workspace has used {used // (1024 * 1024)} MB of its "
+                f"{workspace_quota_bytes // (1024 * 1024)} MB storage limit, and this "
+                f"file needs {max(len(data) // (1024 * 1024), 1)} MB more. "
+                "Delete documents or raise the limit in workspace settings."
+            )
 
     # Re-resolved from the caller's authenticated workspace, and checked
     # here rather than only in the router: a knowledge base belonging to

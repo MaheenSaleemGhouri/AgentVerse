@@ -127,6 +127,13 @@ class FakeKnowledgeRepository:
             return None
         return doc
 
+    async def sum_stored_bytes(self, *, workspace_id: str) -> int:
+        return sum(
+            doc.size_bytes
+            for doc in self.documents.values()
+            if doc.workspace_id == workspace_id and doc.id not in self.deleted_document_ids
+        )
+
     async def soft_delete_document(self, *, workspace_id: str, document_id: str) -> bool:
         if await self.get_document(workspace_id=workspace_id, document_id=document_id):
             self.deleted_document_ids.add(document_id)

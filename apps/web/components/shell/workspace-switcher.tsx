@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronsUpDown, Plus } from "lucide-react";
+import { Building2, Check, ChevronsUpDown, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
@@ -97,6 +97,16 @@ export function WorkspaceSwitcher({
               >
                 <Plus />
                 <span>New workspace</span>
+              </CommandItem>
+              <CommandItem
+                value="Organizations"
+                onSelect={() => {
+                  setOpen(false);
+                  router.push("/organizations");
+                }}
+              >
+                <Building2 />
+                <span>Organizations</span>
               </CommandItem>
             </CommandGroup>
           </CommandList>

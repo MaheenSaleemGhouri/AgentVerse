@@ -20,6 +20,7 @@ class WorkspaceResponse(BaseModel):
     slug: str
     created_at: datetime
     role: Role
+    organization_id: str | None = None
 
 
 class MemberResponse(BaseModel):

@@ -48,6 +48,7 @@ async def list_my_workspaces(
             slug=summary.workspace.slug,
             created_at=summary.workspace.created_at,
             role=summary.role,
+            organization_id=summary.workspace.organization_id,
         )
         for summary in summaries
     ]
@@ -69,6 +70,7 @@ async def create_workspace(
         slug=workspace.slug,
         created_at=workspace.created_at,
         role=Role.OWNER,
+        organization_id=workspace.organization_id,
     )
 
 
@@ -89,6 +91,7 @@ async def get_workspace(
         slug=workspace.slug,
         created_at=workspace.created_at,
         role=context.role,
+        organization_id=workspace.organization_id,
     )
 
 

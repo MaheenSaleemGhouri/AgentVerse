@@ -98,44 +98,85 @@ import {
   type UpdateTeamRequest,
 } from "@/lib/api/teams";
 import {
+  type AuditLogFilters,
+  type AuditLogPage,
+  listAuditLogs as listAuditLogsApi,
+} from "@/lib/api/audit-logs";
+import {
+  type UpdateWorkspaceSettingsRequest,
+  updateWorkspaceSettings as updateWorkspaceSettingsApi,
+  type WorkspaceSettings,
+} from "@/lib/api/workspace-settings";
+import {
+  deleteSsoConfiguration as deleteSsoConfigurationApi,
+  listSsoConfigurations as listSsoConfigurationsApi,
+  type SaveSsoConfigurationRequest,
+  saveSsoConfiguration as saveSsoConfigurationApi,
+  type SsoConfiguration,
+} from "@/lib/api/sso";
+import {
+  type IssuedScimToken,
+  issueScimToken as issueScimTokenApi,
+  listScimTokens as listScimTokensApi,
+  revokeScimToken as revokeScimTokenApi,
+  type ScimToken,
+} from "@/lib/api/scim-tokens";
+import {
+  type AddIpAllowlistEntryRequest,
+  addIpAllowlistEntry as addIpAllowlistEntryApi,
+  type IpAllowlistEntry,
+  listIpAllowlist as listIpAllowlistApi,
+  removeIpAllowlistEntry as removeIpAllowlistEntryApi,
+} from "@/lib/api/ip-allowlist";
+import {
+  type GrantResourcePermissionRequest,
+  grantResourcePermission as grantResourcePermissionApi,
+  listResourcePermissions as listResourcePermissionsApi,
+  type ResourcePermission,
+  revokeResourcePermission as revokeResourcePermissionApi,
+} from "@/lib/api/resource-permissions";
+import {
   type ApiKey,
-  changeMemberRole as changeMemberRoleApi,
   createWorkspace as createWorkspaceApi,
-  inviteMember as inviteMemberApi,
+  type IssueApiKeyRequest,
   issueApiKey as issueApiKeyApi,
+  type InviteByEmailResponse,
   type IssuedApiKey,
   listApiKeys as listApiKeysApi,
   listMembers as listMembersApi,
   listMyWorkspaces as listMyWorkspacesApi,
   type Member,
-  removeMember as removeMemberApi,
-  revokeApiKey as revokeApiKeyApi,
   type Role,
+  revokeApiKey as revokeApiKeyApi,
+  rotateApiKey as rotateApiKeyApi,
   type Workspace,
 } from "@/lib/api/workspaces";
+import {
+  attachWorkspace as attachWorkspaceApi,
+  createOrganization as createOrganizationApi,
+  deleteOrganization as deleteOrganizationApi,
+  detachWorkspace as detachWorkspaceApi,
+  listMyOrganizations as listMyOrganizationsApi,
+  listOrgWorkspaces as listOrgWorkspacesApi,
+  type Organization,
+  type OrganizationWorkspace,
+  renameOrganization as renameOrganizationApi,
+} from "@/lib/api/organizations";
+import {
+  changeScopedMemberRole as changeScopedMemberRoleApi,
+  inviteScopedMemberByEmail as inviteScopedMemberByEmailApi,
+  listScopedMembers as listScopedMembersApi,
+  type MemberScope,
+  removeScopedMember as removeScopedMemberApi,
+  type ScopedMember,
+} from "@/lib/api/members";
+import {
+  acceptInvite as acceptInviteApi,
+  type AcceptInviteResponse,
+} from "@/lib/api/invitations";
 
 export async function createWorkspaceAction(name: string): Promise<Workspace> {
   return createWorkspaceApi(name);
-}
-
-export async function inviteMemberAction(
-  workspaceId: string,
-  userId: string,
-  role: Role
-): Promise<void> {
-  await inviteMemberApi(workspaceId, userId, role);
-}
-
-export async function changeMemberRoleAction(
-  workspaceId: string,
-  targetUserId: string,
-  role: Role
-): Promise<void> {
-  await changeMemberRoleApi(workspaceId, targetUserId, role);
-}
-
-export async function removeMemberAction(workspaceId: string, targetUserId: string): Promise<void> {
-  await removeMemberApi(workspaceId, targetUserId);
 }
 
 export async function createAgentAction(
@@ -272,13 +313,20 @@ export async function listApiKeysAction(workspaceId: string): Promise<ApiKey[]> 
 
 export async function issueApiKeyAction(
   workspaceId: string,
-  name: string
+  body: IssueApiKeyRequest
 ): Promise<IssuedApiKey> {
-  return issueApiKeyApi(workspaceId, name);
+  return issueApiKeyApi(workspaceId, body);
 }
 
 export async function revokeApiKeyAction(workspaceId: string, apiKeyId: string): Promise<void> {
   await revokeApiKeyApi(workspaceId, apiKeyId);
+}
+
+export async function rotateApiKeyAction(
+  workspaceId: string,
+  apiKeyId: string
+): Promise<IssuedApiKey> {
+  return rotateApiKeyApi(workspaceId, apiKeyId);
 }
 
 export async function listMyWorkspacesAction(): Promise<Workspace[]> {
@@ -524,4 +572,166 @@ export async function getIntegrationMetricsAction(
   installedServerId?: string
 ): Promise<IntegrationMetrics> {
   return getIntegrationMetricsApi(workspaceId, installedServerId);
+}
+
+export async function listAuditLogsAction(
+  workspaceId: string,
+  filters: AuditLogFilters = {}
+): Promise<AuditLogPage> {
+  return listAuditLogsApi(workspaceId, filters);
+}
+
+export async function updateWorkspaceSettingsAction(
+  workspaceId: string,
+  body: UpdateWorkspaceSettingsRequest
+): Promise<WorkspaceSettings> {
+  return updateWorkspaceSettingsApi(workspaceId, body);
+}
+
+export async function listMyOrganizationsAction(): Promise<Organization[]> {
+  return listMyOrganizationsApi();
+}
+
+export async function createOrganizationAction(name: string): Promise<Organization> {
+  return createOrganizationApi(name);
+}
+
+export async function renameOrganizationAction(
+  organizationId: string,
+  name: string
+): Promise<Organization> {
+  return renameOrganizationApi(organizationId, name);
+}
+
+export async function deleteOrganizationAction(organizationId: string): Promise<void> {
+  await deleteOrganizationApi(organizationId);
+}
+
+export async function listOrgWorkspacesAction(
+  organizationId: string
+): Promise<OrganizationWorkspace[]> {
+  return listOrgWorkspacesApi(organizationId);
+}
+
+export async function attachWorkspaceAction(
+  organizationId: string,
+  workspaceId: string
+): Promise<void> {
+  await attachWorkspaceApi(organizationId, workspaceId);
+}
+
+export async function detachWorkspaceAction(
+  organizationId: string,
+  workspaceId: string
+): Promise<void> {
+  await detachWorkspaceApi(organizationId, workspaceId);
+}
+
+export async function listScopedMembersAction(scope: MemberScope): Promise<ScopedMember[]> {
+  return listScopedMembersApi(scope);
+}
+
+export async function inviteScopedMemberByEmailAction(
+  scope: MemberScope,
+  email: string,
+  role: Role
+): Promise<InviteByEmailResponse> {
+  return inviteScopedMemberByEmailApi(scope, email, role);
+}
+
+export async function changeScopedMemberRoleAction(
+  scope: MemberScope,
+  targetUserId: string,
+  role: Role
+): Promise<void> {
+  await changeScopedMemberRoleApi(scope, targetUserId, role);
+}
+
+export async function removeScopedMemberAction(
+  scope: MemberScope,
+  targetUserId: string
+): Promise<void> {
+  await removeScopedMemberApi(scope, targetUserId);
+}
+
+export async function acceptInviteAction(token: string): Promise<AcceptInviteResponse> {
+  return acceptInviteApi(token);
+}
+
+export async function listResourcePermissionsAction(
+  workspaceId: string
+): Promise<ResourcePermission[]> {
+  return listResourcePermissionsApi(workspaceId);
+}
+
+export async function grantResourcePermissionAction(
+  workspaceId: string,
+  body: GrantResourcePermissionRequest
+): Promise<ResourcePermission> {
+  return grantResourcePermissionApi(workspaceId, body);
+}
+
+export async function revokeResourcePermissionAction(
+  workspaceId: string,
+  permissionId: string
+): Promise<void> {
+  await revokeResourcePermissionApi(workspaceId, permissionId);
+}
+
+export async function listIpAllowlistAction(
+  workspaceId: string
+): Promise<IpAllowlistEntry[]> {
+  return listIpAllowlistApi(workspaceId);
+}
+
+export async function addIpAllowlistEntryAction(
+  workspaceId: string,
+  body: AddIpAllowlistEntryRequest
+): Promise<IpAllowlistEntry> {
+  return addIpAllowlistEntryApi(workspaceId, body);
+}
+
+export async function removeIpAllowlistEntryAction(
+  workspaceId: string,
+  entryId: string
+): Promise<void> {
+  await removeIpAllowlistEntryApi(workspaceId, entryId);
+}
+
+export async function listSsoConfigurationsAction(
+  organizationId: string
+): Promise<SsoConfiguration[]> {
+  return listSsoConfigurationsApi(organizationId);
+}
+
+export async function saveSsoConfigurationAction(
+  organizationId: string,
+  body: SaveSsoConfigurationRequest
+): Promise<SsoConfiguration> {
+  return saveSsoConfigurationApi(organizationId, body);
+}
+
+export async function deleteSsoConfigurationAction(
+  organizationId: string,
+  configId: string
+): Promise<void> {
+  await deleteSsoConfigurationApi(organizationId, configId);
+}
+
+export async function listScimTokensAction(organizationId: string): Promise<ScimToken[]> {
+  return listScimTokensApi(organizationId);
+}
+
+export async function issueScimTokenAction(
+  organizationId: string,
+  name: string
+): Promise<IssuedScimToken> {
+  return issueScimTokenApi(organizationId, name);
+}
+
+export async function revokeScimTokenAction(
+  organizationId: string,
+  tokenId: string
+): Promise<void> {
+  await revokeScimTokenApi(organizationId, tokenId);
 }

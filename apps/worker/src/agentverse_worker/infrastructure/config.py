@@ -91,6 +91,18 @@ class Settings(BaseSettings):
     # still stay correct.
     tool_metrics_aggregation_interval_seconds: float = 900.0
 
+    # Retention enforcement — deletes run history older than each
+    # workspace's configured `workspace_settings.retention_days`. Hourly
+    # rather than continuous: retention is a policy measured in days, so
+    # a purge running within an hour of the boundary is exactly as
+    # correct and far cheaper.
+    retention_sweep_interval_seconds: float = 3600.0
+    #: Rows deleted per statement, per workspace, per cycle. Bounded so a
+    #: workspace that just lowered its retention from 365 to 7 days does
+    #: not issue one enormous DELETE that holds locks on `agent_runs`
+    #: (`postgresql-expert`); the remainder is picked up next cycle.
+    retention_sweep_batch_size: int = 1000
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -20,6 +20,7 @@ import { Suspense } from "react";
 import { LoginForm } from "@/app/(auth)/login/login-form";
 import { SignupForm } from "@/app/(auth)/signup/signup-form";
 import type { SocialProvider } from "@/lib/social-providers";
+import type { SsoLoginOption } from "@/lib/sso-login-options";
 
 import { AuthHero } from "./auth-hero";
 import { BuiltOnStrip, TrustBar } from "./trust-sections";
@@ -27,9 +28,11 @@ import { BuiltOnStrip, TrustBar } from "./trust-sections";
 export function AuthShell({
   active,
   socialProviders,
+  ssoOptions = [],
 }: {
   active: "login" | "signup";
   socialProviders: SocialProvider[];
+  ssoOptions?: SsoLoginOption[];
 }): React.JSX.Element {
   return (
     <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-10 px-4 py-10 sm:px-6 lg:px-8">
@@ -39,7 +42,7 @@ export function AuthShell({
           {/* LoginForm reads `?redirect=` via useSearchParams, which
               needs a Suspense boundary for this page to prerender. */}
           <Suspense fallback={<PanelSkeleton />}>
-            <LoginForm socialProviders={socialProviders} />
+            <LoginForm socialProviders={socialProviders} ssoOptions={ssoOptions} />
           </Suspense>
         </div>
 

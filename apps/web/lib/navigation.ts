@@ -155,7 +155,6 @@ export const NAV_SECTIONS: readonly NavItem[] = [
     icon: ScrollText,
     description: "Append-only record of authentication and destructive actions",
     hiddenFromSidebar: true,
-    pending: true,
   },
   {
     label: "Notifications",

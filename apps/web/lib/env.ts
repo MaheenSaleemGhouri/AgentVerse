@@ -17,6 +17,12 @@ export const env = {
   betterAuthSecret: requireEnv("BETTER_AUTH_SECRET"),
   betterAuthUrl: requireEnv("BETTER_AUTH_URL"),
   apiInternalUrl: requireEnv("API_INTERNAL_URL"),
+  // The externally reachable origin of apps/api. Only needed to *show*
+  // an identity provider where to send SCIM requests — optional, because
+  // a deployment without SCIM configured has no reason to publish one,
+  // and printing `apiInternalUrl` instead would hand an admin a URL that
+  // silently fails from outside the cluster.
+  apiPublicUrl: process.env.API_PUBLIC_URL,
   internalApiSecret: requireEnv("INTERNAL_API_SECRET"),
   githubClientId: process.env.GITHUB_CLIENT_ID,
   githubClientSecret: process.env.GITHUB_CLIENT_SECRET,

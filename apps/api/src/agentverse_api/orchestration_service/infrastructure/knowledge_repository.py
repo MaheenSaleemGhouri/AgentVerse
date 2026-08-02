@@ -11,7 +11,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentverse_api.infrastructure.sql_result import affected
@@ -199,6 +199,17 @@ class SqlKnowledgeRepository:
         )
         row = result.scalar_one_or_none()
         return None if row is None else _to_document(row)
+
+    async def sum_stored_bytes(self, *, workspace_id: str) -> int:
+        result = await self._session.execute(
+            select(func.coalesce(func.sum(KbDocumentModel.size_bytes), 0)).where(
+                KbDocumentModel.workspace_id == workspace_id,
+                KbDocumentModel.deleted_at.is_(None),
+            )
+        )
+        # `coalesce` makes the empty-workspace case 0 rather than NULL,
+        # so callers never special-case "no documents yet".
+        return int(result.scalar_one())
 
     async def soft_delete_document(self, *, workspace_id: str, document_id: str) -> bool:
         now = datetime.now(UTC)

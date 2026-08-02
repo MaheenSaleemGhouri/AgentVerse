@@ -4,63 +4,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import {
-  changeMemberRoleAction,
-  inviteMemberAction,
   issueApiKeyAction,
   listApiKeysAction,
-  listMembersAction,
-  removeMemberAction,
   revokeApiKeyAction,
+  rotateApiKeyAction,
 } from "@/lib/api/actions";
-import type { ApiKey, Member, Role } from "@/lib/api/workspaces";
+import type { ApiKey, IssueApiKeyRequest } from "@/lib/api/workspaces";
 import { queryKeys } from "@/lib/queries/keys";
 
-export function useMembers(workspaceId: string, initialData?: Member[]) {
-  return useQuery({
-    queryKey: queryKeys.members(workspaceId),
-    queryFn: () => listMembersAction(workspaceId),
-    ...(initialData ? { initialData } : {}),
-  });
-}
-
-export function useInviteMember(workspaceId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: Role }) =>
-      inviteMemberAction(workspaceId, userId, role),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.members(workspaceId) });
-      toast.success("Member added.");
-    },
-    onError: () =>
-      toast.error("Could not add the member — check the user ID and your permissions."),
-  });
-}
-
-export function useChangeMemberRole(workspaceId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ targetUserId, role }: { targetUserId: string; role: Role }) =>
-      changeMemberRoleAction(workspaceId, targetUserId, role),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.members(workspaceId) });
-      toast.success("Role updated.");
-    },
-    onError: () => toast.error("Could not change the role — you may not have permission."),
-  });
-}
-
-export function useRemoveMember(workspaceId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (targetUserId: string) => removeMemberAction(workspaceId, targetUserId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.members(workspaceId) });
-      toast.success("Member removed.");
-    },
-    onError: () => toast.error("Could not remove the member — you may not have permission."),
-  });
-}
+// Member hooks (used by `MembersTable`/`InviteMemberDialog`) live in
+// `lib/queries/members.ts` — scope-generic across workspaces and
+// organizations rather than forked per scope (CLAUDE.md §16).
 
 export function useApiKeys(workspaceId: string, initialData?: ApiKey[]) {
   return useQuery({
@@ -78,7 +32,7 @@ export function useApiKeys(workspaceId: string, initialData?: ApiKey[]) {
 export function useIssueApiKey(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => issueApiKeyAction(workspaceId, name),
+    mutationFn: (body: IssueApiKeyRequest) => issueApiKeyAction(workspaceId, body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys(workspaceId) });
     },
@@ -95,5 +49,21 @@ export function useRevokeApiKey(workspaceId: string) {
       toast.success("Key revoked — any client using it will now be rejected.");
     },
     onError: () => toast.error("Could not revoke the key — try again."),
+  });
+}
+
+/**
+ * The rotated key's plaintext is returned exactly once, the same
+ * contract as issuing — never cached, the caller must show it
+ * immediately (`useIssueApiKey`'s own doc comment above states why).
+ */
+export function useRotateApiKey(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (apiKeyId: string) => rotateApiKeyAction(workspaceId, apiKeyId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys(workspaceId) });
+    },
+    onError: () => toast.error("Could not rotate the key — try again."),
   });
 }

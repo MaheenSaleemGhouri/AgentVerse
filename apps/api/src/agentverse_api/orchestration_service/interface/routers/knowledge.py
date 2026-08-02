@@ -20,10 +20,16 @@ from agentverse_shared.storage.document_store import DocumentStore
 from agentverse_shared.text.tokenizer import TokenCounter
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
+from agentverse_api.auth_service.application.workspace_settings_service import (
+    WorkspaceSettingsService,
+)
 from agentverse_api.auth_service.domain.entities import WorkspaceContext
 from agentverse_api.auth_service.interface.dependencies.require_role import (
     require_member,
     require_viewer,
+)
+from agentverse_api.auth_service.interface.dependencies.services import (
+    get_workspace_settings_service,
 )
 from agentverse_api.infrastructure.config import Settings, get_settings
 from agentverse_api.orchestration_service.application.search_knowledge import (
@@ -168,12 +174,24 @@ async def upload_document_route(
     store: DocumentStore = Depends(get_document_store),
     producer: JobQueueProducer = Depends(get_job_queue_producer),
     settings: Settings = Depends(get_settings),
+    workspace_settings: WorkspaceSettingsService = Depends(get_workspace_settings_service),
 ) -> UploadDocumentResponse:
     """202 — the bytes are durable and ingestion is queued. Chunking and
     embedding are background work (Rule 14), so the client polls the
     document's `status` rather than waiting on this call.
     """
     data = await file.read()
+    # The workspace's storage policy is owned by `auth_service`; this
+    # router reads it through that service rather than joining its table
+    # (CLAUDE.md §5: cross-boundary data goes through the owning
+    # service). `None` limit means the admin set none — unrestricted,
+    # which is every workspace that has never opened settings.
+    configured = await workspace_settings.get_settings(context.workspace_id)
+    quota_bytes = (
+        configured.storage_limit_mb * 1024 * 1024
+        if configured is not None and configured.storage_limit_mb is not None
+        else None
+    )
     try:
         result = await upload_document(
             workspace_id=context.workspace_id,
@@ -186,6 +204,7 @@ async def upload_document_route(
             repo=repo,
             store=store,
             producer=producer,
+            workspace_quota_bytes=quota_bytes,
         )
     except KnowledgeBaseNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_KB_NOT_FOUND) from exc

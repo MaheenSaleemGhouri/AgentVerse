@@ -339,7 +339,8 @@ class FakeIntegrationRepository:
         return self.oauth_sessions.pop(state)
 
     async def purge_expired_oauth_sessions(self) -> int:
-        expired = [s for s, session in self.oauth_sessions.items() if session["expires_at"] <= datetime.now(UTC)]
+        now = datetime.now(UTC)
+        expired = [s for s, session in self.oauth_sessions.items() if session["expires_at"] <= now]
         for s in expired:
             del self.oauth_sessions[s]
         return len(expired)

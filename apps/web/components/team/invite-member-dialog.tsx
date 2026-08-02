@@ -6,8 +6,9 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import type { MemberScope } from "@/lib/api/members";
 import type { Role } from "@/lib/api/workspaces";
-import { useInviteMember } from "@/lib/queries/workspace";
+import { useInviteScopedMemberByEmail } from "@/lib/queries/members";
 import { ASSIGNABLE_ROLES, ROLE_DESCRIPTIONS } from "@/lib/roles";
 
 import { Button } from "@/components/ui/button";
@@ -39,32 +40,29 @@ import {
 } from "@/components/ui/select";
 
 const schema = z.object({
-  userId: z.string().min(1, "User ID is required").max(128),
+  email: z.string().min(1, "Email is required").email("Enter a valid email address."),
   role: z.enum(["admin", "member", "viewer"]),
 });
 
 type FormValues = z.infer<typeof schema>;
 
 /**
- * Adds an existing user to the workspace by ID.
- *
- * Email invitations need a notification service, which is a later phase
- * — so this reflects what the API actually does (`POST /members` takes a
- * `user_id`) rather than presenting an email field that would silently
- * fail.
+ * Invites by email. An address matching an existing account is added
+ * immediately; an unknown address gets a 7-day invite token and an
+ * email (Increment 5) — the success toast reflects which happened.
  */
-export function InviteMemberDialog({ workspaceId }: { workspaceId: string }): React.JSX.Element {
+export function InviteMemberDialog({ scope }: { scope: MemberScope }): React.JSX.Element {
   const [open, setOpen] = React.useState(false);
-  const inviteMember = useInviteMember(workspaceId);
+  const inviteMember = useInviteScopedMemberByEmail(scope);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { userId: "", role: "member" },
+    defaultValues: { email: "", role: "member" },
   });
 
   function onSubmit(values: FormValues): void {
     inviteMember.mutate(
-      { userId: values.userId.trim(), role: values.role as Role },
+      { email: values.email.trim(), role: values.role as Role },
       {
         onSuccess: () => {
           setOpen(false);
@@ -92,23 +90,26 @@ export function InviteMemberDialog({ workspaceId }: { workspaceId: string }): Re
         <DialogHeader>
           <DialogTitle>Add a member</DialogTitle>
           <DialogDescription>
-            Grant an existing AgentVerse user access to this workspace.
+            Invite anyone by email — they&apos;re added immediately if they already have an
+            AgentVerse account, or sent an invite link to accept if not.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
             <FormField
               control={form.control}
-              name="userId"
+              name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>User ID</FormLabel>
+                  <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="usr_…" autoFocus className="font-mono" {...field} />
+                    <Input
+                      type="email"
+                      placeholder="teammate@example.com"
+                      autoFocus
+                      {...field}
+                    />
                   </FormControl>
-                  <FormDescription>
-                    They can find this on their profile page.
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -142,7 +143,7 @@ export function InviteMemberDialog({ workspaceId }: { workspaceId: string }): Re
             />
             <DialogFooter>
               <Button type="submit" disabled={inviteMember.isPending}>
-                {inviteMember.isPending ? "Adding…" : "Add member"}
+                {inviteMember.isPending ? "Sending…" : "Add member"}
               </Button>
             </DialogFooter>
           </form>

@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Lock, Mail } from "lucide-react";
+import { ArrowRight, Building2, Lock, Mail } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -16,6 +16,7 @@ import { GlassPanel } from "@/components/auth/glass-panel";
 import { Checkbox } from "@/components/ui/checkbox";
 import { authClient } from "@/lib/auth-client";
 import type { SocialProvider } from "@/lib/social-providers";
+import type { SsoLoginOption } from "@/lib/sso-login-options";
 
 /** Colocated with its inferred type so validation and typing cannot
  *  drift (§6, forms). */
@@ -28,13 +29,16 @@ type LoginValues = z.infer<typeof loginSchema>;
 
 export function LoginForm({
   socialProviders,
+  ssoOptions = [],
 }: {
   socialProviders: SocialProvider[];
+  ssoOptions?: SsoLoginOption[];
 }): React.JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [formError, setFormError] = useState<string | null>(null);
   const [socialPending, setSocialPending] = useState(false);
+  const [ssoPending, setSsoPending] = useState(false);
 
   const redirectTo = searchParams.get("redirect") ?? "/dashboard";
 
@@ -66,6 +70,26 @@ export function LoginForm({
       return;
     }
     router.push(redirectTo);
+  }
+
+  async function handleSso(option: SsoLoginOption): Promise<void> {
+    setSsoPending(true);
+    setFormError(null);
+    if (option.protocol === "saml") {
+      // SAML is a plain browser redirect into our own SP route, not a
+      // Better Auth client call — the flow is a POST-back from the IdP,
+      // which the plugin layer has no part in.
+      window.location.href = `/api/sso/saml/${option.providerId}/login`;
+      return;
+    }
+    const { error } = await authClient.signIn.oauth2({
+      providerId: option.providerId,
+      callbackURL: redirectTo,
+    });
+    if (error) {
+      setSsoPending(false);
+      setFormError(error.message ?? "Could not start single sign-on.");
+    }
   }
 
   async function handleSocial(provider: SocialProvider): Promise<void> {
@@ -154,16 +178,31 @@ export function LoginForm({
         </GradientButton>
       </form>
 
-      {socialProviders.length > 0 && (
+      {(socialProviders.length > 0 || ssoOptions.length > 0) && (
         <div className="mt-5 flex flex-col gap-3">
           <OrDivider />
           {socialProviders.map((provider) => (
             <SocialButton
               key={provider}
               provider={provider}
-              disabled={socialPending || isSubmitting}
+              disabled={socialPending || ssoPending || isSubmitting}
               onClick={() => void handleSocial(provider)}
             />
+          ))}
+          {/* Rendered only when an organization actually has an enabled
+              SSO config, so this is never a button that fails on click —
+              the same rule the social buttons follow. */}
+          {ssoOptions.map((option) => (
+            <button
+              key={option.providerId}
+              type="button"
+              disabled={socialPending || ssoPending || isSubmitting}
+              onClick={() => void handleSso(option)}
+              className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-white/12 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/[0.08] focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#a855f7]/40 disabled:opacity-50"
+            >
+              <Building2 className="size-4" aria-hidden="true" />
+              {ssoPending ? "Redirecting…" : "Continue with single sign-on"}
+            </button>
           ))}
         </div>
       )}

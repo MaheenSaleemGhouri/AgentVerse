@@ -3,8 +3,36 @@
 from fastapi import FastAPI
 
 from agentverse_api.auth_service.interface.routes.api_keys import router as api_keys_router
+from agentverse_api.auth_service.interface.routes.audit_logs import router as audit_logs_router
 from agentverse_api.auth_service.interface.routes.internal_auth_events import (
     router as internal_auth_events_router,
+)
+from agentverse_api.auth_service.interface.routes.internal_sso_providers import (
+    router as internal_sso_providers_router,
+)
+from agentverse_api.auth_service.interface.routes.invitations import (
+    router as invitations_router,
+)
+from agentverse_api.auth_service.interface.routes.ip_allowlist import (
+    router as ip_allowlist_router,
+)
+from agentverse_api.auth_service.interface.routes.organizations import (
+    router as organizations_router,
+)
+from agentverse_api.auth_service.interface.routes.resource_permissions import (
+    router as resource_permissions_router,
+)
+from agentverse_api.auth_service.interface.routes.scim import (
+    router as scim_router,
+)
+from agentverse_api.auth_service.interface.routes.scim_tokens import (
+    router as scim_tokens_router,
+)
+from agentverse_api.auth_service.interface.routes.sso import (
+    router as sso_router,
+)
+from agentverse_api.auth_service.interface.routes.workspace_settings import (
+    router as workspace_settings_router,
 )
 from agentverse_api.auth_service.interface.routes.workspaces import router as workspaces_router
 from agentverse_api.infrastructure.config import get_settings
@@ -52,6 +80,17 @@ def create_app() -> FastAPI:
     app.middleware("http")(request_id_middleware)
     app.include_router(health_router)
     app.include_router(workspaces_router)
+    app.include_router(workspace_settings_router)
+    app.include_router(organizations_router)
+    app.include_router(invitations_router)
+    app.include_router(resource_permissions_router)
+    app.include_router(ip_allowlist_router)
+    app.include_router(sso_router)
+    app.include_router(scim_tokens_router)
+    # SCIM lives outside `/api/v1` on purpose — see the router's module
+    # docstring: RFC 7644 fixes its paths, media type and error shape.
+    app.include_router(scim_router)
+    app.include_router(internal_sso_providers_router)
     app.include_router(agents_router)
     app.include_router(knowledge_router)
     app.include_router(run_stream_router)
@@ -60,6 +99,7 @@ def create_app() -> FastAPI:
     app.include_router(oauth_callback_router)
     app.include_router(team_session_stream_router)
     app.include_router(api_keys_router)
+    app.include_router(audit_logs_router)
     app.include_router(internal_auth_events_router)
     app.include_router(internal_provider_test_router)
     app.include_router(internal_job_test_router)

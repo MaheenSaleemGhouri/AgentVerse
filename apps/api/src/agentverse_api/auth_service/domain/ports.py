@@ -6,16 +6,31 @@ fake — application-layer use cases depend only on these interfaces
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol
 
+from agentverse_api.auth_service.domain.api_key_scope import ApiKeyScope
 from agentverse_api.auth_service.domain.entities import (
     ApiKey,
     AuditLogEntry,
+    Invitation,
+    IpAllowlistEntry,
+    Organization,
+    OrganizationMember,
+    OrganizationSummary,
+    ResourcePermission,
+    ScimToken,
+    ScimUser,
+    SsoConfiguration,
+    UserSummary,
     Workspace,
     WorkspaceMember,
+    WorkspaceSettings,
     WorkspaceSummary,
 )
+from agentverse_api.auth_service.domain.invitation_target_type import InvitationTargetType
 from agentverse_api.auth_service.domain.role import Role
+from agentverse_api.auth_service.domain.sso import SsoPreset, SsoProtocol
 
 
 class WorkspaceRepository(Protocol):
@@ -46,6 +61,22 @@ class WorkspaceRepository(Protocol):
     async def list_members(self, workspace_id: str) -> list[WorkspaceMember]: ...
 
 
+class WorkspaceSettingsRepository(Protocol):
+    async def get(self, workspace_id: str) -> WorkspaceSettings | None: ...
+
+    async def upsert(
+        self,
+        *,
+        workspace_id: str,
+        logo_url: str | None,
+        brand_color: str | None,
+        custom_domain: str | None,
+        retention_days: int | None,
+        storage_limit_mb: int | None,
+        updated_by_user_id: str,
+    ) -> WorkspaceSettings: ...
+
+
 class ApiKeyRepository(Protocol):
     async def create_api_key(
         self,
@@ -55,6 +86,9 @@ class ApiKeyRepository(Protocol):
         key_prefix: str,
         hashed_key: str,
         created_by_user_id: str,
+        scope: ApiKeyScope = ApiKeyScope.FULL,
+        tier: str = "standard",
+        rotated_from_id: str | None = None,
     ) -> ApiKey: ...
 
     async def list_api_keys(self, workspace_id: str) -> list[ApiKey]: ...
@@ -62,6 +96,266 @@ class ApiKeyRepository(Protocol):
     async def get_api_key(self, api_key_id: str) -> ApiKey | None: ...
 
     async def revoke_api_key(self, api_key_id: str) -> None: ...
+
+    async def find_active_by_hash(self, hashed_key: str) -> ApiKey | None:
+        """Looks a key up by its hash for bearer authentication.
+
+        Returns `None` for a revoked key as well as an unknown one — the
+        caller must not be able to tell a revoked credential from one
+        that never existed.
+        """
+        ...
+
+    async def touch_last_used(self, api_key_id: str) -> None:
+        """Records that the key just authenticated a request. Best-effort
+        telemetry for the key-management UI, never an authorization
+        input.
+        """
+        ...
+
+
+class OrganizationRepository(Protocol):
+    async def create_organization(
+        self, *, name: str, slug: str, owner_user_id: str
+    ) -> Organization: ...
+
+    async def get_organization(self, organization_id: str) -> Organization | None: ...
+
+    async def list_for_user(self, user_id: str) -> list[OrganizationSummary]: ...
+
+    async def slug_exists(self, slug: str) -> bool: ...
+
+    async def rename_organization(self, *, organization_id: str, name: str) -> Organization: ...
+
+    async def delete_organization(self, organization_id: str) -> None: ...
+
+    async def get_membership(
+        self, *, organization_id: str, user_id: str
+    ) -> OrganizationMember | None: ...
+
+    async def add_member(
+        self, *, organization_id: str, user_id: str, role: Role
+    ) -> OrganizationMember: ...
+
+    async def update_member_role(
+        self, *, organization_id: str, user_id: str, role: Role
+    ) -> OrganizationMember: ...
+
+    async def suspend_member(
+        self, *, organization_id: str, user_id: str
+    ) -> OrganizationMember: ...
+
+    async def reinstate_member(
+        self, *, organization_id: str, user_id: str
+    ) -> OrganizationMember: ...
+
+    async def remove_member(self, *, organization_id: str, user_id: str) -> None: ...
+
+    async def count_owners(self, organization_id: str) -> int: ...
+
+    async def list_members(self, organization_id: str) -> list[OrganizationMember]: ...
+
+    async def list_workspaces(self, organization_id: str) -> list[Workspace]: ...
+
+    async def attach_workspace(self, *, organization_id: str, workspace_id: str) -> None: ...
+
+    async def detach_workspace(self, *, workspace_id: str) -> None: ...
+
+
+class InvitationRepository(Protocol):
+    """Stores/reads invitation rows in Better Auth's `verifications`
+    table (ADR-0005: apps/api-domain use of a Better-Auth-owned table,
+    via Alembic) — never Better Auth's own reset-password/email-verify
+    rows, which this repository never touches.
+    """
+
+    async def create(
+        self,
+        *,
+        target_type: InvitationTargetType,
+        target_id: str,
+        role: Role,
+        inviter_user_id: str,
+        email: str,
+        token: str,
+        expires_at: datetime,
+    ) -> Invitation: ...
+
+    async def get_by_token(self, token: str) -> Invitation | None: ...
+
+    async def consume(self, token: str) -> None: ...
+
+
+class UserLookupRepository(Protocol):
+    async def get_by_email(self, email: str) -> UserSummary | None: ...
+
+    async def get_by_id(self, user_id: str) -> UserSummary | None: ...
+
+
+class EmailSender(Protocol):
+    """Provider-abstraction boundary for transactional email (CLAUDE.md
+    §9) — no caller imports a vendor SDK directly. The only
+    implementation today (`LoggingEmailSender`) logs instead of
+    delivering; swapping in a real vendor is a new class behind this
+    same Protocol.
+    """
+
+    async def send(self, *, to: str, subject: str, body: str) -> None: ...
+
+
+class ResourcePermissionRepository(Protocol):
+    async def grant(
+        self,
+        *,
+        workspace_id: str,
+        resource_type: str,
+        resource_id: str,
+        principal_type: str,
+        principal_id: str,
+        permission: str,
+        granted_by_user_id: str,
+    ) -> ResourcePermission:
+        """Idempotent: granting an already-granted tuple updates
+        `granted_by_user_id` and returns the existing row rather than
+        erroring or duplicating it (the full six-column tuple is unique).
+        """
+        ...
+
+    async def revoke_by_id(self, *, workspace_id: str, permission_id: str) -> None: ...
+
+    async def check(
+        self,
+        *,
+        workspace_id: str,
+        resource_type: str,
+        resource_id: str,
+        principal_type: str,
+        principal_id: str,
+        permission: str,
+    ) -> bool: ...
+
+    async def list_for_workspace(self, workspace_id: str) -> list[ResourcePermission]: ...
+
+
+class IpAllowlistRepository(Protocol):
+    async def list_for_workspace(self, workspace_id: str) -> list[IpAllowlistEntry]: ...
+
+    async def add(
+        self, *, workspace_id: str, cidr: str, label: str | None, created_by_user_id: str
+    ) -> IpAllowlistEntry: ...
+
+    async def remove_by_id(self, *, workspace_id: str, entry_id: str) -> None: ...
+
+
+class SsoConfigurationRepository(Protocol):
+    async def list_for_organization(self, organization_id: str) -> list[SsoConfiguration]: ...
+
+    async def get(
+        self, *, organization_id: str, config_id: str
+    ) -> SsoConfiguration | None: ...
+
+    async def upsert(
+        self,
+        *,
+        organization_id: str,
+        protocol: SsoProtocol,
+        preset: SsoPreset,
+        issuer_url: str | None,
+        client_id: str | None,
+        sealed_secret: tuple[bytes, bytes, str] | None,
+        protocol_config: dict[str, str],
+        enabled: bool,
+        actor_user_id: str,
+    ) -> SsoConfiguration:
+        """Creates or replaces the config for `(organization, protocol)`.
+
+        `sealed_secret` is `(ciphertext, wrapped_dek, key_version)` or
+        `None` to leave an existing secret untouched — so an admin can
+        edit the issuer URL without re-entering the secret.
+        """
+        ...
+
+    async def delete(self, *, organization_id: str, config_id: str) -> None: ...
+
+    async def list_enabled_sealed(
+        self, protocol: SsoProtocol
+    ) -> list[tuple[SsoConfiguration, tuple[bytes, bytes, str] | None]]:
+        """Every *enabled* config for `protocol`, paired with its sealed
+        secret. The only read path that surfaces the sealed bytes at all —
+        used solely by the internal provider-resolution endpoint, never by
+        anything reachable from a browser.
+        """
+        ...
+
+
+class ScimTokenRepository(Protocol):
+    async def create(
+        self,
+        *,
+        organization_id: str,
+        name: str,
+        token_prefix: str,
+        hashed_token: str,
+        created_by_user_id: str,
+    ) -> ScimToken: ...
+
+    async def list_for_organization(self, organization_id: str) -> list[ScimToken]: ...
+
+    async def find_active_by_hash(self, hashed_token: str) -> ScimToken | None:
+        """Returns `None` for a revoked token as well as an unknown one —
+        an IdP probing tokens must not be able to tell them apart.
+        """
+        ...
+
+    async def touch_last_used(self, token_id: str) -> None: ...
+
+    async def revoke(self, *, organization_id: str, token_id: str) -> bool:
+        """`False` when the token does not exist *or* belongs to another
+        organization — the caller cannot distinguish the two (Rule 11).
+        """
+        ...
+
+
+class ScimRepository(Protocol):
+    """Reads and writes the `users` + `organization_members` pair that
+    SCIM provisions. Separate from `OrganizationRepository` because SCIM
+    is the one caller that also creates the `users` row (see
+    `application/scim_service.py` for why that is permitted).
+    """
+
+    async def list_users(
+        self, *, organization_id: str, email: str | None, start_index: int, count: int
+    ) -> tuple[list[ScimUser], int]:
+        """Returns `(page, total_matching)` — SCIM's `ListResponse`
+        requires the unpaged total, not just the page length.
+        """
+        ...
+
+    async def get_user(self, *, organization_id: str, user_id: str) -> ScimUser | None: ...
+
+    async def create_user(
+        self, *, organization_id: str, email: str, display_name: str, role: Role
+    ) -> ScimUser:
+        """Creates the account if the email is new, then the membership.
+        An email that already has an account is linked, never duplicated.
+        """
+        ...
+
+    async def set_active(
+        self, *, organization_id: str, user_id: str, active: bool
+    ) -> ScimUser | None: ...
+
+    async def set_display_name(
+        self, *, organization_id: str, user_id: str, display_name: str
+    ) -> ScimUser | None: ...
+
+    async def remove_user(self, *, organization_id: str, user_id: str) -> bool: ...
+
+    async def list_groups(self, organization_id: str) -> list[Workspace]: ...
+
+    async def get_group(
+        self, *, organization_id: str, workspace_id: str
+    ) -> Workspace | None: ...
 
 
 class AuditLogRepository(Protocol):
@@ -74,4 +368,17 @@ class AuditLogRepository(Protocol):
         target: str | None,
         outcome: str,
         metadata: dict[str, str],
+        organization_id: str | None = None,
     ) -> AuditLogEntry: ...
+
+    async def list_for_workspace(
+        self,
+        *,
+        workspace_id: str,
+        limit: int,
+        cursor: str | None,
+        action: str | None,
+        actor_user_id: str | None,
+        since: datetime | None,
+        until: datetime | None,
+    ) -> list[AuditLogEntry]: ...

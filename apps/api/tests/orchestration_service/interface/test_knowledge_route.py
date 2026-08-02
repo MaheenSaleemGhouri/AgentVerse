@@ -9,6 +9,7 @@ behaviour: status codes, tenancy resolution, and admission rejection.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -17,11 +18,14 @@ from agentverse_shared.retrieval.types import RetrievedChunk
 from fakeredis.aioredis import FakeRedis
 from httpx import ASGITransport, AsyncClient
 
-from agentverse_api.auth_service.domain.entities import WorkspaceContext
+from agentverse_api.auth_service.domain.entities import WorkspaceContext, WorkspaceSettings
 from agentverse_api.auth_service.domain.role import Role
 from agentverse_api.auth_service.interface.dependencies.require_role import (
     require_member,
     require_viewer,
+)
+from agentverse_api.auth_service.interface.dependencies.services import (
+    get_workspace_settings_service,
 )
 from agentverse_api.main import create_app
 from agentverse_api.orchestration_service.infrastructure.queue.job_queue_producer import (
@@ -94,6 +98,27 @@ class FakeChunkSearch:
         return list(self._chunks)
 
 
+class FakeWorkspaceSettingsService:
+    """Only the one method the upload path calls."""
+
+    def __init__(self, *, storage_limit_mb: int | None) -> None:
+        self.storage_limit_mb = storage_limit_mb
+
+    async def get_settings(self, workspace_id: str) -> WorkspaceSettings | None:
+        if self.storage_limit_mb is None:
+            return None
+        return WorkspaceSettings(
+            workspace_id=workspace_id,
+            logo_url=None,
+            brand_color=None,
+            custom_domain=None,
+            retention_days=None,
+            storage_limit_mb=self.storage_limit_mb,
+            updated_at=datetime.now(UTC),
+            updated_by_user_id=None,
+        )
+
+
 class WordCounter:
     def count(self, text: str) -> int:
         return len(text.split())
@@ -118,6 +143,12 @@ async def harness(fake_redis: FakeRedis) -> AsyncIterator[dict[str, Any]]:
     app.dependency_overrides[get_job_queue_producer] = lambda: JobQueueProducer(
         fake_redis, stream=STREAM
     )
+    # Upload admission now consults the workspace's storage policy
+    # (owned by auth_service). Defaults to "no limit configured", which
+    # is what every workspace that has never opened settings looks like;
+    # the quota path itself is covered by `test_upload_quota.py`.
+    settings_service = FakeWorkspaceSettingsService(storage_limit_mb=None)
+    app.dependency_overrides[get_workspace_settings_service] = lambda: settings_service
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

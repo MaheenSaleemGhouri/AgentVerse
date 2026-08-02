@@ -66,7 +66,12 @@ async def installed_server(
     async with session_factory() as db:
         await db.execute(
             text("INSERT INTO workspaces (id, name, slug, created_at) VALUES (:id, :n, :s, :now)"),
-            {"id": ids["workspace_id"], "n": "metrics-agg-test", "s": ids["workspace_id"][:8], "now": now},
+            {
+                "id": ids["workspace_id"],
+                "n": "metrics-agg-test",
+                "s": ids["workspace_id"][:8],
+                "now": now,
+            },
         )
         await db.execute(
             text(
@@ -163,7 +168,8 @@ class TestAggregateBucket:
                     await session.execute(
                         text(
                             "SELECT call_count, error_count, total_duration_ms, p95_duration_ms "
-                            "FROM tool_metrics WHERE installed_server_id = :id AND bucket_start = :b"
+                            "FROM tool_metrics "
+                            "WHERE installed_server_id = :id AND bucket_start = :b"
                         ),
                         {"id": installed_server["installed_server_id"], "b": bucket_start},
                     )

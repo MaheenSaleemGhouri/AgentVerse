@@ -10,9 +10,32 @@
 export const queryKeys = {
   workspaces: () => ["workspaces"] as const,
 
-  members: (workspaceId: string) => ["workspaces", workspaceId, "members"] as const,
+  organizations: () => ["organizations"] as const,
+
+  organizationWorkspaces: (organizationId: string) =>
+    ["organizations", organizationId, "workspaces"] as const,
+
+  // Shared by workspace- and organization-scoped member lists (`lib/api/members.ts`)
+  // — scoped by `scope.type` first so switching scope can never serve the
+  // other scope's cached rows, mirroring the workspace-first convention above.
+  scopedMembers: (scope: { type: "workspace" | "organization"; id: string }) =>
+    [scope.type, scope.id, "members"] as const,
 
   apiKeys: (workspaceId: string) => ["workspaces", workspaceId, "api-keys"] as const,
+
+  auditLogs: (workspaceId: string, filters: Record<string, string | undefined> = {}) =>
+    ["workspaces", workspaceId, "audit-logs", filters] as const,
+
+  workspaceSettings: (workspaceId: string) => ["workspaces", workspaceId, "settings"] as const,
+
+  ssoConfigurations: (organizationId: string) =>
+    ["organizations", organizationId, "sso"] as const,
+
+  ipAllowlist: (workspaceId: string) =>
+    ["workspaces", workspaceId, "ip-allowlist"] as const,
+
+  resourcePermissions: (workspaceId: string) =>
+    ["workspaces", workspaceId, "resource-permissions"] as const,
 
   agents: {
     all: (workspaceId: string) => ["workspaces", workspaceId, "agents"] as const,

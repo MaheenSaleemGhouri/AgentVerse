@@ -22,6 +22,7 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 import pytest
 from agentverse_shared.security.envelope import CredentialVault, KeyRing
+from tests.fakes.integration_repository import FakeIntegrationRepository
 
 from agentverse_api.orchestration_service.application.oauth_flow import (
     ACCESS_TOKEN_KEY,
@@ -36,7 +37,6 @@ from agentverse_api.orchestration_service.domain.integration_entities import (
 from agentverse_api.orchestration_service.infrastructure.oauth.providers import (
     OAuthProviderConfig,
 )
-from tests.fakes.integration_repository import FakeIntegrationRepository
 
 CALLBACK_URL = "http://localhost:8000/api/v1/integrations/oauth/callback"
 WORKSPACE_ID = "ws-1"

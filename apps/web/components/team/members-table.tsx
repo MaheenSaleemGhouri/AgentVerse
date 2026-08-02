@@ -3,9 +3,14 @@
 import { MoreVertical, Shield, UserMinus, Users } from "lucide-react";
 import * as React from "react";
 
-import type { Member, Role } from "@/lib/api/workspaces";
+import type { MemberScope, ScopedMember } from "@/lib/api/members";
+import type { Role } from "@/lib/api/workspaces";
 import { formatRelativeTime, initialsFrom } from "@/lib/format";
-import { useChangeMemberRole, useMembers, useRemoveMember } from "@/lib/queries/workspace";
+import {
+  useChangeScopedMemberRole,
+  useRemoveScopedMember,
+  useScopedMembers,
+} from "@/lib/queries/members";
 import { ASSIGNABLE_ROLES, ROLE_DESCRIPTIONS, outranks } from "@/lib/roles";
 
 import { EmptyState } from "@/components/patterns/empty-state";
@@ -51,26 +56,26 @@ const ROLE_TONE: Record<Role, "brand" | "info" | "neutral"> = {
 };
 
 export function MembersTable({
-  workspaceId,
+  scope,
   initialMembers,
   viewerRole,
   canManage,
 }: {
-  workspaceId: string;
-  initialMembers: Member[];
+  scope: MemberScope;
+  initialMembers: ScopedMember[];
   viewerRole: Role;
   canManage: boolean;
 }): React.JSX.Element {
-  const { data: members, isError, refetch } = useMembers(workspaceId, initialMembers);
-  const changeRole = useChangeMemberRole(workspaceId);
-  const removeMember = useRemoveMember(workspaceId);
-  const [pendingRemoval, setPendingRemoval] = React.useState<Member | null>(null);
+  const { data: members, isError, refetch } = useScopedMembers(scope, initialMembers);
+  const changeRole = useChangeScopedMemberRole(scope);
+  const removeMember = useRemoveScopedMember(scope);
+  const [pendingRemoval, setPendingRemoval] = React.useState<ScopedMember | null>(null);
 
   if (isError) {
     return (
       <ErrorState
         title="Could not load members"
-        description="The workspace API did not respond."
+        description={`The ${scope.type} API did not respond.`}
         onRetry={() => void refetch()}
       />
     );
@@ -81,7 +86,7 @@ export function MembersTable({
       <EmptyState
         icon={Users}
         title="No members yet"
-        description="Add a teammate by their user ID to give them access to this workspace."
+        description={`Add a teammate by their user ID to give them access to this ${scope.type}.`}
       />
     );
   }
@@ -210,8 +215,9 @@ export function MembersTable({
           <AlertDialogHeader>
             <AlertDialogTitle>Remove this member?</AlertDialogTitle>
             <AlertDialogDescription>
-              They lose access to every agent, knowledge base, and run in this workspace
-              immediately. Anything they created stays.
+              {scope.type === "workspace"
+                ? "They lose access to every agent, knowledge base, and run in this workspace immediately. Anything they created stays."
+                : "They lose their organization role immediately. This does not affect their access to any individual workspace attached to this organization."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

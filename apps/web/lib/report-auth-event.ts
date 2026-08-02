@@ -1,6 +1,14 @@
 import { env } from "@/lib/env";
 
-type AuthEventType = "auth.signup" | "auth.login";
+// Must stay in step with `AuthEventType` in
+// apps/api/.../application/auth_event_service.py — apps/api validates
+// this value against its own Literal, so a value only added here is
+// rejected at the boundary rather than silently accepted.
+type AuthEventType =
+  | "auth.signup"
+  | "auth.login"
+  | "auth.session_revoked"
+  | "auth.account_locked";
 
 /**
  * Reports a signup/login event to apps/api so `audit_logs` stays the

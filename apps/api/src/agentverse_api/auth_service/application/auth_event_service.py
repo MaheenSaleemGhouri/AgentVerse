@@ -14,7 +14,16 @@ from typing import Literal
 
 from agentverse_api.auth_service.application.audit_service import AuditService
 
-AuthEventType = Literal["auth.signup", "auth.login"]
+# Increment 7 adds the security-relevant events beyond signup/login:
+# a revoked session and a lockout are exactly what an incident review
+# needs, and both originate in apps/web (Better Auth owns sessions and
+# the password-verify path) rather than in apps/api.
+AuthEventType = Literal[
+    "auth.signup",
+    "auth.login",
+    "auth.session_revoked",
+    "auth.account_locked",
+]
 
 
 @dataclass(slots=True)

@@ -1,6 +1,65 @@
 {
   "components": {
     "schemas": {
+      "AcceptInviteRequest": {
+        "properties": {
+          "token": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "AcceptInviteRequest",
+        "type": "object"
+      },
+      "AcceptInviteResponse": {
+        "properties": {
+          "target_id": {
+            "title": "Target Id",
+            "type": "string"
+          },
+          "target_type": {
+            "$ref": "#/components/schemas/InvitationTargetType"
+          }
+        },
+        "required": [
+          "target_type",
+          "target_id"
+        ],
+        "title": "AcceptInviteResponse",
+        "type": "object"
+      },
+      "AddIpAllowlistEntryRequest": {
+        "properties": {
+          "cidr": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Cidr",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "required": [
+          "cidr"
+        ],
+        "title": "AddIpAllowlistEntryRequest",
+        "type": "object"
+      },
       "AddMemberRequest": {
         "properties": {
           "agent_id": {
@@ -237,6 +296,24 @@
             ],
             "title": "Revoked At"
           },
+          "rotated_from_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotated From Id"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ApiKeyScope"
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "string"
+          },
           "workspace_id": {
             "title": "Workspace Id",
             "type": "string"
@@ -249,9 +326,126 @@
           "key_prefix",
           "created_at",
           "last_used_at",
-          "revoked_at"
+          "revoked_at",
+          "scope",
+          "tier",
+          "rotated_from_id"
         ],
         "title": "ApiKeyResponse",
+        "type": "object"
+      },
+      "ApiKeyScope": {
+        "enum": [
+          "full",
+          "read_only"
+        ],
+        "title": "ApiKeyScope",
+        "type": "string"
+      },
+      "AuditLogPage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/AuditLogResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor",
+          "has_more"
+        ],
+        "title": "AuditLogPage",
+        "type": "object"
+      },
+      "AuditLogResponse": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "actor_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor User Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Metadata",
+            "type": "object"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Id"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "actor_user_id",
+          "action",
+          "target",
+          "outcome",
+          "metadata",
+          "created_at"
+        ],
+        "title": "AuditLogResponse",
         "type": "object"
       },
       "Body_upload_document_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__documents_post": {
@@ -278,6 +472,18 @@
           "role"
         ],
         "title": "ChangeMemberRoleRequest",
+        "type": "object"
+      },
+      "ChangeOrgMemberRoleRequest": {
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "ChangeOrgMemberRoleRequest",
         "type": "object"
       },
       "CitationResponse": {
@@ -503,6 +709,21 @@
           "name"
         ],
         "title": "CreateKnowledgeBaseRequest",
+        "type": "object"
+      },
+      "CreateOrganizationRequest": {
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateOrganizationRequest",
         "type": "object"
       },
       "CreateTeamRequest": {
@@ -835,6 +1056,41 @@
           }
         },
         "title": "GrantPermissionRequest",
+        "type": "object"
+      },
+      "GrantResourcePermissionRequest": {
+        "properties": {
+          "permission": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Permission",
+            "type": "string"
+          },
+          "principal_id": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Principal Id",
+            "type": "string"
+          },
+          "resource_id": {
+            "default": "",
+            "maxLength": 100,
+            "title": "Resource Id",
+            "type": "string"
+          },
+          "resource_type": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Resource Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_type",
+          "principal_id",
+          "permission"
+        ],
+        "title": "GrantResourcePermissionRequest",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -1170,6 +1426,60 @@
         "title": "IntegrationMetricsResponse",
         "type": "object"
       },
+      "InvitationTargetType": {
+        "enum": [
+          "workspace",
+          "organization"
+        ],
+        "title": "InvitationTargetType",
+        "type": "string"
+      },
+      "InviteByEmailRequest": {
+        "properties": {
+          "email": {
+            "maxLength": 255,
+            "minLength": 3,
+            "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+            "title": "Email",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role",
+            "default": "member"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "InviteByEmailRequest",
+        "type": "object"
+      },
+      "InviteByEmailResponse": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "status": {
+            "enum": [
+              "added",
+              "invited"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "email",
+          "role"
+        ],
+        "title": "InviteByEmailResponse",
+        "type": "object"
+      },
       "InviteMemberRequest": {
         "properties": {
           "role": {
@@ -1189,10 +1499,100 @@
         "title": "InviteMemberRequest",
         "type": "object"
       },
+      "InviteOrgMemberRequest": {
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/Role",
+            "default": "member"
+          },
+          "user_id": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "InviteOrgMemberRequest",
+        "type": "object"
+      },
+      "IpAllowlistEntryResponse": {
+        "properties": {
+          "cidr": {
+            "title": "Cidr",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by_user_id": {
+            "title": "Created By User Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "cidr",
+          "label",
+          "created_by_user_id",
+          "created_at"
+        ],
+        "title": "IpAllowlistEntryResponse",
+        "type": "object"
+      },
       "IssueApiKeyRequest": {
         "properties": {
           "name": {
             "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ApiKeyScope",
+            "default": "full"
+          },
+          "tier": {
+            "default": "standard",
+            "maxLength": 50,
+            "title": "Tier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "IssueApiKeyRequest",
+        "type": "object"
+      },
+      "IssueScimTokenRequest": {
+        "properties": {
+          "name": {
+            "maxLength": 100,
             "minLength": 1,
             "title": "Name",
             "type": "string"
@@ -1201,7 +1601,7 @@
         "required": [
           "name"
         ],
-        "title": "IssueApiKeyRequest",
+        "title": "IssueScimTokenRequest",
         "type": "object"
       },
       "IssuedApiKeyResponse": {
@@ -1251,6 +1651,24 @@
             ],
             "title": "Revoked At"
           },
+          "rotated_from_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotated From Id"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ApiKeyScope"
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "string"
+          },
           "workspace_id": {
             "title": "Workspace Id",
             "type": "string"
@@ -1264,9 +1682,77 @@
           "created_at",
           "last_used_at",
           "revoked_at",
+          "scope",
+          "tier",
+          "rotated_from_id",
           "key"
         ],
         "title": "IssuedApiKeyResponse",
+        "type": "object"
+      },
+      "IssuedScimTokenResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "organization_id": {
+            "title": "Organization Id",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "token_prefix": {
+            "title": "Token Prefix",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organization_id",
+          "name",
+          "token_prefix",
+          "created_at",
+          "last_used_at",
+          "revoked_at",
+          "token"
+        ],
+        "title": "IssuedScimTokenResponse",
         "type": "object"
       },
       "JobTestRequest": {
@@ -1602,6 +2088,110 @@
         "title": "OauthStartResponse",
         "type": "object"
       },
+      "OrganizationMemberResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "organization_id": {
+            "title": "Organization Id",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "suspended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suspended At"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "organization_id",
+          "user_id",
+          "role",
+          "suspended_at",
+          "created_at"
+        ],
+        "title": "OrganizationMemberResponse",
+        "type": "object"
+      },
+      "OrganizationResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "created_at",
+          "role"
+        ],
+        "title": "OrganizationResponse",
+        "type": "object"
+      },
+      "OrganizationWorkspaceResponse": {
+        "description": "A workspace attached to an organization \u2014 deliberately carries no\nrole: attachment grants no workspace access, so there is no role to\nreport here (ADR-0006). See `WorkspaceResponse` for the caller's own\nworkspace-scoped role.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "created_at"
+        ],
+        "title": "OrganizationWorkspaceResponse",
+        "type": "object"
+      },
       "PermissionResponse": {
         "properties": {
           "agent_id": {
@@ -1774,7 +2364,9 @@
           "event_type": {
             "enum": [
               "auth.signup",
-              "auth.login"
+              "auth.login",
+              "auth.session_revoked",
+              "auth.account_locked"
             ],
             "title": "Event Type",
             "type": "string"
@@ -1842,6 +2434,21 @@
         "title": "RegisterCustomServerRequest",
         "type": "object"
       },
+      "RenameOrganizationRequest": {
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "RenameOrganizationRequest",
+        "type": "object"
+      },
       "ReorderMembersRequest": {
         "description": "Drag-and-drop ordering, applied as one write.\n\nThe full ordered list, not a delta: a delta would need the client and\nserver to agree on a starting state, and for a `sequential` team a\ndisagreement changes execution order rather than just the display.",
         "properties": {
@@ -1859,6 +2466,128 @@
           "member_ids"
         ],
         "title": "ReorderMembersRequest",
+        "type": "object"
+      },
+      "ResolvedSamlProviderResponse": {
+        "description": "Internal-only. Unlike the OIDC counterpart this carries no secret \u2014\na SAML IdP's signing certificate is public by design.",
+        "properties": {
+          "entry_point": {
+            "title": "Entry Point",
+            "type": "string"
+          },
+          "idp_certificate": {
+            "title": "Idp Certificate",
+            "type": "string"
+          },
+          "idp_entity_id": {
+            "title": "Idp Entity Id",
+            "type": "string"
+          },
+          "organization_id": {
+            "title": "Organization Id",
+            "type": "string"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "organization_id",
+          "provider_id",
+          "entry_point",
+          "idp_certificate",
+          "idp_entity_id"
+        ],
+        "title": "ResolvedSamlProviderResponse",
+        "type": "object"
+      },
+      "ResolvedSsoProviderResponse": {
+        "description": "Internal-only (see `routes/internal_sso_providers.py`). This is the\none schema in the codebase that intentionally carries a plaintext\nclient secret, and it is reachable only behind the shared-secret\ninternal check \u2014 never from `/api/v1`.",
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "client_secret": {
+            "title": "Client Secret",
+            "type": "string"
+          },
+          "issuer_url": {
+            "title": "Issuer Url",
+            "type": "string"
+          },
+          "organization_id": {
+            "title": "Organization Id",
+            "type": "string"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "organization_id",
+          "provider_id",
+          "issuer_url",
+          "client_id",
+          "client_secret"
+        ],
+        "title": "ResolvedSsoProviderResponse",
+        "type": "object"
+      },
+      "ResourcePermissionResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "granted_by_user_id": {
+            "title": "Granted By User Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "permission": {
+            "title": "Permission",
+            "type": "string"
+          },
+          "principal_id": {
+            "title": "Principal Id",
+            "type": "string"
+          },
+          "principal_type": {
+            "title": "Principal Type",
+            "type": "string"
+          },
+          "resource_id": {
+            "title": "Resource Id",
+            "type": "string"
+          },
+          "resource_type": {
+            "title": "Resource Type",
+            "type": "string"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "resource_type",
+          "resource_id",
+          "principal_type",
+          "principal_id",
+          "permission",
+          "granted_by_user_id",
+          "created_at"
+        ],
+        "title": "ResourcePermissionResponse",
         "type": "object"
       },
       "Role": {
@@ -1945,6 +2674,297 @@
           "created_at"
         ],
         "title": "RunResponse",
+        "type": "object"
+      },
+      "SaveSsoConfigurationRequest": {
+        "properties": {
+          "client_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Secret"
+          },
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "issuer_url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Url"
+          },
+          "preset": {
+            "$ref": "#/components/schemas/SsoPreset",
+            "default": "generic"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/SsoProtocol"
+          },
+          "protocol_config": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Protocol Config",
+            "type": "object"
+          }
+        },
+        "required": [
+          "protocol"
+        ],
+        "title": "SaveSsoConfigurationRequest",
+        "type": "object"
+      },
+      "ScimCreateUserRequest": {
+        "properties": {
+          "active": {
+            "default": true,
+            "title": "Active",
+            "type": "boolean"
+          },
+          "displayName": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displayname"
+          },
+          "emails": {
+            "items": {
+              "$ref": "#/components/schemas/ScimEmail"
+            },
+            "title": "Emails",
+            "type": "array"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScimName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "userName": {
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "userName"
+        ],
+        "title": "ScimCreateUserRequest",
+        "type": "object"
+      },
+      "ScimEmail": {
+        "properties": {
+          "primary": {
+            "default": true,
+            "title": "Primary",
+            "type": "boolean"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "value": {
+            "maxLength": 320,
+            "minLength": 3,
+            "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "ScimEmail",
+        "type": "object"
+      },
+      "ScimName": {
+        "properties": {
+          "familyName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Familyname"
+          },
+          "formatted": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formatted"
+          },
+          "givenName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Givenname"
+          }
+        },
+        "title": "ScimName",
+        "type": "object"
+      },
+      "ScimPatchOperation": {
+        "properties": {
+          "op": {
+            "title": "Op",
+            "type": "string"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "ScimPatchOperation",
+        "type": "object"
+      },
+      "ScimPatchRequest": {
+        "properties": {
+          "Operations": {
+            "items": {
+              "$ref": "#/components/schemas/ScimPatchOperation"
+            },
+            "title": "Operations",
+            "type": "array"
+          },
+          "schemas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Schemas",
+            "type": "array"
+          }
+        },
+        "title": "ScimPatchRequest",
+        "type": "object"
+      },
+      "ScimTokenResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "organization_id": {
+            "title": "Organization Id",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "token_prefix": {
+            "title": "Token Prefix",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organization_id",
+          "name",
+          "token_prefix",
+          "created_at",
+          "last_used_at",
+          "revoked_at"
+        ],
+        "title": "ScimTokenResponse",
         "type": "object"
       },
       "SearchHitResponse": {
@@ -2069,6 +3089,111 @@
         ],
         "title": "SearchResponse",
         "type": "object"
+      },
+      "SsoConfigurationResponse": {
+        "properties": {
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by_user_id": {
+            "title": "Created By User Id",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "has_client_secret": {
+            "title": "Has Client Secret",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "issuer_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Url"
+          },
+          "organization_id": {
+            "title": "Organization Id",
+            "type": "string"
+          },
+          "preset": {
+            "$ref": "#/components/schemas/SsoPreset"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/SsoProtocol"
+          },
+          "protocol_config": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Protocol Config",
+            "type": "object"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organization_id",
+          "protocol",
+          "preset",
+          "issuer_url",
+          "client_id",
+          "has_client_secret",
+          "protocol_config",
+          "enabled",
+          "created_by_user_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SsoConfigurationResponse",
+        "type": "object"
+      },
+      "SsoPreset": {
+        "description": "Which vendor's setup instructions the admin followed.\n\nUI convenience only (8c): presets pre-fill the *generic* OIDC/SAML\nfields in the form. There is deliberately no per-vendor server code \u2014\na preset never changes how the protocol is executed, only what the\nform starts with.",
+        "enum": [
+          "generic",
+          "google_workspace",
+          "azure_ad",
+          "okta",
+          "auth0"
+        ],
+        "title": "SsoPreset",
+        "type": "string"
+      },
+      "SsoProtocol": {
+        "enum": [
+          "oidc",
+          "saml"
+        ],
+        "title": "SsoProtocol",
+        "type": "string"
       },
       "TeamAnalyticsResponse": {
         "properties": {
@@ -2870,6 +3995,73 @@
         "title": "UpdateTeamRequest",
         "type": "object"
       },
+      "UpdateWorkspaceSettingsRequest": {
+        "properties": {
+          "brand_color": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand Color"
+          },
+          "custom_domain": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Domain"
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          },
+          "retention_days": {
+            "anyOf": [
+              {
+                "maximum": 3650.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retention Days"
+          },
+          "storage_limit_mb": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Limit Mb"
+          }
+        },
+        "title": "UpdateWorkspaceSettingsRequest",
+        "type": "object"
+      },
       "UploadDocumentResponse": {
         "description": "202 body. The document is durable and queued; it is not searchable\nuntil ingestion moves it to `indexed`, which the client polls for.",
         "properties": {
@@ -2936,6 +4128,17 @@
             "title": "Name",
             "type": "string"
           },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
           "role": {
             "$ref": "#/components/schemas/Role"
           },
@@ -2952,6 +4155,104 @@
           "role"
         ],
         "title": "WorkspaceResponse",
+        "type": "object"
+      },
+      "WorkspaceSettingsResponse": {
+        "properties": {
+          "brand_color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand Color"
+          },
+          "custom_domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Domain"
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          },
+          "retention_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retention Days"
+          },
+          "storage_limit_mb": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Limit Mb"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By User Id"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "logo_url",
+          "brand_color",
+          "custom_domain",
+          "retention_days",
+          "storage_limit_mb",
+          "updated_at",
+          "updated_by_user_id"
+        ],
+        "title": "WorkspaceSettingsResponse",
         "type": "object"
       }
     },
@@ -3038,6 +4339,1111 @@
         "summary": "Oauth Callback Route",
         "tags": [
           "integrations"
+        ]
+      }
+    },
+    "/api/v1/invitations/accept": {
+      "post": {
+        "operationId": "accept_invite_api_v1_invitations_accept_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptInviteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptInviteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Accept Invite",
+        "tags": [
+          "invitations"
+        ]
+      }
+    },
+    "/api/v1/organizations": {
+      "get": {
+        "operationId": "list_my_organizations_api_v1_organizations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrganizationResponse"
+                  },
+                  "title": "Response List My Organizations Api V1 Organizations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List My Organizations",
+        "tags": [
+          "organizations"
+        ]
+      },
+      "post": {
+        "operationId": "create_organization_api_v1_organizations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrganizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Organization",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organization_id}": {
+      "delete": {
+        "operationId": "delete_organization_api_v1_organizations__organization_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Organization",
+        "tags": [
+          "organizations"
+        ]
+      },
+      "get": {
+        "operationId": "get_organization_api_v1_organizations__organization_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Organization",
+        "tags": [
+          "organizations"
+        ]
+      },
+      "patch": {
+        "operationId": "rename_organization_api_v1_organizations__organization_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameOrganizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rename Organization",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organization_id}/invitations": {
+      "post": {
+        "operationId": "invite_organization_member_by_email_api_v1_organizations__organization_id__invitations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteByEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteByEmailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Invite Organization Member By Email",
+        "tags": [
+          "invitations"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organization_id}/members": {
+      "get": {
+        "operationId": "list_org_members_api_v1_organizations__organization_id__members_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrganizationMemberResponse"
+                  },
+                  "title": "Response List Org Members Api V1 Organizations  Organization Id  Members Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Org Members",
+        "tags": [
+          "organizations"
+        ]
+      },
+      "post": {
+        "operationId": "invite_org_member_api_v1_organizations__organization_id__members_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteOrgMemberRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMemberResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Invite Org Member",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organization_id}/members/{target_user_id}": {
+      "delete": {
+        "operationId": "remove_org_member_api_v1_organizations__organization_id__members__target_user_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_user_id",
+            "required": true,
+            "schema": {
+              "title": "Target User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove Org Member",
+        "tags": [
+          "organizations"
+        ]
+      },
+      "patch": {
+        "operationId": "change_org_member_role_api_v1_organizations__organization_id__members__target_user_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_user_id",
+            "required": true,
+            "schema": {
+              "title": "Target User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeOrgMemberRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMemberResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Change Org Member Role",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organization_id}/members/{target_user_id}/reinstate": {
+      "post": {
+        "operationId": "reinstate_org_member_api_v1_organizations__organization_id__members__target_user_id__reinstate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_user_id",
+            "required": true,
+            "schema": {
+              "title": "Target User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMemberResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reinstate Org Member",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organization_id}/members/{target_user_id}/suspend": {
+      "post": {
+        "operationId": "suspend_org_member_api_v1_organizations__organization_id__members__target_user_id__suspend_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "target_user_id",
+            "required": true,
+            "schema": {
+              "title": "Target User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMemberResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Suspend Org Member",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organization_id}/scim-tokens": {
+      "get": {
+        "operationId": "list_scim_tokens_api_v1_organizations__organization_id__scim_tokens_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScimTokenResponse"
+                  },
+                  "title": "Response List Scim Tokens Api V1 Organizations  Organization Id  Scim Tokens Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Scim Tokens",
+        "tags": [
+          "scim-tokens"
+        ]
+      },
+      "post": {
+        "operationId": "issue_scim_token_api_v1_organizations__organization_id__scim_tokens_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueScimTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedScimTokenResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Issue Scim Token",
+        "tags": [
+          "scim-tokens"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organization_id}/scim-tokens/{token_id}": {
+      "delete": {
+        "operationId": "revoke_scim_token_api_v1_organizations__organization_id__scim_tokens__token_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token_id",
+            "required": true,
+            "schema": {
+              "title": "Token Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Scim Token",
+        "tags": [
+          "scim-tokens"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organization_id}/sso": {
+      "get": {
+        "operationId": "list_sso_configurations_api_v1_organizations__organization_id__sso_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SsoConfigurationResponse"
+                  },
+                  "title": "Response List Sso Configurations Api V1 Organizations  Organization Id  Sso Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Sso Configurations",
+        "tags": [
+          "sso"
+        ]
+      },
+      "put": {
+        "operationId": "save_sso_configuration_api_v1_organizations__organization_id__sso_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSsoConfigurationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SsoConfigurationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Save Sso Configuration",
+        "tags": [
+          "sso"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organization_id}/sso/{config_id}": {
+      "delete": {
+        "operationId": "delete_sso_configuration_api_v1_organizations__organization_id__sso__config_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Sso Configuration",
+        "tags": [
+          "sso"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organization_id}/workspaces": {
+      "get": {
+        "operationId": "list_org_workspaces_api_v1_organizations__organization_id__workspaces_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrganizationWorkspaceResponse"
+                  },
+                  "title": "Response List Org Workspaces Api V1 Organizations  Organization Id  Workspaces Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Org Workspaces",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organization_id}/workspaces/{workspace_id}": {
+      "delete": {
+        "operationId": "detach_workspace_api_v1_organizations__organization_id__workspaces__workspace_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Detach Workspace",
+        "tags": [
+          "organizations"
+        ]
+      },
+      "post": {
+        "operationId": "attach_workspace_api_v1_organizations__organization_id__workspaces__workspace_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Attach Workspace",
+        "tags": [
+          "organizations"
         ]
       }
     },
@@ -3846,6 +6252,172 @@
         "summary": "Revoke Api Key",
         "tags": [
           "api-keys"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/api-keys/{api_key_id}/rotate": {
+      "post": {
+        "operationId": "rotate_api_key_api_v1_workspaces__workspace_id__api_keys__api_key_id__rotate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "api_key_id",
+            "required": true,
+            "schema": {
+              "title": "Api Key Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedApiKeyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rotate Api Key",
+        "tags": [
+          "api-keys"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/audit-logs": {
+      "get": {
+        "description": "Cursor-paginated on `created_at`, matching the runtime-log\nconvention (CLAUDE.md \u00a77) \u2014 offset pagination on a fast-appending\ntable skips and repeats rows as new entries land mid-page.",
+        "operationId": "list_audit_logs_route_api_v1_workspaces__workspace_id__audit_logs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Action"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor_user_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor User Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Audit Logs Route",
+        "tags": [
+          "audit-logs"
         ]
       }
     },
@@ -4900,6 +7472,218 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspace_id}/invitations": {
+      "post": {
+        "operationId": "invite_workspace_member_by_email_api_v1_workspaces__workspace_id__invitations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteByEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteByEmailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Invite Workspace Member By Email",
+        "tags": [
+          "invitations"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/ip-allowlist": {
+      "get": {
+        "operationId": "list_ip_allowlist_api_v1_workspaces__workspace_id__ip_allowlist_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IpAllowlistEntryResponse"
+                  },
+                  "title": "Response List Ip Allowlist Api V1 Workspaces  Workspace Id  Ip Allowlist Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Ip Allowlist",
+        "tags": [
+          "ip-allowlist"
+        ]
+      },
+      "post": {
+        "operationId": "add_ip_allowlist_entry_api_v1_workspaces__workspace_id__ip_allowlist_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddIpAllowlistEntryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IpAllowlistEntryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Add Ip Allowlist Entry",
+        "tags": [
+          "ip-allowlist"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/ip-allowlist/{entry_id}": {
+      "delete": {
+        "operationId": "remove_ip_allowlist_entry_api_v1_workspaces__workspace_id__ip_allowlist__entry_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove Ip Allowlist Entry",
+        "tags": [
+          "ip-allowlist"
+        ]
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/knowledge-bases": {
       "get": {
         "operationId": "list_knowledge_bases_route_api_v1_workspaces__workspace_id__knowledge_bases_get",
@@ -5640,6 +8424,263 @@
         "summary": "Change Member Role",
         "tags": [
           "workspaces"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/resource-permissions": {
+      "get": {
+        "operationId": "list_resource_permissions_api_v1_workspaces__workspace_id__resource_permissions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResourcePermissionResponse"
+                  },
+                  "title": "Response List Resource Permissions Api V1 Workspaces  Workspace Id  Resource Permissions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Resource Permissions",
+        "tags": [
+          "resource-permissions"
+        ]
+      },
+      "post": {
+        "operationId": "grant_resource_permission_api_v1_workspaces__workspace_id__resource_permissions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantResourcePermissionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourcePermissionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Grant Resource Permission",
+        "tags": [
+          "resource-permissions"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/resource-permissions/{permission_id}": {
+      "delete": {
+        "operationId": "revoke_resource_permission_api_v1_workspaces__workspace_id__resource_permissions__permission_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "permission_id",
+            "required": true,
+            "schema": {
+              "title": "Permission Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Resource Permission",
+        "tags": [
+          "resource-permissions"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/settings": {
+      "get": {
+        "operationId": "get_workspace_settings_route_api_v1_workspaces__workspace_id__settings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Workspace Settings Route",
+        "tags": [
+          "workspace-settings"
+        ]
+      },
+      "patch": {
+        "operationId": "update_workspace_settings_route_api_v1_workspaces__workspace_id__settings_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWorkspaceSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Workspace Settings Route",
+        "tags": [
+          "workspace-settings"
         ]
       }
     },
@@ -6935,6 +9976,112 @@
         ]
       }
     },
+    "/internal/sso-providers": {
+      "get": {
+        "operationId": "list_resolved_sso_providers_internal_sso_providers_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Internal-Secret",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Secret"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResolvedSsoProviderResponse"
+                  },
+                  "title": "Response List Resolved Sso Providers Internal Sso Providers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Resolved Sso Providers",
+        "tags": [
+          "internal"
+        ]
+      }
+    },
+    "/internal/sso-providers/saml": {
+      "get": {
+        "operationId": "list_resolved_saml_providers_internal_sso_providers_saml_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Internal-Secret",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Secret"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResolvedSamlProviderResponse"
+                  },
+                  "title": "Response List Resolved Saml Providers Internal Sso Providers Saml Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Resolved Saml Providers",
+        "tags": [
+          "internal"
+        ]
+      }
+    },
     "/ready": {
       "get": {
         "description": "Readiness: are hard dependencies reachable.\n\nNo dependency (Postgres/Redis/vector DB) is consumed by any code\npath yet in Phase 0, so readiness currently reduces to liveness.\nPhase 1 adds a real Postgres connectivity check here.",
@@ -6954,6 +10101,529 @@
         "summary": "Ready",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/scim/v2/Groups": {
+      "get": {
+        "operationId": "list_groups_scim_v2_Groups_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "startIndex",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Startindex",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Count",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Groups",
+        "tags": [
+          "scim"
+        ]
+      },
+      "post": {
+        "description": "Answers group writes with an explicit 501 rather than a 404 or a\nsilent success \u2014 an IdP administrator needs to know push-groups is\nunsupported, not be left believing it worked.",
+        "operationId": "groups_are_read_only_scim_v2_Groups_post",
+        "responses": {
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Groups Are Read Only",
+        "tags": [
+          "scim"
+        ]
+      }
+    },
+    "/scim/v2/Groups/{group_id}": {
+      "delete": {
+        "description": "Answers group writes with an explicit 501 rather than a 404 or a\nsilent success \u2014 an IdP administrator needs to know push-groups is\nunsupported, not be left believing it worked.",
+        "operationId": "groups_are_read_only_scim_v2_Groups__group_id__delete",
+        "responses": {
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Groups Are Read Only",
+        "tags": [
+          "scim"
+        ]
+      },
+      "get": {
+        "operationId": "get_group_scim_v2_Groups__group_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Group",
+        "tags": [
+          "scim"
+        ]
+      },
+      "patch": {
+        "description": "Answers group writes with an explicit 501 rather than a 404 or a\nsilent success \u2014 an IdP administrator needs to know push-groups is\nunsupported, not be left believing it worked.",
+        "operationId": "groups_are_read_only_scim_v2_Groups__group_id__patch",
+        "responses": {
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Groups Are Read Only",
+        "tags": [
+          "scim"
+        ]
+      },
+      "put": {
+        "description": "Answers group writes with an explicit 501 rather than a 404 or a\nsilent success \u2014 an IdP administrator needs to know push-groups is\nunsupported, not be left believing it worked.",
+        "operationId": "groups_are_read_only_scim_v2_Groups__group_id__put",
+        "responses": {
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Groups Are Read Only",
+        "tags": [
+          "scim"
+        ]
+      }
+    },
+    "/scim/v2/ServiceProviderConfig": {
+      "get": {
+        "description": "Advertises exactly what this implementation supports.\n\nHonest by construction: `patch` true, `filter` true (with a low\n`maxResults` reflecting the single supported filter form), and\n`bulk`/`sort`/`etag`/`changePassword` all false, because none of\nthem are implemented. An IdP reads this to decide what to send.",
+        "operationId": "service_provider_config_scim_v2_ServiceProviderConfig_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Service Provider Config",
+        "tags": [
+          "scim"
+        ]
+      }
+    },
+    "/scim/v2/Users": {
+      "get": {
+        "operationId": "list_users_scim_v2_Users_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "filter",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Filter"
+            }
+          },
+          {
+            "in": "query",
+            "name": "startIndex",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Startindex",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Count",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Users",
+        "tags": [
+          "scim"
+        ]
+      },
+      "post": {
+        "operationId": "create_user_scim_v2_Users_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimCreateUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create User",
+        "tags": [
+          "scim"
+        ]
+      }
+    },
+    "/scim/v2/Users/{user_id}": {
+      "delete": {
+        "operationId": "delete_user_scim_v2_Users__user_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete User",
+        "tags": [
+          "scim"
+        ]
+      },
+      "get": {
+        "operationId": "get_user_scim_v2_Users__user_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get User",
+        "tags": [
+          "scim"
+        ]
+      },
+      "patch": {
+        "operationId": "patch_user_scim_v2_Users__user_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimPatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Patch User",
+        "tags": [
+          "scim"
+        ]
+      },
+      "put": {
+        "description": "PUT replaces the mutable attributes this service stores. It never\nre-keys the account: `userName` is the identity SSO asserts, and\nsilently rewriting it would orphan the person from their sign-in.",
+        "operationId": "replace_user_scim_v2_Users__user_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimCreateUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Replace User",
+        "tags": [
+          "scim"
         ]
       }
     }

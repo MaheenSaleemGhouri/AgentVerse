@@ -1,11 +1,16 @@
 "use client";
 
-import { KeyRound, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { KeyRound, Plus, RotateCw, Trash2, TriangleAlert } from "lucide-react";
 import * as React from "react";
 
-import type { ApiKey } from "@/lib/api/workspaces";
+import type { ApiKey, ApiKeyScope } from "@/lib/api/workspaces";
 import { formatRelativeTime } from "@/lib/format";
-import { useApiKeys, useIssueApiKey, useRevokeApiKey } from "@/lib/queries/workspace";
+import {
+  useApiKeys,
+  useIssueApiKey,
+  useRevokeApiKey,
+  useRotateApiKey,
+} from "@/lib/queries/workspace";
 import { cn } from "@/lib/utils";
 
 import { CopyButton } from "@/components/patterns/copy-button";
@@ -35,6 +40,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -42,6 +54,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+const SCOPE_LABEL: Record<ApiKeyScope, string> = {
+  full: "Full access",
+  read_only: "Read-only",
+};
 
 export function ApiKeysPanel({
   workspaceId,
@@ -53,9 +71,11 @@ export function ApiKeysPanel({
   const { data: keys } = useApiKeys(workspaceId, initialKeys);
   const issueKey = useIssueApiKey(workspaceId);
   const revokeKey = useRevokeApiKey(workspaceId);
+  const rotateKey = useRotateApiKey(workspaceId);
 
   const [createOpen, setCreateOpen] = React.useState(false);
   const [name, setName] = React.useState("");
+  const [scope, setScope] = React.useState<ApiKeyScope>("full");
   // Held in component state only, never written to the query cache —
   // the plaintext key is returned exactly once and must not be
   // retrievable from anywhere afterwards.
@@ -64,12 +84,25 @@ export function ApiKeysPanel({
 
   function createKey(): void {
     if (!name.trim()) return;
-    issueKey.mutate(name.trim(), {
-      onSuccess: (issued) => {
-        setCreateOpen(false);
-        setName("");
-        setIssuedSecret(issued.key);
-      },
+    issueKey.mutate(
+      // `tier` has no picker yet — "standard" is the only tier that
+      // exists today, sent explicitly since the generated request type
+      // treats every field with a schema default as required to send.
+      { name: name.trim(), scope, tier: "standard" },
+      {
+        onSuccess: (issued) => {
+          setCreateOpen(false);
+          setName("");
+          setScope("full");
+          setIssuedSecret(issued.key);
+        },
+      }
+    );
+  }
+
+  function rotate(key: ApiKey): void {
+    rotateKey.mutate(key.id, {
+      onSuccess: (issued) => setIssuedSecret(issued.key),
     });
   }
 
@@ -116,10 +149,11 @@ export function ApiKeysPanel({
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Prefix</TableHead>
+                <TableHead>Scope</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Last used</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-12" />
+                <TableHead className="w-24" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -130,6 +164,14 @@ export function ApiKeysPanel({
                     <code className="font-mono text-xs text-muted-foreground">
                       {key.key_prefix}…
                     </code>
+                    {key.rotated_from_id && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">Rotated key</p>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge tone={key.scope === "full" ? "brand" : "neutral"}>
+                      {SCOPE_LABEL[key.scope]}
+                    </StatusBadge>
                   </TableCell>
                   <TableCell className="text-sm whitespace-nowrap text-muted-foreground">
                     {formatRelativeTime(key.created_at)}
@@ -148,14 +190,33 @@ export function ApiKeysPanel({
                   </TableCell>
                   <TableCell>
                     {!key.revoked_at && (
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Revoke ${key.name}`}
-                        onClick={() => setPendingRevoke(key)}
-                      >
-                        <Trash2 />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Rotate ${key.name}`}
+                              onClick={() => rotate(key)}
+                              disabled={rotateKey.isPending}
+                            >
+                              <RotateCw />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Revokes this key and issues a replacement with the same name and
+                            scope
+                          </TooltipContent>
+                        </Tooltip>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Revoke ${key.name}`}
+                          onClick={() => setPendingRevoke(key)}
+                        >
+                          <Trash2 />
+                        </Button>
+                      </div>
                     )}
                   </TableCell>
                 </TableRow>
@@ -184,6 +245,22 @@ export function ApiKeysPanel({
               autoFocus
               maxLength={100}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="key-scope">Scope</Label>
+            <Select value={scope} onValueChange={(value) => setScope(value as ApiKeyScope)}>
+              <SelectTrigger id="key-scope">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="full">Full access</SelectItem>
+                <SelectItem value="read_only">Read-only</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Read-only keys are capped at viewer access. A key never grants more than
+              the member who issued it currently has.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
