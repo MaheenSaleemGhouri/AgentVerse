@@ -46,6 +46,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/security/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List My Devices */
+        get: operations["list_my_devices_api_v1_me_security_devices_get"];
+        put?: never;
+        /** Trust My Device */
+        post: operations["trust_my_device_api_v1_me_security_devices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/security/devices/{device_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke My Device */
+        delete: operations["revoke_my_device_api_v1_me_security_devices__device_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/security/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List My Security Events */
+        get: operations["list_my_security_events_api_v1_me_security_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organizations": {
         parameters: {
             query?: never;
@@ -81,6 +133,33 @@ export interface paths {
         head?: never;
         /** Rename Organization */
         patch: operations["rename_organization_api_v1_organizations__organization_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/organizations/{organization_id}/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Organization Dashboard
+         * @description Headline counts plus per-member activity for the organization.
+         *
+         *     Viewer-gated rather than admin-gated: knowing who is in your own
+         *     organization and when they last signed in is ordinary membership
+         *     information, not privileged. What it deliberately does not expose is
+         *     anything workspace-scoped — an organization grants no workspace
+         *     access (ADR-0011), so this endpoint must not become a way to see
+         *     inside workspaces the caller is not a member of.
+         */
+        get: operations["organization_dashboard_api_v1_organizations__organization_id__dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/organizations/{organization_id}/invitations": {
@@ -164,6 +243,49 @@ export interface paths {
         put?: never;
         /** Suspend Org Member */
         post: operations["suspend_org_member_api_v1_organizations__organization_id__members__target_user_id__suspend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organization_id}/password-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Password Policy */
+        get: operations["get_password_policy_api_v1_organizations__organization_id__password_policy_get"];
+        /** Set Password Policy */
+        put: operations["set_password_policy_api_v1_organizations__organization_id__password_policy_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organization_id}/password-policy/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Password
+         * @description Validates a candidate password against the organization's policy.
+         *
+         *     The password is never stored or logged — it is checked and
+         *     discarded. This exists so the sign-up/change-password UI can show
+         *     the real rules rather than a client-side guess at them, while the
+         *     same policy is still enforced server-side on the actual change.
+         */
+        post: operations["check_password_api_v1_organizations__organization_id__password_policy_check_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -515,6 +637,54 @@ export interface paths {
          *     table skips and repeats rows as new entries land mid-page.
          */
         get: operations["list_audit_logs_route_api_v1_workspaces__workspace_id__audit_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/audit-logs/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit Activity Route
+         * @description Daily entry counts for the activity graph, gap-filled to zero.
+         */
+        get: operations["audit_activity_route_api_v1_workspaces__workspace_id__audit_logs_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/audit-logs/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Audit Logs Route
+         * @description Exports the workspace's audit log as CSV or JSON.
+         *
+         *     Bounded by `MAX_EXPORT_ROWS` rather than streaming the whole table:
+         *     `audit_logs` is append-only and unbounded, so an unlimited export
+         *     would be a denial-of-service against this service's own memory.
+         *
+         *     The response is a download (`Content-Disposition: attachment`) with
+         *     `X-Content-Type-Options: nosniff`, so a browser never renders
+         *     attacker-influenced audit content as a document in this origin.
+         */
+        get: operations["export_audit_logs_route_api_v1_workspaces__workspace_id__audit_logs_export_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1071,6 +1241,40 @@ export interface paths {
         head?: never;
         /** Update Custom Role */
         patch: operations["update_custom_role_api_v1_workspaces__workspace_id__roles__role_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/security/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Workspace Security Events */
+        get: operations["list_workspace_security_events_api_v1_workspaces__workspace_id__security_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/security/score": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Security Score */
+        get: operations["get_security_score_api_v1_workspaces__workspace_id__security_score_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/workspaces/{workspace_id}/settings": {
@@ -1701,6 +1905,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Expires At */
+            expires_at: string | null;
             /** Id */
             id: string;
             /** Key Prefix */
@@ -1716,6 +1922,8 @@ export interface components {
             scope: components["schemas"]["ApiKeyScope"];
             /** Tier */
             tier: string;
+            /** Use Count */
+            use_count: number;
             /** Workspace Id */
             workspace_id: string;
         };
@@ -1724,6 +1932,30 @@ export interface components {
          * @enum {string}
          */
         ApiKeyScope: "full" | "read_only";
+        /** AuditActivityPoint */
+        AuditActivityPoint: {
+            /** Count */
+            count: number;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+        };
+        /**
+         * AuditActivityResponse
+         * @description Daily counts for the activity graph.
+         *
+         *     Days with no activity are present with `count: 0` rather than
+         *     omitted — a sparse series would render as a misleadingly continuous
+         *     line that hides the quiet days.
+         */
+        AuditActivityResponse: {
+            /** Points */
+            points: components["schemas"]["AuditActivityPoint"][];
+            /** Total */
+            total: number;
+        };
         /** AuditLogPage */
         AuditLogPage: {
             /** Data */
@@ -1772,6 +2004,16 @@ export interface components {
         /** ChangeOrgMemberRoleRequest */
         ChangeOrgMemberRoleRequest: {
             role: components["schemas"]["Role"];
+        };
+        /** CheckPasswordRequest */
+        CheckPasswordRequest: {
+            /** Password */
+            password: string;
+        };
+        /** CheckPasswordResponse */
+        CheckPasswordResponse: {
+            /** Violations */
+            violations: string[];
         };
         /** CitationResponse */
         CitationResponse: {
@@ -2225,6 +2467,8 @@ export interface components {
         };
         /** IssueApiKeyRequest */
         IssueApiKeyRequest: {
+            /** Expires In Days */
+            expires_in_days?: number | null;
             /** Name */
             name: string;
             /** @default full */
@@ -2247,6 +2491,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Expires At */
+            expires_at: string | null;
             /** Id */
             id: string;
             /** Key */
@@ -2264,6 +2510,8 @@ export interface components {
             scope: components["schemas"]["ApiKeyScope"];
             /** Tier */
             tier: string;
+            /** Use Count */
+            use_count: number;
             /** Workspace Id */
             workspace_id: string;
         };
@@ -2412,6 +2660,35 @@ export interface components {
              */
             transport: "stdio" | "sse" | "streamable_http";
         };
+        /**
+         * MemberPresenceResponse
+         * @description A member plus what is actually known about their recent activity.
+         *
+         *     `has_active_session` means "holds an unexpired session", not "is
+         *     looking at the screen right now" — there is no heartbeat in this
+         *     system, and the field is named for what it can honestly claim.
+         */
+        MemberPresenceResponse: {
+            /** Email */
+            email: string;
+            /** Has Active Session */
+            has_active_session: boolean;
+            /** Last Ip Address */
+            last_ip_address: string | null;
+            /** Last Login At */
+            last_login_at: string | null;
+            /** Last Seen At */
+            last_seen_at: string | null;
+            /** Last User Agent */
+            last_user_agent: string | null;
+            /** Name */
+            name: string;
+            role: components["schemas"]["Role"];
+            /** Suspended At */
+            suspended_at: string | null;
+            /** User Id */
+            user_id: string;
+        };
         /** MemberResponse */
         MemberResponse: {
             /**
@@ -2443,6 +2720,13 @@ export interface components {
             expires_at: string;
             /** State */
             state: string;
+        };
+        /** OrganizationDashboardResponse */
+        OrganizationDashboardResponse: {
+            /** Members */
+            members: components["schemas"]["MemberPresenceResponse"][];
+            organization: components["schemas"]["OrganizationResponse"];
+            stats: components["schemas"]["OrganizationStatsResponse"];
         };
         /** OrganizationMemberResponse */
         OrganizationMemberResponse: {
@@ -2495,6 +2779,21 @@ export interface components {
             /** Website Url */
             website_url: string | null;
         };
+        /** OrganizationStatsResponse */
+        OrganizationStatsResponse: {
+            /** Active Member Count */
+            active_member_count: number;
+            /** Member Count */
+            member_count: number;
+            /** Members By Role */
+            members_by_role: {
+                [key: string]: number;
+            };
+            /** Suspended Member Count */
+            suspended_member_count: number;
+            /** Workspace Count */
+            workspace_count: number;
+        };
         /**
          * OrganizationWorkspaceResponse
          * @description A workspace attached to an organization — deliberately carries no
@@ -2514,6 +2813,23 @@ export interface components {
             name: string;
             /** Slug */
             slug: string;
+        };
+        /** PasswordPolicyResponse */
+        PasswordPolicyResponse: {
+            /** Is Configured */
+            is_configured: boolean;
+            /** Max Age Days */
+            max_age_days: number | null;
+            /** Min Length */
+            min_length: number;
+            /** Require Lowercase */
+            require_lowercase: boolean;
+            /** Require Number */
+            require_number: boolean;
+            /** Require Symbol */
+            require_symbol: boolean;
+            /** Require Uppercase */
+            require_uppercase: boolean;
         };
         /**
          * Permission
@@ -2842,6 +3158,19 @@ export interface components {
             /** Token Prefix */
             token_prefix: string;
         };
+        /** ScoreFactorResponse */
+        ScoreFactorResponse: {
+            /** Earned */
+            earned: number;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Possible */
+            possible: number;
+            /** Remediation */
+            remediation: string | null;
+        };
         /** SearchHitResponse */
         SearchHitResponse: {
             /** Chunk Id */
@@ -2884,6 +3213,66 @@ export interface components {
             /** Used Tokens */
             used_tokens: number;
         };
+        /** SecurityEventResponse */
+        SecurityEventResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            event_type: components["schemas"]["SecurityEventType"];
+            /** Id */
+            id: string;
+            /** Ip Address */
+            ip_address: string | null;
+            /** Metadata */
+            metadata: {
+                [key: string]: string;
+            };
+            /** Organization Id */
+            organization_id: string | null;
+            severity: components["schemas"]["SecuritySeverity"];
+            /** User Agent */
+            user_agent: string | null;
+            /** User Id */
+            user_id: string | null;
+            /** Workspace Id */
+            workspace_id: string | null;
+        };
+        /**
+         * SecurityEventType
+         * @description Security signals about an *account*, distinct from `audit_logs`.
+         *
+         *     The two are not duplicates and are deliberately not merged:
+         *     `audit_logs` answers "who did what inside this workspace" and is
+         *     workspace-scoped and append-only for compliance; a security event
+         *     answers "what happened to this identity's security posture" and is
+         *     frequently user-scoped with no workspace at all (a failed login
+         *     happens before any workspace is resolved). Merging them would force
+         *     a nullable workspace onto the compliance log and a workspace filter
+         *     onto questions that have no workspace.
+         * @enum {string}
+         */
+        SecurityEventType: "login.new_device" | "login.failed" | "account.locked" | "password.changed" | "two_factor.enabled" | "two_factor.disabled" | "device.trusted" | "device.revoked" | "suspicious.ip" | "suspicious.rapid_failures";
+        /** SecurityScoreResponse */
+        SecurityScoreResponse: {
+            /** Factors */
+            factors: components["schemas"]["ScoreFactorResponse"][];
+            /** Grade */
+            grade: string;
+            /** Score */
+            score: number;
+        };
+        /**
+         * SecuritySeverity
+         * @description How much attention an event deserves.
+         *
+         *     Deliberately three levels, not five: an operator triaging a feed
+         *     needs "ignore / look / act now", and finer gradations only push the
+         *     judgement call from the reader to the author.
+         * @enum {string}
+         */
+        SecuritySeverity: "info" | "warning" | "critical";
         /** SsoConfigurationResponse */
         SsoConfigurationResponse: {
             /** Client Id */
@@ -3120,6 +3509,38 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** TrustDeviceRequest */
+        TrustDeviceRequest: {
+            /** Device Fingerprint */
+            device_fingerprint: string;
+            /** Device Name */
+            device_name?: string | null;
+        };
+        /** TrustedDeviceResponse */
+        TrustedDeviceResponse: {
+            /** Device Fingerprint */
+            device_fingerprint: string;
+            /** Device Name */
+            device_name: string | null;
+            /** Id */
+            id: string;
+            /** Ip Address */
+            ip_address: string | null;
+            /**
+             * Last Seen At
+             * Format: date-time
+             */
+            last_seen_at: string;
+            /** Revoked At */
+            revoked_at: string | null;
+            /**
+             * Trusted At
+             * Format: date-time
+             */
+            trusted_at: string;
+            /** User Agent */
+            user_agent: string | null;
+        };
         /** UpdateAgentVersionRequest */
         UpdateAgentVersionRequest: {
             /** Knowledge Base Ids */
@@ -3177,6 +3598,21 @@ export interface components {
             support_email?: string | null;
             /** Website Url */
             website_url?: string | null;
+        };
+        /** UpdatePasswordPolicyRequest */
+        UpdatePasswordPolicyRequest: {
+            /** Max Age Days */
+            max_age_days?: number | null;
+            /** Min Length */
+            min_length: number;
+            /** Require Lowercase */
+            require_lowercase: boolean;
+            /** Require Number */
+            require_number: boolean;
+            /** Require Symbol */
+            require_symbol: boolean;
+            /** Require Uppercase */
+            require_uppercase: boolean;
         };
         /**
          * UpdateTeamRequest
@@ -3349,6 +3785,120 @@ export interface operations {
             };
         };
     };
+    list_my_devices_api_v1_me_security_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrustedDeviceResponse"][];
+                };
+            };
+        };
+    };
+    trust_my_device_api_v1_me_security_devices_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrustDeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrustedDeviceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_my_device_api_v1_me_security_devices__device_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_my_security_events_api_v1_me_security_events_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                severity?: components["schemas"]["SecuritySeverity"] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityEventResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_my_organizations_api_v1_organizations_get: {
         parameters: {
             query?: never;
@@ -3484,6 +4034,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrganizationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    organization_dashboard_api_v1_organizations__organization_id__dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationDashboardResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3715,6 +4296,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrganizationMemberResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_password_policy_api_v1_organizations__organization_id__password_policy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordPolicyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_password_policy_api_v1_organizations__organization_id__password_policy_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePasswordPolicyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordPolicyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_password_api_v1_organizations__organization_id__password_policy_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckPasswordResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4612,6 +5294,73 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AuditLogPage"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    audit_activity_route_api_v1_workspaces__workspace_id__audit_logs_activity_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditActivityResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_audit_logs_route_api_v1_workspaces__workspace_id__audit_logs_export_get: {
+        parameters: {
+            query?: {
+                format?: "csv" | "json";
+                action?: string | null;
+                actor_user_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -5996,6 +6745,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomRoleResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_workspace_security_events_api_v1_workspaces__workspace_id__security_events_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                severity?: components["schemas"]["SecuritySeverity"] | null;
+            };
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityEventResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_security_score_api_v1_workspaces__workspace_id__security_score_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityScoreResponse"];
                 };
             };
             /** @description Validation Error */

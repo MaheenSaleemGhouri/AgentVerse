@@ -16,6 +16,15 @@ export const queryKeys = {
     ["organizations", organizationId, "workspaces"] as const,
   organizationSettings: (organizationId: string) =>
     ["organizations", organizationId, "settings"] as const,
+  passwordPolicy: (organizationId: string) =>
+    ["organizations", organizationId, "password-policy"] as const,
+  // Not workspace-scoped: trusted devices belong to the signed-in
+  // identity, not to whichever workspace happens to be open.
+  myDevices: () => ["me", "devices"] as const,
+  mySecurityEvents: () => ["me", "security-events"] as const,
+  workspaceSecurityEvents: (workspaceId: string) =>
+    ["workspaces", workspaceId, "security-events"] as const,
+  securityScore: (workspaceId: string) => ["workspaces", workspaceId, "security-score"] as const,
 
   // Shared by workspace- and organization-scoped member lists (`lib/api/members.ts`)
   // — scoped by `scope.type` first so switching scope can never serve the

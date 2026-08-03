@@ -108,6 +108,14 @@ import {
   updateOrganizationSettings as updateOrganizationSettingsApi,
 } from "@/lib/api/organization-settings";
 import {
+  listMyDevices as listMyDevicesApi,
+  type PasswordPolicy,
+  revokeDevice as revokeDeviceApi,
+  setPasswordPolicy as setPasswordPolicyApi,
+  type TrustedDevice,
+  type UpdatePasswordPolicyRequest,
+} from "@/lib/api/security";
+import {
   type UpdateWorkspaceSettingsRequest,
   updateWorkspaceSettings as updateWorkspaceSettingsApi,
   type WorkspaceSettings,
@@ -609,6 +617,21 @@ export async function updateOrganizationSettingsAction(
   body: UpdateOrganizationSettingsRequest
 ): Promise<OrganizationSettings> {
   return updateOrganizationSettingsApi(organizationId, body);
+}
+
+export async function listMyDevicesAction(): Promise<TrustedDevice[]> {
+  return listMyDevicesApi();
+}
+
+export async function revokeDeviceAction(deviceId: string): Promise<void> {
+  return revokeDeviceApi(deviceId);
+}
+
+export async function setPasswordPolicyAction(
+  organizationId: string,
+  body: UpdatePasswordPolicyRequest
+): Promise<PasswordPolicy> {
+  return setPasswordPolicyApi(organizationId, body);
 }
 
 export async function listMyOrganizationsAction(): Promise<Organization[]> {

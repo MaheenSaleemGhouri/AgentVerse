@@ -10,8 +10,10 @@ from dataclasses import dataclass
 
 from agentverse_api.auth_service.application.audit_service import AuditService
 from agentverse_api.auth_service.domain.entities import (
+    MemberPresence,
     Organization,
     OrganizationMember,
+    OrganizationStats,
     OrganizationSummary,
     Workspace,
 )
@@ -206,6 +208,15 @@ class OrganizationService:
 
     async def list_workspaces(self, organization_id: str) -> list[Workspace]:
         return await self.organizations.list_workspaces(organization_id)
+
+    async def get_organization(self, organization_id: str) -> Organization | None:
+        return await self.organizations.get_organization(organization_id)
+
+    async def list_member_presence(self, organization_id: str) -> list[MemberPresence]:
+        return await self.organizations.list_member_presence(organization_id)
+
+    async def stats(self, organization_id: str) -> OrganizationStats:
+        return await self.organizations.stats(organization_id)
 
     async def attach_workspace(
         self, *, organization_id: str, actor_user_id: str, workspace_id: str

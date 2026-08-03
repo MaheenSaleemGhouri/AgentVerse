@@ -8,6 +8,7 @@ from datetime import datetime
 from agentverse_api.auth_service.domain.api_key_scope import ApiKeyScope
 from agentverse_api.auth_service.domain.invitation_target_type import InvitationTargetType
 from agentverse_api.auth_service.domain.role import Role
+from agentverse_api.auth_service.domain.security import SecurityEventType, SecuritySeverity
 from agentverse_api.auth_service.domain.sso import SsoPreset, SsoProtocol
 
 
@@ -108,6 +109,12 @@ class ApiKey:
     #: key issued directly, including every key that existed before
     #: rotation shipped.
     rotated_from_id: str | None
+    #: `None` means the key never expires.
+    expires_at: datetime | None = None
+    use_count: int = 0
+
+    def is_expired(self, *, now: datetime) -> bool:
+        return self.expires_at is not None and self.expires_at <= now
 
     @property
     def is_active(self) -> bool:
@@ -161,6 +168,92 @@ class OrganizationSettings:
     description: str | None
     updated_at: datetime
     updated_by_user_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class MemberPresence:
+    """What is actually known about a member's recent activity.
+
+    Deliberately not called "online". There is no heartbeat anywhere in
+    this system, so the honest signal is "holds an unexpired session",
+    which is what `has_active_session` means — a user who closed their
+    laptop still has one. Presenting that as a live online indicator
+    would be inventing a fact the platform does not have.
+    """
+
+    user_id: str
+    email: str
+    name: str
+    role: Role
+    #: Most recent session start. `None` for a member who has never
+    #: signed in since sessions were retained.
+    last_login_at: datetime | None
+    #: Most recent activity on any session.
+    last_seen_at: datetime | None
+    has_active_session: bool
+    #: From the most recent session — what they last signed in from.
+    last_user_agent: str | None
+    last_ip_address: str | None
+    suspended_at: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class OrganizationStats:
+    """Headline counts for the organization dashboard."""
+
+    workspace_count: int
+    member_count: int
+    active_member_count: int
+    suspended_member_count: int
+    members_by_role: dict[Role, int]
+
+
+@dataclass(frozen=True, slots=True)
+class SecurityEvent:
+    """One security signal about an identity.
+
+    `user_id` is nullable because the most important events happen
+    before an identity is resolved — a failed login for an address that
+    matches no account still needs recording, and dropping it would
+    blind exactly the enumeration attack it evidences.
+    """
+
+    id: str
+    user_id: str | None
+    workspace_id: str | None
+    organization_id: str | None
+    event_type: SecurityEventType
+    severity: SecuritySeverity
+    ip_address: str | None
+    user_agent: str | None
+    metadata: dict[str, str]
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class TrustedDevice:
+    """A device a user has confirmed, so a later sign-in from it is not
+    reported as new.
+
+    Identified by a caller-supplied fingerprint rather than by session:
+    sessions rotate on every login, so keying on one would make every
+    sign-in look like a new device — the exact false positive that
+    trains people to ignore the alert.
+    """
+
+    id: str
+    user_id: str
+    device_fingerprint: str
+    device_name: str | None
+    user_agent: str | None
+    ip_address: str | None
+    trusted_at: datetime
+    last_seen_at: datetime
+    revoked_at: datetime | None
+
+    @property
+    def is_active(self) -> bool:
+        return self.revoked_at is None
 
 
 @dataclass(frozen=True, slots=True)

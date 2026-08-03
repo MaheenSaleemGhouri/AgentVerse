@@ -23,6 +23,7 @@ from agentverse_api.auth_service.application.resource_permission_service import 
     ResourcePermissionService,
 )
 from agentverse_api.auth_service.application.scim_service import ScimService
+from agentverse_api.auth_service.application.security_service import SecurityService
 from agentverse_api.auth_service.application.sso_service import SsoService
 from agentverse_api.auth_service.application.workspace_service import WorkspaceService
 from agentverse_api.auth_service.application.workspace_settings_service import (
@@ -37,14 +38,18 @@ from agentverse_api.auth_service.infrastructure.repositories import (
     SqlIpAllowlistRepository,
     SqlOrganizationRepository,
     SqlOrganizationSettingsRepository,
+    SqlPasswordPolicyRepository,
     SqlResourcePermissionRepository,
     SqlScimRepository,
     SqlScimTokenRepository,
+    SqlSecurityEventRepository,
     SqlSsoConfigurationRepository,
+    SqlTrustedDeviceRepository,
     SqlUserLookupRepository,
     SqlWorkspaceRepository,
     SqlWorkspaceSettingsRepository,
 )
+from agentverse_api.auth_service.interface.security_posture import SecurityPostureReader
 from agentverse_api.infrastructure.config import get_settings
 from agentverse_api.infrastructure.db import get_db_session
 from agentverse_api.orchestration_service.interface.dependencies.services import (
@@ -86,6 +91,28 @@ def get_organization_settings_service(
     audit = AuditService(audit_logs=SqlAuditLogRepository(session))
     return OrganizationSettingsService(
         settings=SqlOrganizationSettingsRepository(session), audit=audit
+    )
+
+
+def get_security_service(session: AsyncSession = Depends(get_db_session)) -> SecurityService:
+    audit = AuditService(audit_logs=SqlAuditLogRepository(session))
+    return SecurityService(
+        events=SqlSecurityEventRepository(session),
+        devices=SqlTrustedDeviceRepository(session),
+        policies=SqlPasswordPolicyRepository(session),
+        audit=audit,
+    )
+
+
+def get_security_posture_reader(
+    session: AsyncSession = Depends(get_db_session),
+) -> SecurityPostureReader:
+    return SecurityPostureReader(
+        workspaces=SqlWorkspaceRepository(session),
+        ip_allowlist=SqlIpAllowlistRepository(session),
+        sso=SqlSsoConfigurationRepository(session),
+        policies=SqlPasswordPolicyRepository(session),
+        api_keys=SqlApiKeyRepository(session),
     )
 
 

@@ -44,6 +44,40 @@ class ChangeOrgMemberRoleRequest(BaseModel):
     role: Role
 
 
+class MemberPresenceResponse(BaseModel):
+    """A member plus what is actually known about their recent activity.
+
+    `has_active_session` means "holds an unexpired session", not "is
+    looking at the screen right now" — there is no heartbeat in this
+    system, and the field is named for what it can honestly claim.
+    """
+
+    user_id: str
+    email: str
+    name: str
+    role: Role
+    last_login_at: datetime | None
+    last_seen_at: datetime | None
+    has_active_session: bool
+    last_user_agent: str | None
+    last_ip_address: str | None
+    suspended_at: datetime | None
+
+
+class OrganizationStatsResponse(BaseModel):
+    workspace_count: int
+    member_count: int
+    active_member_count: int
+    suspended_member_count: int
+    members_by_role: dict[Role, int]
+
+
+class OrganizationDashboardResponse(BaseModel):
+    organization: OrganizationResponse
+    stats: OrganizationStatsResponse
+    members: list[MemberPresenceResponse]
+
+
 class OrganizationWorkspaceResponse(BaseModel):
     """A workspace attached to an organization — deliberately carries no
     role: attachment grants no workspace access, so there is no role to

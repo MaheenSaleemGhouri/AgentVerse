@@ -66,8 +66,11 @@ export function OrganizationsList({
         />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
+          {/* Each card lands on the organization overview, not settings:
+              a member opening their organization wants to see it, and
+              only an admin can change anything under settings anyway. */}
           {(organizations ?? []).map((organization) => (
-            <Link key={organization.id} href={`/organizations/${organization.id}/settings`}>
+            <Link key={organization.id} href={`/organizations/${organization.id}`}>
               <Card className="gap-3 p-4 transition-colors hover:border-primary/40">
                 <div className="flex items-center gap-3">
                   <span

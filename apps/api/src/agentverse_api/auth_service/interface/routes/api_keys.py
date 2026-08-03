@@ -30,6 +30,8 @@ def _issued_response(issued: IssuedApiKey) -> IssuedApiKeyResponse:
         scope=issued.entity.scope,
         tier=issued.entity.tier,
         rotated_from_id=issued.entity.rotated_from_id,
+        expires_at=issued.entity.expires_at,
+        use_count=issued.entity.use_count,
         key=issued.plaintext_key,
     )
 
@@ -46,6 +48,7 @@ async def issue_api_key(
         created_by_user_id=context.user_id,
         scope=body.scope,
         tier=body.tier,
+        expires_in_days=body.expires_in_days,
     )
     return _issued_response(issued)
 

@@ -5,6 +5,12 @@ import { notFound, redirect } from "next/navigation";
 
 import { listAuditLogs } from "@/lib/api/audit-logs";
 import { listIpAllowlist } from "@/lib/api/ip-allowlist";
+import {
+  getSecurityScore,
+  listMyDevices,
+  listMySecurityEvents,
+  listWorkspaceSecurityEvents,
+} from "@/lib/api/security";
 import { listApiKeys, listMyWorkspaces } from "@/lib/api/workspaces";
 import { auth } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
@@ -12,7 +18,10 @@ import { ROLE_DESCRIPTIONS } from "@/lib/roles";
 
 import { StatusBadge } from "@/components/patterns/status-badge";
 import { IpAllowlistPanel } from "@/components/settings/ip-allowlist-panel";
+import { SecurityEventsPanel } from "@/components/settings/security-events-panel";
+import { SecurityScoreCard } from "@/components/settings/security-score-card";
 import { SessionsPanel } from "@/components/settings/sessions-panel";
+import { TrustedDevicesPanel } from "@/components/settings/trusted-devices-panel";
 import { TwoFactorPanel } from "@/components/settings/two-factor-panel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -53,6 +62,17 @@ export default async function SecurityPage({
   // Admin-gated on the API too, so members/viewers never issue the call.
   const ipAllowlist = canViewAuditTrail ? await listIpAllowlist(workspaceId) : [];
 
+  // The score and the workspace-wide feed are admin-gated; the caller's
+  // own devices and events are not — a member always sees their own
+  // security history, which is the point of it.
+  const [myDevices, myEvents] = await Promise.all([listMyDevices(), listMySecurityEvents(20)]);
+  const [securityScore, workspaceEvents] = canViewAuditTrail
+    ? await Promise.all([
+        getSecurityScore(workspaceId),
+        listWorkspaceSecurityEvents(workspaceId, 20),
+      ])
+    : [null, []];
+
   // `twoFactorEnabled` comes from the live session's user record — the
   // column the `twoFactor()` plugin maintains (Increment 7.2).
   const twoFactorEnabled =
@@ -60,6 +80,8 @@ export default async function SecurityPage({
 
   return (
     <div className="max-w-3xl space-y-6">
+      {securityScore && <SecurityScoreCard score={securityScore} />}
+
       <Card className="gap-4 p-6">
         <div className="flex items-start gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success-soft text-success">
@@ -81,6 +103,22 @@ export default async function SecurityPage({
       <TwoFactorPanel enabled={twoFactorEnabled} />
 
       <SessionsPanel currentSessionToken={session.session.token} />
+
+      <TrustedDevicesPanel initialDevices={myDevices} />
+
+      <SecurityEventsPanel
+        events={myEvents}
+        title="Your recent security activity"
+        description="Sign-ins, device changes and failed attempts on your own account."
+      />
+
+      {canViewAuditTrail && (
+        <SecurityEventsPanel
+          events={workspaceEvents}
+          title="Workspace security activity"
+          description="Security signals across everyone in this workspace."
+        />
+      )}
 
       <Card className="gap-4 p-6">
         <div className="flex items-start gap-3">

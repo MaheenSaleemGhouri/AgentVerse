@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from agentverse_api.auth_service.domain.api_key_scope import ApiKeyScope
 from agentverse_api.auth_service.domain.entities import (
@@ -16,8 +16,10 @@ from agentverse_api.auth_service.domain.entities import (
     AuditLogEntry,
     Invitation,
     IpAllowlistEntry,
+    MemberPresence,
     Organization,
     OrganizationMember,
+    OrganizationStats,
     OrganizationSummary,
     ResourcePermission,
     UserSummary,
@@ -89,6 +91,13 @@ class FakeWorkspaceRepository:
 
     async def list_members(self, workspace_id: str) -> list[WorkspaceMember]:
         return [member for (wid, _uid), member in self.members.items() if wid == workspace_id]
+
+    async def count_two_factor_coverage(self, workspace_id: str) -> tuple[int, int]:
+        # The fake holds no `users` rows, so nobody has two-factor. The
+        # real join is covered against Postgres in the integration
+        # suite — that is where a join is capable of being wrong.
+        members = await self.list_members(workspace_id)
+        return 0, len(members)
 
 
 @dataclass
@@ -218,6 +227,44 @@ class FakeOrganizationRepository:
             if workspace.organization_id == organization_id
         ]
 
+    async def list_member_presence(self, organization_id: str) -> list[MemberPresence]:
+        # No session store in the fake, so presence reads as "never
+        # signed in". That is the honest in-memory answer: the real
+        # session join is exercised against Postgres in the integration
+        # suite, which is where a join can actually be wrong.
+        return [
+            MemberPresence(
+                user_id=member.user_id,
+                email=f"{member.user_id}@example.com",
+                name=member.user_id,
+                role=member.role,
+                last_login_at=None,
+                last_seen_at=None,
+                has_active_session=False,
+                last_user_agent=None,
+                last_ip_address=None,
+                suspended_at=member.suspended_at,
+            )
+            for (org_id, _), member in self.members.items()
+            if org_id == organization_id
+        ]
+
+    async def stats(self, organization_id: str) -> OrganizationStats:
+        members = [
+            member for (org_id, _), member in self.members.items() if org_id == organization_id
+        ]
+        by_role: dict[Role, int] = {}
+        for member in members:
+            by_role[member.role] = by_role.get(member.role, 0) + 1
+        suspended = sum(1 for member in members if member.suspended_at is not None)
+        return OrganizationStats(
+            workspace_count=len(await self.list_workspaces(organization_id)),
+            member_count=len(members),
+            active_member_count=len(members) - suspended,
+            suspended_member_count=suspended,
+            members_by_role=by_role,
+        )
+
     async def attach_workspace(self, *, organization_id: str, workspace_id: str) -> None:
         existing = self.workspaces[workspace_id]
         self.workspaces[workspace_id] = Workspace(
@@ -255,6 +302,7 @@ class FakeApiKeyRepository:
         scope: ApiKeyScope = ApiKeyScope.FULL,
         tier: str = "standard",
         rotated_from_id: str | None = None,
+        expires_at: datetime | None = None,
     ) -> ApiKey:
         key = ApiKey(
             id=str(uuid.uuid4()),
@@ -269,6 +317,8 @@ class FakeApiKeyRepository:
             scope=scope,
             tier=tier,
             rotated_from_id=rotated_from_id,
+            expires_at=expires_at,
+            use_count=0,
         )
         self.keys[key.id] = key
         return key
@@ -279,26 +329,30 @@ class FakeApiKeyRepository:
     async def get_api_key(self, api_key_id: str) -> ApiKey | None:
         return self.keys.get(api_key_id)
 
-    async def revoke_api_key(self, api_key_id: str) -> None:
-        key = self.keys[api_key_id]
-        self.keys[api_key_id] = ApiKey(
-            id=key.id,
-            workspace_id=key.workspace_id,
-            name=key.name,
-            key_prefix=key.key_prefix,
-            hashed_key=key.hashed_key,
-            created_by_user_id=key.created_by_user_id,
-            created_at=key.created_at,
-            last_used_at=key.last_used_at,
-            revoked_at=datetime.now(UTC),
-            scope=key.scope,
-            tier=key.tier,
-            rotated_from_id=key.rotated_from_id,
+    async def count_non_expiring(self, workspace_id: str) -> int:
+        return sum(
+            1
+            for key in self.keys.values()
+            if key.workspace_id == workspace_id
+            and key.revoked_at is None
+            and key.expires_at is None
         )
 
+    async def revoke_api_key(self, api_key_id: str) -> None:
+        self.keys[api_key_id] = replace(self.keys[api_key_id], revoked_at=datetime.now(UTC))
+
     async def find_active_by_hash(self, hashed_key: str) -> ApiKey | None:
+        now = datetime.now(UTC)
         for key in self.keys.values():
-            if key.hashed_key == hashed_key and key.revoked_at is None:
+            # Mirrors the real repository's SQL, expiry included. A fake
+            # that skipped the expiry check would let unit tests pass
+            # while the actual authentication path refused the key —
+            # the exact false confidence a fake exists to avoid.
+            if (
+                key.hashed_key == hashed_key
+                and key.revoked_at is None
+                and not key.is_expired(now=now)
+            ):
                 return key
         return None
 
@@ -306,7 +360,9 @@ class FakeApiKeyRepository:
         key = self.keys.get(api_key_id)
         if key is None:
             return
-        self.keys[api_key_id] = replace(key, last_used_at=datetime.now(UTC))
+        self.keys[api_key_id] = replace(
+            key, last_used_at=datetime.now(UTC), use_count=key.use_count + 1
+        )
 
 
 @dataclass
@@ -363,6 +419,17 @@ class FakeAuditLogRepository:
             cursor_dt = datetime.fromisoformat(cursor)
             matches = [entry for entry in matches if entry.created_at < cursor_dt]
         return matches[:limit]
+
+    async def count_by_day(self, workspace_id: str, *, since: datetime) -> list[tuple[date, int]]:
+        counts: dict[date, int] = {}
+        for entry in self.entries:
+            if entry.workspace_id != workspace_id or entry.created_at < since:
+                continue
+            day = entry.created_at.date()
+            counts[day] = counts.get(day, 0) + 1
+        # Oldest first, matching the real repository's ORDER BY — a fake
+        # that returned them unordered would let a gap-filling bug pass.
+        return sorted(counts.items())
 
 
 @dataclass

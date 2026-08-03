@@ -120,3 +120,12 @@ export async function detachWorkspace(
     skipJson: true,
   });
 }
+
+export type OrganizationDashboard = components["schemas"]["OrganizationDashboardResponse"];
+export type MemberPresence = components["schemas"]["MemberPresenceResponse"];
+
+export async function getOrganizationDashboard(
+  organizationId: string
+): Promise<OrganizationDashboard> {
+  return apiFetch<OrganizationDashboard>(`/api/v1/organizations/${organizationId}/dashboard`);
+}

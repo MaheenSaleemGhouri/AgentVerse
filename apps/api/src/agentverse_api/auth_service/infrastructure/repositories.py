@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select, update
+from sqlalchemy import or_ as sa_or
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +19,8 @@ from agentverse_api.auth_service.domain.entities import (
     AuditLogEntry,
     Invitation,
     IpAllowlistEntry,
+    MemberPresence,
+    OrganizationStats,
     OrganizationSummary,
     ScimUser,
     UserSummary,
@@ -42,7 +45,13 @@ from agentverse_api.auth_service.domain.entities import (
     ScimToken as ScimTokenEntity,
 )
 from agentverse_api.auth_service.domain.entities import (
+    SecurityEvent as SecurityEventEntity,
+)
+from agentverse_api.auth_service.domain.entities import (
     SsoConfiguration as SsoConfigurationEntity,
+)
+from agentverse_api.auth_service.domain.entities import (
+    TrustedDevice as TrustedDeviceEntity,
 )
 from agentverse_api.auth_service.domain.entities import (
     Workspace as WorkspaceEntity,
@@ -57,6 +66,14 @@ from agentverse_api.auth_service.domain.exceptions import CustomRoleNotFoundErro
 from agentverse_api.auth_service.domain.invitation_target_type import InvitationTargetType
 from agentverse_api.auth_service.domain.permission import Permission
 from agentverse_api.auth_service.domain.role import Role
+from agentverse_api.auth_service.domain.security import (
+    PasswordPolicy as PasswordPolicyEntity,
+)
+from agentverse_api.auth_service.domain.security import (
+    SecurityEventType,
+    SecuritySeverity,
+    severity_for,
+)
 from agentverse_api.auth_service.domain.sso import SsoPreset, SsoProtocol
 from agentverse_api.auth_service.infrastructure.models import (
     ApiKey,
@@ -64,9 +81,13 @@ from agentverse_api.auth_service.infrastructure.models import (
     Organization,
     OrganizationMember,
     OrganizationSettings,
+    PasswordPolicy,
     ResourcePermission,
     ScimToken,
+    SecurityEvent,
+    Session,
     SsoConfiguration,
+    TrustedDevice,
     User,
     Verification,
     Workspace,
@@ -192,6 +213,8 @@ def _to_api_key(row: ApiKey) -> ApiKeyEntity:
         scope=ApiKeyScope(row.scope),
         tier=row.tier,
         rotated_from_id=row.rotated_from_id,
+        expires_at=row.expires_at,
+        use_count=row.use_count,
     )
 
 
@@ -335,6 +358,22 @@ class SqlWorkspaceRepository:
         stmt = select(WorkspaceMember).where(WorkspaceMember.workspace_id == workspace_id)
         result = await self._session.execute(stmt)
         return [_to_member(row) for row in result.scalars().all()]
+
+    async def count_two_factor_coverage(self, workspace_id: str) -> tuple[int, int]:
+        # One query, two aggregates: computing the ratio from two
+        # separate round trips could straddle a membership change and
+        # report more enabled members than total.
+        stmt = (
+            select(
+                func.count(User.id).filter(User.two_factor_enabled.is_(True)),
+                func.count(User.id),
+            )
+            .select_from(WorkspaceMember)
+            .join(User, User.id == WorkspaceMember.user_id)
+            .where(WorkspaceMember.workspace_id == workspace_id)
+        )
+        enabled, total = (await self._session.execute(stmt)).one()
+        return int(enabled), int(total)
 
 
 class SqlOrganizationRepository:
@@ -483,6 +522,91 @@ class SqlOrganizationRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
+    async def list_member_presence(self, organization_id: str) -> list[MemberPresence]:
+        # Sessions are aggregated in SQL: MAX over each member's sessions
+        # in one pass, rather than fetching every session row to reduce
+        # them in Python. `expires_at > now` is the only honest "active"
+        # signal available — there is no heartbeat to derive presence
+        # from, and inventing one would be inventing a fact.
+        now = datetime.now(UTC)
+        latest_session = (
+            select(
+                Session.user_id.label("user_id"),
+                func.max(Session.created_at).label("last_login_at"),
+                func.max(Session.updated_at).label("last_seen_at"),
+                func.count().filter(Session.expires_at > now).label("active_sessions"),
+            )
+            .group_by(Session.user_id)
+            .subquery()
+        )
+        # The user agent/IP of the *most recent* session specifically,
+        # which an aggregate cannot give — a separate correlated pick.
+        newest = (
+            select(Session.user_id, Session.user_agent, Session.ip_address)
+            .distinct(Session.user_id)
+            .order_by(Session.user_id, Session.created_at.desc())
+            .subquery()
+        )
+        stmt = (
+            select(
+                User.id,
+                User.email,
+                User.name,
+                OrganizationMember.role,
+                OrganizationMember.suspended_at,
+                latest_session.c.last_login_at,
+                latest_session.c.last_seen_at,
+                latest_session.c.active_sessions,
+                newest.c.user_agent,
+                newest.c.ip_address,
+            )
+            .select_from(OrganizationMember)
+            .join(User, User.id == OrganizationMember.user_id)
+            .join(latest_session, latest_session.c.user_id == User.id, isouter=True)
+            .join(newest, newest.c.user_id == User.id, isouter=True)
+            .where(OrganizationMember.organization_id == organization_id)
+            .order_by(User.email)
+        )
+        result = await self._session.execute(stmt)
+        return [
+            MemberPresence(
+                user_id=row.id,
+                email=row.email,
+                name=row.name,
+                role=row.role,
+                last_login_at=row.last_login_at,
+                last_seen_at=row.last_seen_at,
+                has_active_session=bool(row.active_sessions),
+                last_user_agent=row.user_agent,
+                last_ip_address=row.ip_address,
+                suspended_at=row.suspended_at,
+            )
+            for row in result
+        ]
+
+    async def stats(self, organization_id: str) -> OrganizationStats:
+        members = await self.list_members(organization_id)
+        workspace_count = (
+            await self._session.execute(
+                select(func.count())
+                .select_from(Workspace)
+                .where(Workspace.organization_id == organization_id)
+            )
+        ).scalar_one()
+
+        by_role: dict[Role, int] = {}
+        for member in members:
+            by_role[member.role] = by_role.get(member.role, 0) + 1
+        suspended = sum(1 for member in members if member.suspended_at is not None)
+
+        return OrganizationStats(
+            workspace_count=int(workspace_count),
+            member_count=len(members),
+            active_member_count=len(members) - suspended,
+            suspended_member_count=suspended,
+            members_by_role=by_role,
+        )
+
     async def list_members(self, organization_id: str) -> list[OrganizationMemberEntity]:
         stmt = select(OrganizationMember).where(
             OrganizationMember.organization_id == organization_id
@@ -609,6 +733,259 @@ class SqlOrganizationSettingsRepository:
         return _to_organization_settings(result.scalar_one())
 
 
+def _to_security_event(row: SecurityEvent) -> SecurityEventEntity:
+    return SecurityEventEntity(
+        id=row.id,
+        user_id=row.user_id,
+        workspace_id=row.workspace_id,
+        organization_id=row.organization_id,
+        event_type=SecurityEventType(row.event_type),
+        severity=SecuritySeverity(row.severity),
+        ip_address=row.ip_address,
+        user_agent=row.user_agent,
+        metadata=row.event_metadata,
+        created_at=row.created_at,
+    )
+
+
+def _to_trusted_device(row: TrustedDevice) -> TrustedDeviceEntity:
+    return TrustedDeviceEntity(
+        id=row.id,
+        user_id=row.user_id,
+        device_fingerprint=row.device_fingerprint,
+        device_name=row.device_name,
+        user_agent=row.user_agent,
+        ip_address=row.ip_address,
+        trusted_at=row.trusted_at,
+        last_seen_at=row.last_seen_at,
+        revoked_at=row.revoked_at,
+    )
+
+
+def _to_password_policy(row: PasswordPolicy) -> PasswordPolicyEntity:
+    return PasswordPolicyEntity(
+        min_length=row.min_length,
+        require_uppercase=row.require_uppercase,
+        require_lowercase=row.require_lowercase,
+        require_number=row.require_number,
+        require_symbol=row.require_symbol,
+        max_age_days=row.max_age_days,
+    )
+
+
+class SqlSecurityEventRepository:
+    """Implements `domain.ports.SecurityEventRepository` against Postgres."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def record(
+        self,
+        *,
+        user_id: str | None,
+        workspace_id: str | None,
+        organization_id: str | None,
+        event_type: SecurityEventType,
+        ip_address: str | None,
+        user_agent: str | None,
+        metadata: dict[str, str],
+    ) -> SecurityEventEntity:
+        row = SecurityEvent(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            workspace_id=workspace_id,
+            organization_id=organization_id,
+            event_type=event_type.value,
+            # Derived, never caller-supplied: the same event recorded
+            # from two code paths must land at the same severity or the
+            # feed stops being sortable by urgency.
+            severity=severity_for(event_type).value,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            event_metadata=metadata,
+            created_at=datetime.now(UTC),
+        )
+        self._session.add(row)
+        await self._session.flush()
+        return _to_security_event(row)
+
+    async def list_for_user(
+        self,
+        user_id: str,
+        *,
+        limit: int,
+        severity: SecuritySeverity | None = None,
+    ) -> list[SecurityEventEntity]:
+        stmt = select(SecurityEvent).where(SecurityEvent.user_id == user_id)
+        if severity is not None:
+            stmt = stmt.where(SecurityEvent.severity == severity.value)
+        stmt = stmt.order_by(SecurityEvent.created_at.desc()).limit(limit)
+        result = await self._session.execute(stmt)
+        return [_to_security_event(row) for row in result.scalars()]
+
+    async def list_for_workspace(
+        self,
+        workspace_id: str,
+        *,
+        limit: int,
+        severity: SecuritySeverity | None = None,
+    ) -> list[SecurityEventEntity]:
+        stmt = select(SecurityEvent).where(SecurityEvent.workspace_id == workspace_id)
+        if severity is not None:
+            stmt = stmt.where(SecurityEvent.severity == severity.value)
+        stmt = stmt.order_by(SecurityEvent.created_at.desc()).limit(limit)
+        result = await self._session.execute(stmt)
+        return [_to_security_event(row) for row in result.scalars()]
+
+    async def count_critical_since(self, workspace_id: str, *, since: datetime) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(SecurityEvent)
+            .where(
+                SecurityEvent.workspace_id == workspace_id,
+                SecurityEvent.severity == SecuritySeverity.CRITICAL.value,
+                SecurityEvent.created_at >= since,
+            )
+        )
+        return int((await self._session.execute(stmt)).scalar_one())
+
+    async def count_recent_failures(self, *, user_id: str, since: datetime) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(SecurityEvent)
+            .where(
+                SecurityEvent.user_id == user_id,
+                SecurityEvent.event_type == SecurityEventType.LOGIN_FAILED.value,
+                SecurityEvent.created_at >= since,
+            )
+        )
+        return int((await self._session.execute(stmt)).scalar_one())
+
+
+class SqlTrustedDeviceRepository:
+    """Implements `domain.ports.TrustedDeviceRepository` against Postgres."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def upsert(
+        self,
+        *,
+        user_id: str,
+        device_fingerprint: str,
+        device_name: str | None,
+        user_agent: str | None,
+        ip_address: str | None,
+    ) -> TrustedDeviceEntity:
+        now = datetime.now(UTC)
+        insert_stmt = pg_insert(TrustedDevice).values(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            device_fingerprint=device_fingerprint,
+            device_name=device_name,
+            user_agent=user_agent,
+            ip_address=ip_address,
+            trusted_at=now,
+            last_seen_at=now,
+            revoked_at=None,
+        )
+        upsert_stmt = insert_stmt.on_conflict_do_update(
+            index_elements=[TrustedDevice.user_id, TrustedDevice.device_fingerprint],
+            set_={
+                "device_name": insert_stmt.excluded.device_name,
+                "user_agent": insert_stmt.excluded.user_agent,
+                "ip_address": insert_stmt.excluded.ip_address,
+                "last_seen_at": insert_stmt.excluded.last_seen_at,
+                # Re-trusting a previously revoked device un-revokes it,
+                # rather than leaving a row that reads as trusted while
+                # still being refused.
+                "revoked_at": None,
+            },
+        ).returning(TrustedDevice)
+        result = await self._session.execute(upsert_stmt)
+        await self._session.flush()
+        return _to_trusted_device(result.scalar_one())
+
+    async def get(self, *, user_id: str, device_fingerprint: str) -> TrustedDeviceEntity | None:
+        stmt = select(TrustedDevice).where(
+            TrustedDevice.user_id == user_id,
+            TrustedDevice.device_fingerprint == device_fingerprint,
+        )
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _to_trusted_device(row) if row is not None else None
+
+    async def list_for_user(self, user_id: str) -> list[TrustedDeviceEntity]:
+        stmt = (
+            select(TrustedDevice)
+            .where(TrustedDevice.user_id == user_id)
+            .order_by(TrustedDevice.last_seen_at.desc())
+        )
+        result = await self._session.execute(stmt)
+        return [_to_trusted_device(row) for row in result.scalars()]
+
+    async def revoke(self, *, user_id: str, device_id: str) -> TrustedDeviceEntity | None:
+        # Scoped by user_id as well as id: a device id from another
+        # account must read as "no such device", never revoke someone
+        # else's (Rule 11 — never trust a client-supplied id alone).
+        stmt = select(TrustedDevice).where(
+            TrustedDevice.id == device_id, TrustedDevice.user_id == user_id
+        )
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            return None
+        if row.revoked_at is None:
+            row.revoked_at = datetime.now(UTC)
+            await self._session.flush()
+        return _to_trusted_device(row)
+
+
+class SqlPasswordPolicyRepository:
+    """Implements `domain.ports.PasswordPolicyRepository` against Postgres."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get(self, organization_id: str) -> PasswordPolicyEntity | None:
+        row = await self._session.get(PasswordPolicy, organization_id)
+        return _to_password_policy(row) if row is not None else None
+
+    async def upsert(
+        self,
+        *,
+        organization_id: str,
+        policy: PasswordPolicyEntity,
+        updated_by_user_id: str,
+    ) -> PasswordPolicyEntity:
+        now = datetime.now(UTC)
+        insert_stmt = pg_insert(PasswordPolicy).values(
+            organization_id=organization_id,
+            min_length=policy.min_length,
+            require_uppercase=policy.require_uppercase,
+            require_lowercase=policy.require_lowercase,
+            require_number=policy.require_number,
+            require_symbol=policy.require_symbol,
+            max_age_days=policy.max_age_days,
+            updated_at=now,
+            updated_by_user_id=updated_by_user_id,
+        )
+        upsert_stmt = insert_stmt.on_conflict_do_update(
+            index_elements=[PasswordPolicy.organization_id],
+            set_={
+                "min_length": insert_stmt.excluded.min_length,
+                "require_uppercase": insert_stmt.excluded.require_uppercase,
+                "require_lowercase": insert_stmt.excluded.require_lowercase,
+                "require_number": insert_stmt.excluded.require_number,
+                "require_symbol": insert_stmt.excluded.require_symbol,
+                "max_age_days": insert_stmt.excluded.max_age_days,
+                "updated_at": insert_stmt.excluded.updated_at,
+                "updated_by_user_id": insert_stmt.excluded.updated_by_user_id,
+            },
+        ).returning(PasswordPolicy)
+        result = await self._session.execute(upsert_stmt)
+        await self._session.flush()
+        return _to_password_policy(result.scalar_one())
+
+
 class SqlApiKeyRepository:
     """Implements `domain.ports.ApiKeyRepository` against Postgres."""
 
@@ -626,6 +1003,7 @@ class SqlApiKeyRepository:
         scope: ApiKeyScope = ApiKeyScope.FULL,
         tier: str = "standard",
         rotated_from_id: str | None = None,
+        expires_at: datetime | None = None,
     ) -> ApiKeyEntity:
         row = ApiKey(
             workspace_id=workspace_id,
@@ -637,6 +1015,7 @@ class SqlApiKeyRepository:
             scope=scope.value,
             tier=tier,
             rotated_from_id=rotated_from_id,
+            expires_at=expires_at,
         )
         self._session.add(row)
         await self._session.flush()
@@ -646,6 +1025,18 @@ class SqlApiKeyRepository:
         stmt = select(ApiKey).where(ApiKey.workspace_id == workspace_id)
         result = await self._session.execute(stmt)
         return [_to_api_key(row) for row in result.scalars().all()]
+
+    async def count_non_expiring(self, workspace_id: str) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(ApiKey)
+            .where(
+                ApiKey.workspace_id == workspace_id,
+                ApiKey.revoked_at.is_(None),
+                ApiKey.expires_at.is_(None),
+            )
+        )
+        return int((await self._session.execute(stmt)).scalar_one())
 
     async def get_api_key(self, api_key_id: str) -> ApiKeyEntity | None:
         row = await self._session.get(ApiKey, api_key_id)
@@ -660,13 +1051,26 @@ class SqlApiKeyRepository:
     async def find_active_by_hash(self, hashed_key: str) -> ApiKeyEntity | None:
         # `hashed_key` is UNIQUE, so this is an index lookup on the
         # authentication hot path, not a scan.
-        stmt = select(ApiKey).where(ApiKey.hashed_key == hashed_key, ApiKey.revoked_at.is_(None))
+        #
+        # Expiry is filtered in SQL rather than checked by the caller
+        # afterwards: an expired key must be indistinguishable from an
+        # unknown one, and a caller that forgot the check would silently
+        # accept it.
+        stmt = select(ApiKey).where(
+            ApiKey.hashed_key == hashed_key,
+            ApiKey.revoked_at.is_(None),
+            sa_or(ApiKey.expires_at.is_(None), ApiKey.expires_at > datetime.now(UTC)),
+        )
         result = await self._session.execute(stmt)
         row = result.scalar_one_or_none()
         return _to_api_key(row) if row is not None else None
 
     async def touch_last_used(self, api_key_id: str) -> None:
-        stmt = update(ApiKey).where(ApiKey.id == api_key_id).values(last_used_at=datetime.now(UTC))
+        stmt = (
+            update(ApiKey)
+            .where(ApiKey.id == api_key_id)
+            .values(last_used_at=datetime.now(UTC), use_count=ApiKey.use_count + 1)
+        )
         await self._session.execute(stmt)
 
 
@@ -734,6 +1138,17 @@ class SqlAuditLogRepository:
             statement.order_by(AuditLog.created_at.desc()).limit(limit)
         )
         return [_to_audit_entry(row) for row in result.scalars()]
+
+    async def count_by_day(self, workspace_id: str, *, since: datetime) -> list[tuple[date, int]]:
+        day = func.date_trunc("day", AuditLog.created_at).label("day")
+        stmt = (
+            select(day, func.count().label("entries"))
+            .where(AuditLog.workspace_id == workspace_id, AuditLog.created_at >= since)
+            .group_by(day)
+            .order_by(day)
+        )
+        result = await self._session.execute(stmt)
+        return [(row.day.date(), int(row.entries)) for row in result]
 
 
 class SqlInvitationRepository:

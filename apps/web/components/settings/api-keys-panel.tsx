@@ -56,6 +56,12 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
+/** The server refuses an expired key regardless; this only decides how
+ *  the row is labelled, so a clock skew of seconds is harmless here. */
+function isExpired(expiresAt: string | null): boolean {
+  return expiresAt !== null && new Date(expiresAt).getTime() <= Date.now();
+}
+
 const SCOPE_LABEL: Record<ApiKeyScope, string> = {
   full: "Full access",
   read_only: "Read-only",
@@ -76,6 +82,10 @@ export function ApiKeysPanel({
   const [createOpen, setCreateOpen] = React.useState(false);
   const [name, setName] = React.useState("");
   const [scope, setScope] = React.useState<ApiKeyScope>("full");
+  // "never" is a deliberate option rather than the absence of a choice:
+  // it is what every key issued before expiry shipped already does, and
+  // making it explicit means the person issuing one has to mean it.
+  const [expiry, setExpiry] = React.useState<string>("90");
   // Held in component state only, never written to the query cache —
   // the plaintext key is returned exactly once and must not be
   // retrievable from anywhere afterwards.
@@ -88,12 +98,18 @@ export function ApiKeysPanel({
       // `tier` has no picker yet — "standard" is the only tier that
       // exists today, sent explicitly since the generated request type
       // treats every field with a schema default as required to send.
-      { name: name.trim(), scope, tier: "standard" },
+      {
+        name: name.trim(),
+        scope,
+        tier: "standard",
+        expires_in_days: expiry === "never" ? null : Number(expiry),
+      },
       {
         onSuccess: (issued) => {
           setCreateOpen(false);
           setName("");
           setScope("full");
+          setExpiry("90");
           setIssuedSecret(issued.key);
         },
       }
@@ -152,6 +168,7 @@ export function ApiKeysPanel({
                 <TableHead>Scope</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Last used</TableHead>
+                <TableHead>Expires</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-24" />
               </TableRow>
@@ -178,12 +195,28 @@ export function ApiKeysPanel({
                   </TableCell>
                   <TableCell className="text-sm whitespace-nowrap text-muted-foreground">
                     {/* "Never used" is a real signal — an unused key is
-                        usually a leftover worth revoking. */}
+                        usually a leftover worth revoking. The call count
+                        answers the follow-up question a bare timestamp
+                        cannot: is it still carrying real traffic? */}
                     {key.last_used_at ? formatRelativeTime(key.last_used_at) : "Never"}
+                    {key.use_count > 0 && (
+                      <p className="text-xs">
+                        {key.use_count.toLocaleString()} call
+                        {key.use_count === 1 ? "" : "s"}
+                      </p>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm whitespace-nowrap text-muted-foreground">
+                    {key.expires_at ? formatRelativeTime(key.expires_at) : "Never"}
                   </TableCell>
                   <TableCell>
                     {key.revoked_at ? (
                       <StatusBadge tone="danger">Revoked</StatusBadge>
+                    ) : isExpired(key.expires_at) ? (
+                      // Distinct from Revoked: nobody revoked it, its
+                      // configured lifetime simply ran out. Both stop
+                      // authenticating; only one was a decision.
+                      <StatusBadge tone="warning">Expired</StatusBadge>
                     ) : (
                       <StatusBadge tone="success">Active</StatusBadge>
                     )}
@@ -260,6 +293,24 @@ export function ApiKeysPanel({
             <p className="text-xs text-muted-foreground">
               Read-only keys are capped at viewer access. A key never grants more than
               the member who issued it currently has.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="key-expiry">Expires</Label>
+            <Select value={expiry} onValueChange={setExpiry}>
+              <SelectTrigger id="key-expiry">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="30">In 30 days</SelectItem>
+                <SelectItem value="90">In 90 days</SelectItem>
+                <SelectItem value="365">In a year</SelectItem>
+                <SelectItem value="never">Never</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              An expired key stops authenticating immediately. Keys that never expire count
+              against this workspace&apos;s security score.
             </p>
           </div>
           <DialogFooter>

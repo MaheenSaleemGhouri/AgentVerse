@@ -6,7 +6,7 @@ fake — application-layer use cases depend only on these interfaces
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Protocol
 
 from agentverse_api.auth_service.domain.api_key_scope import ApiKeyScope
@@ -16,14 +16,18 @@ from agentverse_api.auth_service.domain.entities import (
     CustomRole,
     Invitation,
     IpAllowlistEntry,
+    MemberPresence,
     Organization,
     OrganizationMember,
     OrganizationSettings,
+    OrganizationStats,
     OrganizationSummary,
     ResourcePermission,
     ScimToken,
     ScimUser,
+    SecurityEvent,
     SsoConfiguration,
+    TrustedDevice,
     UserSummary,
     Workspace,
     WorkspaceMember,
@@ -33,6 +37,11 @@ from agentverse_api.auth_service.domain.entities import (
 from agentverse_api.auth_service.domain.invitation_target_type import InvitationTargetType
 from agentverse_api.auth_service.domain.permission import Permission
 from agentverse_api.auth_service.domain.role import Role
+from agentverse_api.auth_service.domain.security import (
+    PasswordPolicy,
+    SecurityEventType,
+    SecuritySeverity,
+)
 from agentverse_api.auth_service.domain.sso import SsoPreset, SsoProtocol
 
 
@@ -62,6 +71,14 @@ class WorkspaceRepository(Protocol):
     async def count_owners(self, workspace_id: str) -> int: ...
 
     async def list_members(self, workspace_id: str) -> list[WorkspaceMember]: ...
+
+    async def count_two_factor_coverage(self, workspace_id: str) -> tuple[int, int]:
+        """`(members with two-factor enabled, total members)`.
+
+        Returned as a pair from one query rather than two calls, so the
+        ratio can never be computed from two different points in time.
+        """
+        ...
 
 
 class WorkspaceSettingsRepository(Protocol):
@@ -97,6 +114,70 @@ class OrganizationSettingsRepository(Protocol):
     ) -> OrganizationSettings: ...
 
 
+class SecurityEventRepository(Protocol):
+    async def record(
+        self,
+        *,
+        user_id: str | None,
+        workspace_id: str | None,
+        organization_id: str | None,
+        event_type: SecurityEventType,
+        ip_address: str | None,
+        user_agent: str | None,
+        metadata: dict[str, str],
+    ) -> SecurityEvent: ...
+
+    async def list_for_user(
+        self,
+        user_id: str,
+        *,
+        limit: int,
+        severity: SecuritySeverity | None = None,
+    ) -> list[SecurityEvent]: ...
+
+    async def list_for_workspace(
+        self,
+        workspace_id: str,
+        *,
+        limit: int,
+        severity: SecuritySeverity | None = None,
+    ) -> list[SecurityEvent]: ...
+
+    async def count_critical_since(self, workspace_id: str, *, since: datetime) -> int: ...
+
+    async def count_recent_failures(self, *, user_id: str, since: datetime) -> int: ...
+
+
+class TrustedDeviceRepository(Protocol):
+    async def upsert(
+        self,
+        *,
+        user_id: str,
+        device_fingerprint: str,
+        device_name: str | None,
+        user_agent: str | None,
+        ip_address: str | None,
+    ) -> TrustedDevice: ...
+
+    async def get(self, *, user_id: str, device_fingerprint: str) -> TrustedDevice | None: ...
+
+    async def list_for_user(self, user_id: str) -> list[TrustedDevice]: ...
+
+    async def revoke(self, *, user_id: str, device_id: str) -> TrustedDevice | None: ...
+
+
+class PasswordPolicyRepository(Protocol):
+    async def get(self, organization_id: str) -> PasswordPolicy | None: ...
+
+    async def upsert(
+        self,
+        *,
+        organization_id: str,
+        policy: PasswordPolicy,
+        updated_by_user_id: str,
+    ) -> PasswordPolicy: ...
+
+
 class ApiKeyRepository(Protocol):
     async def create_api_key(
         self,
@@ -109,9 +190,14 @@ class ApiKeyRepository(Protocol):
         scope: ApiKeyScope = ApiKeyScope.FULL,
         tier: str = "standard",
         rotated_from_id: str | None = None,
+        expires_at: datetime | None = None,
     ) -> ApiKey: ...
 
     async def list_api_keys(self, workspace_id: str) -> list[ApiKey]: ...
+
+    async def count_non_expiring(self, workspace_id: str) -> int:
+        """Active keys with no expiry — an input to the security score."""
+        ...
 
     async def get_api_key(self, api_key_id: str) -> ApiKey | None: ...
 
@@ -127,9 +213,9 @@ class ApiKeyRepository(Protocol):
         ...
 
     async def touch_last_used(self, api_key_id: str) -> None:
-        """Records that the key just authenticated a request. Best-effort
-        telemetry for the key-management UI, never an authorization
-        input.
+        """Records that the key just authenticated a request, bumping
+        `last_used_at` and `use_count`. Best-effort telemetry for the
+        key-management UI, never an authorization input.
         """
         ...
 
@@ -174,6 +260,17 @@ class OrganizationRepository(Protocol):
     async def list_members(self, organization_id: str) -> list[OrganizationMember]: ...
 
     async def list_workspaces(self, organization_id: str) -> list[Workspace]: ...
+
+    async def list_member_presence(self, organization_id: str) -> list[MemberPresence]:
+        """Members with their session-derived activity.
+
+        One query joining sessions rather than N per member: a 500-person
+        organization would otherwise issue 500 round trips to render one
+        page.
+        """
+        ...
+
+    async def stats(self, organization_id: str) -> OrganizationStats: ...
 
     async def attach_workspace(self, *, organization_id: str, workspace_id: str) -> None: ...
 
@@ -445,3 +542,13 @@ class AuditLogRepository(Protocol):
         since: datetime | None,
         until: datetime | None,
     ) -> list[AuditLogEntry]: ...
+
+    async def count_by_day(self, workspace_id: str, *, since: datetime) -> list[tuple[date, int]]:
+        """Daily entry counts, oldest first, for the activity graph.
+
+        Aggregated in SQL rather than by counting fetched rows: a busy
+        workspace's 30-day history is far larger than the graph needs,
+        and pulling it all back to count it in Python would be the
+        expensive way to draw a small chart.
+        """
+        ...

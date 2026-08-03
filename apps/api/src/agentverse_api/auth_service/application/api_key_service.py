@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 from agentverse_api.auth_service.application.audit_service import AuditService
 from agentverse_api.auth_service.domain.api_key_scope import ApiKeyScope
@@ -45,10 +46,18 @@ class ApiKeyService:
         created_by_user_id: str,
         scope: ApiKeyScope = ApiKeyScope.FULL,
         tier: str = "standard",
+        expires_in_days: int | None = None,
     ) -> IssuedApiKey:
         secret = secrets.token_urlsafe(_SECRET_BYTES)
         plaintext_key = f"{_KEY_PREFIX}{secret}"
         display_prefix = plaintext_key[: len(_KEY_PREFIX) + 6]
+        # Resolved from a duration rather than accepting an absolute
+        # timestamp from the client: a caller-supplied `expires_at` can
+        # be backdated, and a key that arrives already expired is a
+        # confusing failure rather than a useful one.
+        expires_at = (
+            None if expires_in_days is None else datetime.now(UTC) + timedelta(days=expires_in_days)
+        )
 
         entity = await self.api_keys.create_api_key(
             workspace_id=workspace_id,
@@ -58,6 +67,7 @@ class ApiKeyService:
             created_by_user_id=created_by_user_id,
             scope=scope,
             tier=tier,
+            expires_at=expires_at,
         )
         await self.audit.record(
             action="api_key.issued",
@@ -127,6 +137,15 @@ class ApiKeyService:
         secret = secrets.token_urlsafe(_SECRET_BYTES)
         plaintext_key = f"{_KEY_PREFIX}{secret}"
         display_prefix = plaintext_key[: len(_KEY_PREFIX) + 6]
+        # The replacement inherits the old key's *lifetime*, not its
+        # absolute expiry. Copying the timestamp would mean rotating a
+        # 90-day key on day 89 hands back a key that dies tomorrow —
+        # technically "same expiry", practically useless.
+        new_expires_at = (
+            None
+            if old.expires_at is None
+            else datetime.now(UTC) + (old.expires_at - old.created_at)
+        )
         new_entity = await self.api_keys.create_api_key(
             workspace_id=workspace_id,
             name=old.name,
@@ -136,6 +155,7 @@ class ApiKeyService:
             scope=old.scope,
             tier=old.tier,
             rotated_from_id=old.id,
+            expires_at=new_expires_at,
         )
         await self.audit.record(
             action="api_key.rotated",

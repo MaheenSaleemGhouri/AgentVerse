@@ -34,6 +34,9 @@ from agentverse_api.auth_service.interface.routes.scim import (
 from agentverse_api.auth_service.interface.routes.scim_tokens import (
     router as scim_tokens_router,
 )
+from agentverse_api.auth_service.interface.routes.security import (
+    router as security_router,
+)
 from agentverse_api.auth_service.interface.routes.sso import (
     router as sso_router,
 )
@@ -92,6 +95,7 @@ def create_app() -> FastAPI:
     app.include_router(invitations_router)
     app.include_router(resource_permissions_router)
     app.include_router(rbac_router)
+    app.include_router(security_router)
     app.include_router(ip_allowlist_router)
     app.include_router(sso_router)
     app.include_router(scim_tokens_router)

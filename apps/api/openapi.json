@@ -260,6 +260,18 @@
             "title": "Created At",
             "type": "string"
           },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -314,6 +326,10 @@
             "title": "Tier",
             "type": "string"
           },
+          "use_count": {
+            "title": "Use Count",
+            "type": "integer"
+          },
           "workspace_id": {
             "title": "Workspace Id",
             "type": "string"
@@ -329,7 +345,9 @@
           "revoked_at",
           "scope",
           "tier",
-          "rotated_from_id"
+          "rotated_from_id",
+          "expires_at",
+          "use_count"
         ],
         "title": "ApiKeyResponse",
         "type": "object"
@@ -341,6 +359,47 @@
         ],
         "title": "ApiKeyScope",
         "type": "string"
+      },
+      "AuditActivityPoint": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          }
+        },
+        "required": [
+          "day",
+          "count"
+        ],
+        "title": "AuditActivityPoint",
+        "type": "object"
+      },
+      "AuditActivityResponse": {
+        "description": "Daily counts for the activity graph.\n\nDays with no activity are present with `count: 0` rather than\nomitted \u2014 a sparse series would render as a misleadingly continuous\nline that hides the quiet days.",
+        "properties": {
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/AuditActivityPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "points",
+          "total"
+        ],
+        "title": "AuditActivityResponse",
+        "type": "object"
       },
       "AuditLogPage": {
         "properties": {
@@ -484,6 +543,37 @@
           "role"
         ],
         "title": "ChangeOrgMemberRoleRequest",
+        "type": "object"
+      },
+      "CheckPasswordRequest": {
+        "properties": {
+          "password": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "title": "CheckPasswordRequest",
+        "type": "object"
+      },
+      "CheckPasswordResponse": {
+        "properties": {
+          "violations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Violations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "violations"
+        ],
+        "title": "CheckPasswordResponse",
         "type": "object"
       },
       "CitationResponse": {
@@ -1682,6 +1772,19 @@
       },
       "IssueApiKeyRequest": {
         "properties": {
+          "expires_in_days": {
+            "anyOf": [
+              {
+                "maximum": 3650.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires In Days"
+          },
           "name": {
             "maxLength": 200,
             "minLength": 1,
@@ -1726,6 +1829,18 @@
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
           },
           "id": {
             "title": "Id",
@@ -1785,6 +1900,10 @@
             "title": "Tier",
             "type": "string"
           },
+          "use_count": {
+            "title": "Use Count",
+            "type": "integer"
+          },
           "workspace_id": {
             "title": "Workspace Id",
             "type": "string"
@@ -1801,6 +1920,8 @@
           "scope",
           "tier",
           "rotated_from_id",
+          "expires_at",
+          "use_count",
           "key"
         ],
         "title": "IssuedApiKeyResponse",
@@ -2151,6 +2272,102 @@
         "title": "McpServerResponse",
         "type": "object"
       },
+      "MemberPresenceResponse": {
+        "description": "A member plus what is actually known about their recent activity.\n\n`has_active_session` means \"holds an unexpired session\", not \"is\nlooking at the screen right now\" \u2014 there is no heartbeat in this\nsystem, and the field is named for what it can honestly claim.",
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "has_active_session": {
+            "title": "Has Active Session",
+            "type": "boolean"
+          },
+          "last_ip_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Ip Address"
+          },
+          "last_login_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login At"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "last_user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last User Agent"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "suspended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suspended At"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "email",
+          "name",
+          "role",
+          "last_login_at",
+          "last_seen_at",
+          "has_active_session",
+          "last_user_agent",
+          "last_ip_address",
+          "suspended_at"
+        ],
+        "title": "MemberPresenceResponse",
+        "type": "object"
+      },
       "MemberResponse": {
         "properties": {
           "created_at": {
@@ -2202,6 +2419,30 @@
           "expires_at"
         ],
         "title": "OauthStartResponse",
+        "type": "object"
+      },
+      "OrganizationDashboardResponse": {
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/MemberPresenceResponse"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/OrganizationResponse"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/OrganizationStatsResponse"
+          }
+        },
+        "required": [
+          "organization",
+          "stats",
+          "members"
+        ],
+        "title": "OrganizationDashboardResponse",
         "type": "object"
       },
       "OrganizationMemberResponse": {
@@ -2388,6 +2629,45 @@
         "title": "OrganizationSettingsResponse",
         "type": "object"
       },
+      "OrganizationStatsResponse": {
+        "properties": {
+          "active_member_count": {
+            "title": "Active Member Count",
+            "type": "integer"
+          },
+          "member_count": {
+            "title": "Member Count",
+            "type": "integer"
+          },
+          "members_by_role": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Role"
+            },
+            "title": "Members By Role",
+            "type": "object"
+          },
+          "suspended_member_count": {
+            "title": "Suspended Member Count",
+            "type": "integer"
+          },
+          "workspace_count": {
+            "title": "Workspace Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "workspace_count",
+          "member_count",
+          "active_member_count",
+          "suspended_member_count",
+          "members_by_role"
+        ],
+        "title": "OrganizationStatsResponse",
+        "type": "object"
+      },
       "OrganizationWorkspaceResponse": {
         "description": "A workspace attached to an organization \u2014 deliberately carries no\nrole: attachment grants no workspace access, so there is no role to\nreport here (ADR-0011). See `WorkspaceResponse` for the caller's own\nworkspace-scoped role.",
         "properties": {
@@ -2416,6 +2696,56 @@
           "created_at"
         ],
         "title": "OrganizationWorkspaceResponse",
+        "type": "object"
+      },
+      "PasswordPolicyResponse": {
+        "properties": {
+          "is_configured": {
+            "title": "Is Configured",
+            "type": "boolean"
+          },
+          "max_age_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Age Days"
+          },
+          "min_length": {
+            "title": "Min Length",
+            "type": "integer"
+          },
+          "require_lowercase": {
+            "title": "Require Lowercase",
+            "type": "boolean"
+          },
+          "require_number": {
+            "title": "Require Number",
+            "type": "boolean"
+          },
+          "require_symbol": {
+            "title": "Require Symbol",
+            "type": "boolean"
+          },
+          "require_uppercase": {
+            "title": "Require Uppercase",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "min_length",
+          "require_uppercase",
+          "require_lowercase",
+          "require_number",
+          "require_symbol",
+          "max_age_days",
+          "is_configured"
+        ],
+        "title": "PasswordPolicyResponse",
         "type": "object"
       },
       "Permission": {
@@ -3262,6 +3592,46 @@
         "title": "ScimTokenResponse",
         "type": "object"
       },
+      "ScoreFactorResponse": {
+        "properties": {
+          "earned": {
+            "title": "Earned",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "possible": {
+            "title": "Possible",
+            "type": "integer"
+          },
+          "remediation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remediation"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "earned",
+          "possible",
+          "remediation"
+        ],
+        "title": "ScoreFactorResponse",
+        "type": "object"
+      },
       "SearchHitResponse": {
         "properties": {
           "chunk_id": {
@@ -3384,6 +3754,154 @@
         ],
         "title": "SearchResponse",
         "type": "object"
+      },
+      "SecurityEventResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "event_type": {
+            "$ref": "#/components/schemas/SecurityEventType"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "ip_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip Address"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Metadata",
+            "type": "object"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/SecuritySeverity"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Id"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "workspace_id",
+          "organization_id",
+          "event_type",
+          "severity",
+          "ip_address",
+          "user_agent",
+          "metadata",
+          "created_at"
+        ],
+        "title": "SecurityEventResponse",
+        "type": "object"
+      },
+      "SecurityEventType": {
+        "description": "Security signals about an *account*, distinct from `audit_logs`.\n\nThe two are not duplicates and are deliberately not merged:\n`audit_logs` answers \"who did what inside this workspace\" and is\nworkspace-scoped and append-only for compliance; a security event\nanswers \"what happened to this identity's security posture\" and is\nfrequently user-scoped with no workspace at all (a failed login\nhappens before any workspace is resolved). Merging them would force\na nullable workspace onto the compliance log and a workspace filter\nonto questions that have no workspace.",
+        "enum": [
+          "login.new_device",
+          "login.failed",
+          "account.locked",
+          "password.changed",
+          "two_factor.enabled",
+          "two_factor.disabled",
+          "device.trusted",
+          "device.revoked",
+          "suspicious.ip",
+          "suspicious.rapid_failures"
+        ],
+        "title": "SecurityEventType",
+        "type": "string"
+      },
+      "SecurityScoreResponse": {
+        "properties": {
+          "factors": {
+            "items": {
+              "$ref": "#/components/schemas/ScoreFactorResponse"
+            },
+            "title": "Factors",
+            "type": "array"
+          },
+          "grade": {
+            "title": "Grade",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "score",
+          "grade",
+          "factors"
+        ],
+        "title": "SecurityScoreResponse",
+        "type": "object"
+      },
+      "SecuritySeverity": {
+        "description": "How much attention an event deserves.\n\nDeliberately three levels, not five: an operator triaging a feed\nneeds \"ignore / look / act now\", and finer gradations only push the\njudgement call from the reader to the author.",
+        "enum": [
+          "info",
+          "warning",
+          "critical"
+        ],
+        "title": "SecuritySeverity",
+        "type": "string"
       },
       "SsoConfigurationResponse": {
         "properties": {
@@ -4054,6 +4572,112 @@
         "title": "ToolSummary",
         "type": "object"
       },
+      "TrustDeviceRequest": {
+        "properties": {
+          "device_fingerprint": {
+            "maxLength": 256,
+            "minLength": 8,
+            "title": "Device Fingerprint",
+            "type": "string"
+          },
+          "device_name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Name"
+          }
+        },
+        "required": [
+          "device_fingerprint"
+        ],
+        "title": "TrustDeviceRequest",
+        "type": "object"
+      },
+      "TrustedDeviceResponse": {
+        "properties": {
+          "device_fingerprint": {
+            "title": "Device Fingerprint",
+            "type": "string"
+          },
+          "device_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Name"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "ip_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip Address"
+          },
+          "last_seen_at": {
+            "format": "date-time",
+            "title": "Last Seen At",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "trusted_at": {
+            "format": "date-time",
+            "title": "Trusted At",
+            "type": "string"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          }
+        },
+        "required": [
+          "id",
+          "device_fingerprint",
+          "device_name",
+          "user_agent",
+          "ip_address",
+          "trusted_at",
+          "last_seen_at",
+          "revoked_at"
+        ],
+        "title": "TrustedDeviceResponse",
+        "type": "object"
+      },
       "UpdateAgentVersionRequest": {
         "properties": {
           "knowledge_base_ids": {
@@ -4296,6 +4920,54 @@
           }
         },
         "title": "UpdateOrganizationSettingsRequest",
+        "type": "object"
+      },
+      "UpdatePasswordPolicyRequest": {
+        "properties": {
+          "max_age_days": {
+            "anyOf": [
+              {
+                "maximum": 3650.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Age Days"
+          },
+          "min_length": {
+            "maximum": 128.0,
+            "minimum": 8.0,
+            "title": "Min Length",
+            "type": "integer"
+          },
+          "require_lowercase": {
+            "title": "Require Lowercase",
+            "type": "boolean"
+          },
+          "require_number": {
+            "title": "Require Number",
+            "type": "boolean"
+          },
+          "require_symbol": {
+            "title": "Require Symbol",
+            "type": "boolean"
+          },
+          "require_uppercase": {
+            "title": "Require Uppercase",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "min_length",
+          "require_uppercase",
+          "require_lowercase",
+          "require_number",
+          "require_symbol"
+        ],
+        "title": "UpdatePasswordPolicyRequest",
         "type": "object"
       },
       "UpdateTeamRequest": {
@@ -4817,6 +5489,190 @@
         ]
       }
     },
+    "/api/v1/me/security/devices": {
+      "get": {
+        "operationId": "list_my_devices_api_v1_me_security_devices_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TrustedDeviceResponse"
+                  },
+                  "title": "Response List My Devices Api V1 Me Security Devices Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List My Devices",
+        "tags": [
+          "security"
+        ]
+      },
+      "post": {
+        "operationId": "trust_my_device_api_v1_me_security_devices_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrustDeviceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrustedDeviceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Trust My Device",
+        "tags": [
+          "security"
+        ]
+      }
+    },
+    "/api/v1/me/security/devices/{device_id}": {
+      "delete": {
+        "operationId": "revoke_my_device_api_v1_me_security_devices__device_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "title": "Device Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke My Device",
+        "tags": [
+          "security"
+        ]
+      }
+    },
+    "/api/v1/me/security/events": {
+      "get": {
+        "operationId": "list_my_security_events_api_v1_me_security_events_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "severity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SecuritySeverity"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Severity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SecurityEventResponse"
+                  },
+                  "title": "Response List My Security Events Api V1 Me Security Events Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List My Security Events",
+        "tags": [
+          "security"
+        ]
+      }
+    },
     "/api/v1/organizations": {
       "get": {
         "operationId": "list_my_organizations_api_v1_organizations_get",
@@ -5026,6 +5882,54 @@
           }
         ],
         "summary": "Rename Organization",
+        "tags": [
+          "organizations"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organization_id}/dashboard": {
+      "get": {
+        "description": "Headline counts plus per-member activity for the organization.\n\nViewer-gated rather than admin-gated: knowing who is in your own\norganization and when they last signed in is ordinary membership\ninformation, not privileged. What it deliberately does not expose is\nanything workspace-scoped \u2014 an organization grants no workspace\naccess (ADR-0011), so this endpoint must not become a way to see\ninside workspaces the caller is not a member of.",
+        "operationId": "organization_dashboard_api_v1_organizations__organization_id__dashboard_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationDashboardResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Organization Dashboard",
         "tags": [
           "organizations"
         ]
@@ -5416,6 +6320,166 @@
         "summary": "Suspend Org Member",
         "tags": [
           "organizations"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organization_id}/password-policy": {
+      "get": {
+        "operationId": "get_password_policy_api_v1_organizations__organization_id__password_policy_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordPolicyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Password Policy",
+        "tags": [
+          "security"
+        ]
+      },
+      "put": {
+        "operationId": "set_password_policy_api_v1_organizations__organization_id__password_policy_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePasswordPolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordPolicyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Password Policy",
+        "tags": [
+          "security"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organization_id}/password-policy/check": {
+      "post": {
+        "description": "Validates a candidate password against the organization's policy.\n\nThe password is never stored or logged \u2014 it is checked and\ndiscarded. This exists so the sign-up/change-password UI can show\nthe real rules rather than a client-side guess at them, while the\nsame policy is still enforced server-side on the actual change.",
+        "operationId": "check_password_api_v1_organizations__organization_id__password_policy_check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckPasswordResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Check Password",
+        "tags": [
+          "security"
         ]
       }
     },
@@ -6947,6 +8011,167 @@
           }
         ],
         "summary": "List Audit Logs Route",
+        "tags": [
+          "audit-logs"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/audit-logs/activity": {
+      "get": {
+        "description": "Daily entry counts for the activity graph, gap-filled to zero.",
+        "operationId": "audit_activity_route_api_v1_workspaces__workspace_id__audit_logs_activity_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditActivityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Audit Activity Route",
+        "tags": [
+          "audit-logs"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/audit-logs/export": {
+      "get": {
+        "description": "Exports the workspace's audit log as CSV or JSON.\n\nBounded by `MAX_EXPORT_ROWS` rather than streaming the whole table:\n`audit_logs` is append-only and unbounded, so an unlimited export\nwould be a denial-of-service against this service's own memory.\n\nThe response is a download (`Content-Disposition: attachment`) with\n`X-Content-Type-Options: nosniff`, so a browser never renders\nattacker-influenced audit content as a document in this origin.",
+        "operationId": "export_audit_logs_route_api_v1_workspaces__workspace_id__audit_logs_export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "csv",
+              "enum": [
+                "csv",
+                "json"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Action"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor_user_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor User Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10000,
+              "maximum": 10000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Export Audit Logs Route",
         "tags": [
           "audit-logs"
         ]
@@ -9435,6 +10660,132 @@
         "summary": "Update Custom Role",
         "tags": [
           "roles"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/security/events": {
+      "get": {
+        "operationId": "list_workspace_security_events_api_v1_workspaces__workspace_id__security_events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "severity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SecuritySeverity"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Severity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SecurityEventResponse"
+                  },
+                  "title": "Response List Workspace Security Events Api V1 Workspaces  Workspace Id  Security Events Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Workspace Security Events",
+        "tags": [
+          "security"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/security/score": {
+      "get": {
+        "operationId": "get_security_score_api_v1_workspaces__workspace_id__security_score_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityScoreResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Security Score",
+        "tags": [
+          "security"
         ]
       }
     },

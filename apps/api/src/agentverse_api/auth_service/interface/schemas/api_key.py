@@ -11,6 +11,12 @@ class IssueApiKeyRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     scope: ApiKeyScope = ApiKeyScope.FULL
     tier: str = Field(default="standard", max_length=50)
+    #: A lifetime, not an absolute timestamp: a client-supplied
+    #: `expires_at` can be backdated, and a key that arrives already
+    #: expired is a confusing failure rather than a useful one. `None`
+    #: means the key never expires, which is what every key issued
+    #: before expiry shipped already does.
+    expires_in_days: int | None = Field(default=None, ge=1, le=3650)
 
 
 class ApiKeyResponse(BaseModel):
@@ -24,6 +30,8 @@ class ApiKeyResponse(BaseModel):
     scope: ApiKeyScope
     tier: str
     rotated_from_id: str | None
+    expires_at: datetime | None
+    use_count: int
 
 
 class IssuedApiKeyResponse(ApiKeyResponse):

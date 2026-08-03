@@ -31,8 +31,11 @@ from agentverse_api.auth_service.interface.schemas.organization import (
     ChangeOrgMemberRoleRequest,
     CreateOrganizationRequest,
     InviteOrgMemberRequest,
+    MemberPresenceResponse,
+    OrganizationDashboardResponse,
     OrganizationMemberResponse,
     OrganizationResponse,
+    OrganizationStatsResponse,
     OrganizationWorkspaceResponse,
     RenameOrganizationRequest,
 )
@@ -287,4 +290,61 @@ async def detach_workspace(
         organization_id=org_context.organization_id,
         actor_user_id=org_context.user_id,
         workspace_id=workspace_context.workspace_id,
+    )
+
+
+@router.get("/{organization_id}/dashboard", response_model=OrganizationDashboardResponse)
+async def organization_dashboard(
+    context: OrganizationContext = Depends(require_org_viewer),
+    service: OrganizationService = Depends(get_organization_service),
+) -> OrganizationDashboardResponse:
+    """Headline counts plus per-member activity for the organization.
+
+    Viewer-gated rather than admin-gated: knowing who is in your own
+    organization and when they last signed in is ordinary membership
+    information, not privileged. What it deliberately does not expose is
+    anything workspace-scoped — an organization grants no workspace
+    access (ADR-0011), so this endpoint must not become a way to see
+    inside workspaces the caller is not a member of.
+    """
+    organization = await service.get_organization(context.organization_id)
+    if organization is None:
+        # Unreachable in practice — `require_org_viewer` already resolved
+        # it — but returning a 404 rather than asserting keeps the
+        # failure mode consistent with every other org route.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
+
+    stats = await service.stats(context.organization_id)
+    members = await service.list_member_presence(context.organization_id)
+
+    return OrganizationDashboardResponse(
+        organization=OrganizationResponse(
+            id=organization.id,
+            name=organization.name,
+            slug=organization.slug,
+            created_at=organization.created_at,
+            role=context.role,
+        ),
+        stats=OrganizationStatsResponse(
+            workspace_count=stats.workspace_count,
+            member_count=stats.member_count,
+            active_member_count=stats.active_member_count,
+            suspended_member_count=stats.suspended_member_count,
+            members_by_role=stats.members_by_role,
+        ),
+        members=[
+            MemberPresenceResponse(
+                user_id=member.user_id,
+                email=member.email,
+                name=member.name,
+                role=member.role,
+                last_login_at=member.last_login_at,
+                last_seen_at=member.last_seen_at,
+                has_active_session=member.has_active_session,
+                last_user_agent=member.last_user_agent,
+                last_ip_address=member.last_ip_address,
+                suspended_at=member.suspended_at,
+            )
+            for member in members
+        ],
     )

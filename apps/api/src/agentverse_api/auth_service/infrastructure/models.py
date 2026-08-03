@@ -281,6 +281,14 @@ class ApiKey(Base):
     rotated_from_id: Mapped[str | None] = mapped_column(
         ForeignKey("api_keys.id", ondelete="SET NULL"), default=None
     )
+    #: `None` means the key never expires. Enforced in the bearer path,
+    #: not merely displayed — a stored expiry that nothing checks is
+    #: worse than none, because it reads as a control that isn't there.
+    expires_at: Mapped[datetime | None] = mapped_column(default=None)
+    #: Incremented on every successful authentication, alongside
+    #: `last_used_at`. A count answers "is this key still in use and how
+    #: heavily", which a single timestamp cannot.
+    use_count: Mapped[int] = mapped_column(server_default="0", default=0)
 
 
 class WorkspaceSettings(Base):
@@ -329,6 +337,80 @@ class OrganizationSettings(Base):
     website_url: Mapped[str | None] = mapped_column(Text, default=None)
     support_email: Mapped[str | None] = mapped_column(Text, default=None)
     description: Mapped[str | None] = mapped_column(Text, default=None)
+    updated_at: Mapped[datetime]
+    updated_by_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), default=None
+    )
+
+
+class SecurityEvent(Base):
+    """Security signals about an identity — see
+    `domain.security.SecurityEventType` for why this is not `audit_logs`.
+
+    Every scoping column is nullable because the events that matter most
+    arrive before scope is known: a failed login has no workspace, and
+    often no user.
+    """
+
+    __tablename__ = "security_events"
+
+    id: Mapped[str] = _uuid_pk()
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True, default=None
+    )
+    workspace_id: Mapped[str | None] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="SET NULL"), index=True, default=None
+    )
+    organization_id: Mapped[str | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="SET NULL"), index=True, default=None
+    )
+    event_type: Mapped[str] = mapped_column(Text, index=True)
+    severity: Mapped[str] = mapped_column(Text, index=True)
+    ip_address: Mapped[str | None] = mapped_column(Text, default=None)
+    user_agent: Mapped[str | None] = mapped_column(Text, default=None)
+    event_metadata: Mapped[dict[str, str]] = mapped_column("metadata", JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(index=True)
+
+
+class TrustedDevice(Base):
+    """A device a user has confirmed. Unique per (user, fingerprint) so
+    re-confirming an already-trusted device updates it instead of
+    accumulating duplicate rows.
+    """
+
+    __tablename__ = "trusted_devices"
+    __table_args__ = (UniqueConstraint("user_id", "device_fingerprint"),)
+
+    id: Mapped[str] = _uuid_pk()
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    device_fingerprint: Mapped[str] = mapped_column(Text)
+    device_name: Mapped[str | None] = mapped_column(Text, default=None)
+    user_agent: Mapped[str | None] = mapped_column(Text, default=None)
+    ip_address: Mapped[str | None] = mapped_column(Text, default=None)
+    trusted_at: Mapped[datetime]
+    last_seen_at: Mapped[datetime]
+    revoked_at: Mapped[datetime | None] = mapped_column(default=None)
+
+
+class PasswordPolicy(Base):
+    """1:1 with `Organization`. No row means the platform default
+    (`domain.security.DEFAULT_PASSWORD_POLICY`) applies — the default is
+    a real baseline, not "no rules".
+    """
+
+    __tablename__ = "password_policies"
+
+    organization_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    min_length: Mapped[int]
+    require_uppercase: Mapped[bool]
+    require_lowercase: Mapped[bool]
+    require_number: Mapped[bool]
+    require_symbol: Mapped[bool]
+    max_age_days: Mapped[int | None] = mapped_column(default=None)
     updated_at: Mapped[datetime]
     updated_by_user_id: Mapped[str | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), default=None
