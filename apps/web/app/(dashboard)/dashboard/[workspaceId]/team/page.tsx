@@ -2,9 +2,11 @@ import { notFound } from "next/navigation";
 
 import { listMembers, listMyWorkspaces } from "@/lib/api/workspaces";
 import { listResourcePermissions } from "@/lib/api/resource-permissions";
+import { listBuiltinRoles, listCustomRoles } from "@/lib/api/roles";
 
 import { PageHeader } from "@/components/patterns/page-header";
 import { ResourcePermissionsPanel } from "@/components/settings/resource-permissions-panel";
+import { RolesPanel } from "@/components/settings/roles-panel";
 import { InviteMemberDialog } from "@/components/team/invite-member-dialog";
 import { MembersTable } from "@/components/team/members-table";
 
@@ -14,9 +16,13 @@ export default async function TeamPage({
   params: Promise<{ workspaceId: string }>;
 }): Promise<React.JSX.Element> {
   const { workspaceId } = await params;
-  const [workspaces, members] = await Promise.all([
+  // The role model is viewer-gated on the API, so it is fetched for
+  // everyone — a member seeing what their own role permits is the point.
+  const [workspaces, members, builtinRoles, customRoles] = await Promise.all([
     listMyWorkspaces(),
     listMembers(workspaceId),
+    listBuiltinRoles(workspaceId),
+    listCustomRoles(workspaceId),
   ]);
 
   const current = workspaces.find((workspace) => workspace.id === workspaceId);
@@ -49,6 +55,12 @@ export default async function TeamPage({
         initialMembers={members}
         viewerRole={current.role}
         canManage={canManage}
+      />
+      <RolesPanel
+        workspaceId={workspaceId}
+        canManage={canManage}
+        initialBuiltinRoles={builtinRoles}
+        initialCustomRoles={customRoles}
       />
       {canManage && (
         <ResourcePermissionsPanel

@@ -684,6 +684,44 @@
         "title": "CreateAgentResponse",
         "type": "object"
       },
+      "CreateCustomRoleRequest": {
+        "properties": {
+          "base_role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "base_role"
+        ],
+        "title": "CreateCustomRoleRequest",
+        "type": "object"
+      },
       "CreateKnowledgeBaseRequest": {
         "properties": {
           "description": {
@@ -898,6 +936,84 @@
           "created_at"
         ],
         "title": "CredentialResponse",
+        "type": "object"
+      },
+      "CustomRoleResponse": {
+        "properties": {
+          "base_role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By User Id"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "array"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "name",
+          "description",
+          "base_role",
+          "permissions",
+          "created_by_user_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CustomRoleResponse",
         "type": "object"
       },
       "ExecuteTeamRequest": {
@@ -2162,8 +2278,118 @@
         "title": "OrganizationResponse",
         "type": "object"
       },
+      "OrganizationSettingsResponse": {
+        "properties": {
+          "brand_color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand Color"
+          },
+          "custom_domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Domain"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          },
+          "organization_id": {
+            "title": "Organization Id",
+            "type": "string"
+          },
+          "support_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Support Email"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By User Id"
+          },
+          "website_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website Url"
+          }
+        },
+        "required": [
+          "organization_id",
+          "logo_url",
+          "brand_color",
+          "custom_domain",
+          "website_url",
+          "support_email",
+          "description",
+          "updated_at",
+          "updated_by_user_id"
+        ],
+        "title": "OrganizationSettingsResponse",
+        "type": "object"
+      },
       "OrganizationWorkspaceResponse": {
-        "description": "A workspace attached to an organization \u2014 deliberately carries no\nrole: attachment grants no workspace access, so there is no role to\nreport here (ADR-0006). See `WorkspaceResponse` for the caller's own\nworkspace-scoped role.",
+        "description": "A workspace attached to an organization \u2014 deliberately carries no\nrole: attachment grants no workspace access, so there is no role to\nreport here (ADR-0011). See `WorkspaceResponse` for the caller's own\nworkspace-scoped role.",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -2191,6 +2417,46 @@
         ],
         "title": "OrganizationWorkspaceResponse",
         "type": "object"
+      },
+      "Permission": {
+        "description": "`<resource>:<action>`, covering the resources CLAUDE.md \u00a75 names.\n\nTyped rather than free-form strings so a misspelled permission is a\nstatic error at the call site instead of a check that silently never\nmatches.",
+        "enum": [
+          "agent:view",
+          "agent:create",
+          "agent:edit",
+          "agent:delete",
+          "agent:run",
+          "team:view",
+          "team:create",
+          "team:edit",
+          "team:delete",
+          "knowledge:view",
+          "knowledge:create",
+          "knowledge:edit",
+          "knowledge:delete",
+          "mcp:view",
+          "mcp:install",
+          "mcp:edit",
+          "mcp:delete",
+          "billing:view",
+          "billing:manage",
+          "settings:view",
+          "settings:manage",
+          "api_key:view",
+          "api_key:create",
+          "api_key:rotate",
+          "api_key:revoke",
+          "analytics:view",
+          "analytics:export",
+          "audit_log:view",
+          "audit_log:export",
+          "member:view",
+          "member:invite",
+          "member:remove",
+          "member:assign_role"
+        ],
+        "title": "Permission",
+        "type": "string"
       },
       "PermissionResponse": {
         "properties": {
@@ -2594,11 +2860,40 @@
         "enum": [
           "owner",
           "admin",
+          "manager",
+          "developer",
+          "analyst",
           "member",
           "viewer"
         ],
         "title": "Role",
         "type": "string"
+      },
+      "RoleDescriptor": {
+        "description": "One built-in tier and everything it can do, inherited grants included.\n\nServed rather than duplicated in the frontend so the UI's permission\nmatrix and the server's enforcement can never drift \u2014 there is one\nsource of truth (CLAUDE.md Rule 3), and it is the server's.",
+        "properties": {
+          "permissions": {
+            "items": {
+              "$ref": "#/components/schemas/Permission"
+            },
+            "title": "Permissions",
+            "type": "array"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          }
+        },
+        "required": [
+          "role",
+          "rank",
+          "permissions"
+        ],
+        "title": "RoleDescriptor",
+        "type": "object"
       },
       "RunAgentRequest": {
         "properties": {
@@ -3823,6 +4118,62 @@
         "title": "UpdateAgentVersionRequest",
         "type": "object"
       },
+      "UpdateCustomRoleRequest": {
+        "description": "Every field optional \u2014 an omitted field is left unchanged.\n\n`permissions` is replace-not-merge when present: a PATCH that sends\nthe list sets exactly that list. Merging would make removing a grant\nimpossible through this endpoint.",
+        "properties": {
+          "base_role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "permissions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Permissions"
+          }
+        },
+        "title": "UpdateCustomRoleRequest",
+        "type": "object"
+      },
       "UpdateInstalledServerRequest": {
         "properties": {
           "config": {
@@ -3867,6 +4218,84 @@
           }
         },
         "title": "UpdateInstalledServerRequest",
+        "type": "object"
+      },
+      "UpdateOrganizationSettingsRequest": {
+        "properties": {
+          "brand_color": {
+            "anyOf": [
+              {
+                "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand Color"
+          },
+          "custom_domain": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Domain"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          },
+          "support_email": {
+            "anyOf": [
+              {
+                "maxLength": 320,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Support Email"
+          },
+          "website_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website Url"
+          }
+        },
+        "title": "UpdateOrganizationSettingsRequest",
         "type": "object"
       },
       "UpdateTeamRequest": {
@@ -5142,6 +5571,108 @@
         "summary": "Revoke Scim Token",
         "tags": [
           "scim-tokens"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organization_id}/settings": {
+      "get": {
+        "operationId": "get_organization_settings_route_api_v1_organizations__organization_id__settings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Organization Settings Route",
+        "tags": [
+          "organization-settings"
+        ]
+      },
+      "patch": {
+        "operationId": "update_organization_settings_route_api_v1_organizations__organization_id__settings_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganizationSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Organization Settings Route",
+        "tags": [
+          "organization-settings"
         ]
       }
     },
@@ -8579,6 +9110,331 @@
         "summary": "Revoke Resource Permission",
         "tags": [
           "resource-permissions"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/roles": {
+      "get": {
+        "operationId": "list_custom_roles_api_v1_workspaces__workspace_id__roles_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CustomRoleResponse"
+                  },
+                  "title": "Response List Custom Roles Api V1 Workspaces  Workspace Id  Roles Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Custom Roles",
+        "tags": [
+          "roles"
+        ]
+      },
+      "post": {
+        "operationId": "create_custom_role_api_v1_workspaces__workspace_id__roles_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCustomRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomRoleResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Custom Role",
+        "tags": [
+          "roles"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/roles/builtin": {
+      "get": {
+        "description": "The seven built-in tiers and their fully-inherited permission sets.",
+        "operationId": "list_builtin_roles_api_v1_workspaces__workspace_id__roles_builtin_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RoleDescriptor"
+                  },
+                  "title": "Response List Builtin Roles Api V1 Workspaces  Workspace Id  Roles Builtin Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Builtin Roles",
+        "tags": [
+          "roles"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/roles/{role_id}": {
+      "delete": {
+        "operationId": "delete_custom_role_api_v1_workspaces__workspace_id__roles__role_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "role_id",
+            "required": true,
+            "schema": {
+              "title": "Role Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Custom Role",
+        "tags": [
+          "roles"
+        ]
+      },
+      "get": {
+        "operationId": "get_custom_role_api_v1_workspaces__workspace_id__roles__role_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "role_id",
+            "required": true,
+            "schema": {
+              "title": "Role Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomRoleResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Custom Role",
+        "tags": [
+          "roles"
+        ]
+      },
+      "patch": {
+        "operationId": "update_custom_role_api_v1_workspaces__workspace_id__roles__role_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "role_id",
+            "required": true,
+            "schema": {
+              "title": "Role Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCustomRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomRoleResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Custom Role",
+        "tags": [
+          "roles"
         ]
       }
     },

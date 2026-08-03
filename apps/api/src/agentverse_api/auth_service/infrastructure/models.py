@@ -12,13 +12,41 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, ForeignKey, LargeBinary, Text, UniqueConstraint
-from sqlalchemy import Enum as SqlEnum
+from sqlalchemy import JSON, ForeignKey, LargeBinary, Text, TypeDecorator, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from agentverse_api.auth_service.domain.role import Role
 from agentverse_api.infrastructure.orm_base import Base
+
+
+class RoleType(TypeDecorator[Role]):
+    """TEXT in the database, `Role` in Python.
+
+    The role columns moved off the `workspace_role` Postgres ENUM so the
+    seven-tier model could stay reversible (migration `b3f7c1a9e582`).
+    A bare `Text` column would have made `Mapped[Role]` a lie — SQLAlchemy
+    would hand back plain strings, and `role is Role.OWNER` identity
+    checks would quietly start failing while `==` kept working, which is
+    exactly the kind of half-broken that survives a test suite.
+
+    Coercing here rather than in each `_to_*` converter keeps it in one
+    place: every read goes through this, so no future converter can
+    forget.
+    """
+
+    impl = Text
+    cache_ok = True
+
+    def process_bind_param(self, value: Role | str | None, dialect: object) -> str | None:
+        if value is None:
+            return None
+        return Role(value).value
+
+    def process_result_value(self, value: str | None, dialect: object) -> Role | None:
+        if value is None:
+            return None
+        return Role(value)
 
 
 def _uuid_pk() -> Mapped[str]:
@@ -154,7 +182,7 @@ class Workspace(Base):
     slug: Mapped[str] = mapped_column(Text, unique=True, index=True)
     created_at: Mapped[datetime]
     # Nullable, `ON DELETE SET NULL`: an organization groups workspaces for
-    # billing/SSO/branding only (ADR-0006) — it is never the isolation
+    # billing/SSO/branding only (ADR-0011) — it is never the isolation
     # boundary, so deleting the organization detaches, never deletes, the
     # workspace.
     organization_id: Mapped[str | None] = mapped_column(
@@ -178,8 +206,16 @@ class WorkspaceMember(Base):
         ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
     )
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    role: Mapped[Role] = mapped_column(
-        SqlEnum(Role, name="workspace_role", values_callable=lambda enum: [e.value for e in enum])
+    # TEXT, not a Postgres ENUM: the seven-tier role model has to stay
+    # reversible, and enum values cannot be dropped (see migration
+    # `b3f7c1a9e582`). `Role` still validates every value at the domain
+    # boundary, and a CHECK constraint holds the line in the database.
+    role: Mapped[Role] = mapped_column(RoleType)
+    #: Set when the member holds a tenant-defined role instead of a
+    #: built-in one. `role` still carries the custom role's base tier, so
+    #: every pre-existing `require_role` check keeps working unchanged.
+    custom_role_id: Mapped[str | None] = mapped_column(
+        ForeignKey("roles.id", ondelete="SET NULL"), default=None, index=True
     )
     created_at: Mapped[datetime]
 
@@ -187,7 +223,7 @@ class WorkspaceMember(Base):
 
 
 class Organization(Base):
-    """Additive grouping layer over `workspaces` (ADR-0006) — never an
+    """Additive grouping layer over `workspaces` (ADR-0011) — never an
     isolation boundary. `workspace_members` remains the sole source of
     workspace authorization regardless of organization membership.
     """
@@ -211,11 +247,10 @@ class OrganizationMember(Base):
         ForeignKey("organizations.id", ondelete="CASCADE"), index=True
     )
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    # Reuses the `workspace_role` Postgres ENUM (same four values/semantics)
-    # rather than a second, near-identical type — DRY (CLAUDE.md §16).
-    role: Mapped[Role] = mapped_column(
-        SqlEnum(Role, name="workspace_role", values_callable=lambda enum: [e.value for e in enum])
-    )
+    # Same TEXT + CHECK treatment as `workspace_members.role`, and for the
+    # same reversibility reason — the two columns shared the one enum type
+    # and had to move off it together (migration `b3f7c1a9e582`).
+    role: Mapped[Role] = mapped_column(RoleType)
     # Mirrors `ApiKey.revoked_at`: suspending keeps the row (audit-followable)
     # instead of deleting it. `None` means active.
     suspended_at: Mapped[datetime | None] = mapped_column(default=None)
@@ -267,6 +302,33 @@ class WorkspaceSettings(Base):
     custom_domain: Mapped[str | None] = mapped_column(Text, unique=True, default=None)
     retention_days: Mapped[int | None] = mapped_column(default=None)
     storage_limit_mb: Mapped[int | None] = mapped_column(default=None)
+    updated_at: Mapped[datetime]
+    updated_by_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), default=None
+    )
+
+
+class OrganizationSettings(Base):
+    """1:1 with `Organization`, same shape as `WorkspaceSettings` — the
+    id is both PK and FK, so "no row yet" is the documented default state
+    rather than a missing-record error.
+    """
+
+    __tablename__ = "organization_settings"
+
+    organization_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    logo_url: Mapped[str | None] = mapped_column(Text, default=None)
+    brand_color: Mapped[str | None] = mapped_column(Text, default=None)
+    # Unique across organizations for the same reason it is unique across
+    # workspaces: a custom domain resolves to exactly one tenant.
+    custom_domain: Mapped[str | None] = mapped_column(Text, unique=True, default=None)
+    website_url: Mapped[str | None] = mapped_column(Text, default=None)
+    support_email: Mapped[str | None] = mapped_column(Text, default=None)
+    description: Mapped[str | None] = mapped_column(Text, default=None)
     updated_at: Mapped[datetime]
     updated_by_user_id: Mapped[str | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), default=None
@@ -357,9 +419,7 @@ class SsoConfiguration(Base):
     client_secret_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary, default=None)
     wrapped_dek: Mapped[bytes | None] = mapped_column(LargeBinary, default=None)
     key_version: Mapped[str | None] = mapped_column(Text, default=None)
-    protocol_config: Mapped[dict[str, str]] = mapped_column(
-        JSONB().with_variant(JSON, "sqlite")
-    )
+    protocol_config: Mapped[dict[str, str]] = mapped_column(JSONB().with_variant(JSON, "sqlite"))
     enabled: Mapped[bool] = mapped_column(default=False)
     created_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     created_at: Mapped[datetime]
@@ -416,4 +476,50 @@ class ResourcePermission(Base):
     principal_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     permission: Mapped[str] = mapped_column(Text)
     granted_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime]
+
+
+class CustomRole(Base):
+    """A tenant-defined role, always anchored to a built-in base tier.
+
+    Workspace-scoped rather than global: a role name is a tenant's own
+    vocabulary, and a shared role table would be a cross-tenant surface
+    on a model where `workspace_id` isolation is absolute (Rule 11).
+    """
+
+    __tablename__ = "roles"
+    __table_args__ = (UniqueConstraint("workspace_id", "name", name="uq_role_workspace_name"),)
+
+    id: Mapped[str] = _uuid_pk()
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text, default=None)
+    #: The built-in tier this role inherits from. Keeps a custom role
+    #: rankable, so routes gated on a minimum role need no awareness of
+    #: custom roles at all.
+    base_role: Mapped[Role] = mapped_column(RoleType)
+    created_by_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), default=None
+    )
+    created_at: Mapped[datetime]
+    updated_at: Mapped[datetime | None] = mapped_column(default=None)
+
+
+class CustomRolePermission(Base):
+    """One additive grant on a custom role.
+
+    Additive only — there is deliberately no "deny" flag. A role that
+    subtracted an inherited capability would make the hierarchy
+    non-monotonic and silently break every route still gated on a
+    minimum role.
+    """
+
+    __tablename__ = "role_permissions"
+    __table_args__ = (UniqueConstraint("role_id", "permission", name="uq_role_permission"),)
+
+    id: Mapped[str] = _uuid_pk()
+    role_id: Mapped[str] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"), index=True)
+    permission: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime]

@@ -1,6 +1,6 @@
 """Resolves `organization_id` from the authenticated identity's actual
 membership — structurally identical to `get_current_workspace.py`
-(ADR-0006). Organization access is fully independent of workspace
+(ADR-0011). Organization access is fully independent of workspace
 access: this dependency never consults `workspace_members`.
 """
 
@@ -28,9 +28,7 @@ async def get_current_organization(
     if membership is None:
         # 404, never 403: a non-member must not learn whether the
         # organization exists at all (CLAUDE.md Rule 11 / ADR-0004).
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
 
     if membership.suspended_at is not None:
         # 403, not 404: the caller *is* a known member — existence isn't

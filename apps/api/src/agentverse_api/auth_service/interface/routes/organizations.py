@@ -1,5 +1,5 @@
 """`/api/v1/organizations` — organization CRUD, membership, and the
-workspace attach/detach composition (ADR-0006, CLAUDE.md §7 REST
+workspace attach/detach composition (ADR-0011, CLAUDE.md §7 REST
 conventions).
 """
 
@@ -86,9 +86,7 @@ async def get_organization(
     repo = SqlOrganizationRepository(session)
     organization = await repo.get_organization(context.organization_id)
     if organization is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
     return OrganizationResponse(
         id=organization.id,
         name=organization.name,
@@ -116,9 +114,7 @@ async def rename_organization(
     )
 
 
-@router.delete(
-    "/{organization_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None
-)
+@router.delete("/{organization_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_organization(
     context: OrganizationContext = Depends(require_org_owner),
     service: OrganizationService = Depends(get_organization_service),
@@ -240,9 +236,7 @@ async def remove_org_member(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
-@router.get(
-    "/{organization_id}/workspaces", response_model=list[OrganizationWorkspaceResponse]
-)
+@router.get("/{organization_id}/workspaces", response_model=list[OrganizationWorkspaceResponse])
 async def list_org_workspaces(
     context: OrganizationContext = Depends(require_org_viewer),
     service: OrganizationService = Depends(get_organization_service),
@@ -266,7 +260,7 @@ async def list_org_workspaces(
 )
 async def attach_workspace(
     org_context: OrganizationContext = Depends(require_org_admin),
-    # Composed independently of `org_context` (ADR-0006): the caller must
+    # Composed independently of `org_context` (ADR-0011): the caller must
     # separately be the *workspace's* owner, not just an org admin — org
     # administration never implies workspace access on its own.
     workspace_context: WorkspaceContext = Depends(require_owner),

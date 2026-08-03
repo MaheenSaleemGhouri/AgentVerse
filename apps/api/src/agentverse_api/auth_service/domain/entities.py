@@ -19,7 +19,7 @@ class Workspace:
     created_at: datetime
     #: The organization this workspace is grouped under, if any. Purely
     #: additive metadata — it grants no implicit access; `workspace_members`
-    #: remains the sole source of workspace authorization (ADR-0006).
+    #: remains the sole source of workspace authorization (ADR-0011).
     organization_id: str | None = None
 
 
@@ -29,6 +29,9 @@ class WorkspaceMember:
     user_id: str
     role: Role
     created_at: datetime
+    #: Set when the member holds a tenant-defined role; `role` still
+    #: carries that role's base tier so rank comparisons are unaffected.
+    custom_role_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +61,33 @@ class WorkspaceContext:
     #: permission check is unchanged — this exists so audit entries can
     #: say *which credential* acted, not to gate anything.
     api_key_id: str | None = None
+    #: Set when the member holds a tenant-defined role. `role` still
+    #: carries that role's base tier, so `require_role` needs no
+    #: awareness of custom roles; only `require_permission` resolves the
+    #: additive grants this points at.
+    custom_role_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CustomRole:
+    """A tenant-defined role anchored to a built-in base tier.
+
+    `base_role` is what keeps a custom role compatible with every route
+    still gated on a minimum role: the role remains rankable, so
+    `require_role` never needs to know custom roles exist.
+    """
+
+    id: str
+    workspace_id: str
+    name: str
+    description: str | None
+    base_role: Role
+    created_by_user_id: str | None
+    created_at: datetime
+    updated_at: datetime | None
+    #: Additive grants on top of `base_role`'s inherited set. Never
+    #: subtractive — see `domain/permission.py`.
+    permissions: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,11 +119,12 @@ class WorkspaceSettings:
     """Workspace-wide branding/policy — distinct from `settings/appearance`,
     which is a *personal* light/dark/system theme toggle stored client-side.
 
-    `retention_days`/`storage_limit_mb` are policy only: no worker job
-    purges data on `retention_days` and no upload path checks
-    `storage_limit_mb` yet. Storing the value the admin configured is a
-    real, useful capability on its own (and the prerequisite for
-    enforcement); claiming enforcement that doesn't exist is not.
+    `retention_days` and `storage_limit_mb` are both enforced:
+    `agentverse_worker.retention.sweep` deletes run history past the
+    window hourly and records the purge in `audit_logs`, and
+    `upload_document` refuses an upload that would exceed the limit
+    before writing a byte. Either left unset means unrestricted — no
+    default window is invented for a workspace that never opted in.
     """
 
     workspace_id: str
@@ -102,6 +133,32 @@ class WorkspaceSettings:
     custom_domain: str | None
     retention_days: int | None
     storage_limit_mb: int | None
+    updated_at: datetime
+    updated_by_user_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class OrganizationSettings:
+    """Organization-level profile and branding.
+
+    Deliberately parallel to `WorkspaceSettings` rather than merged with
+    it (ADR-0011): an organization groups workspaces for billing, SSO and
+    identity, but grants no workspace access, so its branding is a
+    separate fact from any one workspace's. A workspace that sets its own
+    `logo_url` keeps it; org branding is the fallback, never an override.
+
+    Unlike `WorkspaceSettings`, there is no retention/storage policy here
+    — those are enforced against workspace-owned data, and an org has
+    none of its own.
+    """
+
+    organization_id: str
+    logo_url: str | None
+    brand_color: str | None
+    custom_domain: str | None
+    website_url: str | None
+    support_email: str | None
+    description: str | None
     updated_at: datetime
     updated_by_user_id: str | None
 
@@ -192,7 +249,7 @@ class OrganizationSummary:
 class OrganizationContext:
     """Resolved by `get_current_organization` — the only trusted answer to
     "does this identity have access to this organization, and at what role."
-    Structurally identical to `WorkspaceContext` by design (ADR-0006): the
+    Structurally identical to `WorkspaceContext` by design (ADR-0011): the
     two are deliberately parallel, never merged into one context type,
     because organization access and workspace access are independent.
     """

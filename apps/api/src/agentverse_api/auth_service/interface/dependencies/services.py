@@ -15,6 +15,10 @@ from agentverse_api.auth_service.application.audit_service import AuditService
 from agentverse_api.auth_service.application.invitation_service import InvitationService
 from agentverse_api.auth_service.application.ip_allowlist_service import IpAllowlistService
 from agentverse_api.auth_service.application.organization_service import OrganizationService
+from agentverse_api.auth_service.application.organization_settings_service import (
+    OrganizationSettingsService,
+)
+from agentverse_api.auth_service.application.rbac_service import RbacService
 from agentverse_api.auth_service.application.resource_permission_service import (
     ResourcePermissionService,
 )
@@ -28,9 +32,11 @@ from agentverse_api.auth_service.infrastructure.email import LoggingEmailSender
 from agentverse_api.auth_service.infrastructure.repositories import (
     SqlApiKeyRepository,
     SqlAuditLogRepository,
+    SqlCustomRoleRepository,
     SqlInvitationRepository,
     SqlIpAllowlistRepository,
     SqlOrganizationRepository,
+    SqlOrganizationSettingsRepository,
     SqlResourcePermissionRepository,
     SqlScimRepository,
     SqlScimTokenRepository,
@@ -74,6 +80,15 @@ def get_workspace_settings_service(
     return WorkspaceSettingsService(settings=SqlWorkspaceSettingsRepository(session), audit=audit)
 
 
+def get_organization_settings_service(
+    session: AsyncSession = Depends(get_db_session),
+) -> OrganizationSettingsService:
+    audit = AuditService(audit_logs=SqlAuditLogRepository(session))
+    return OrganizationSettingsService(
+        settings=SqlOrganizationSettingsRepository(session), audit=audit
+    )
+
+
 def get_invitation_service(
     session: AsyncSession = Depends(get_db_session),
 ) -> InvitationService:
@@ -99,6 +114,13 @@ def get_resource_permission_service(
     return ResourcePermissionService(
         resource_permissions=SqlResourcePermissionRepository(session), audit=audit
     )
+
+
+def get_rbac_service(
+    session: AsyncSession = Depends(get_db_session),
+) -> RbacService:
+    audit = AuditService(audit_logs=SqlAuditLogRepository(session))
+    return RbacService(roles=SqlCustomRoleRepository(session), audit=audit)
 
 
 def get_ip_allowlist_service(

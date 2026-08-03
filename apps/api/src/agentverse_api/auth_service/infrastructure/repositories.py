@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,10 +24,16 @@ from agentverse_api.auth_service.domain.entities import (
     WorkspaceSummary,
 )
 from agentverse_api.auth_service.domain.entities import (
+    CustomRole as CustomRoleEntity,
+)
+from agentverse_api.auth_service.domain.entities import (
     Organization as OrganizationEntity,
 )
 from agentverse_api.auth_service.domain.entities import (
     OrganizationMember as OrganizationMemberEntity,
+)
+from agentverse_api.auth_service.domain.entities import (
+    OrganizationSettings as OrganizationSettingsEntity,
 )
 from agentverse_api.auth_service.domain.entities import (
     ResourcePermission as ResourcePermissionEntity,
@@ -46,7 +53,9 @@ from agentverse_api.auth_service.domain.entities import (
 from agentverse_api.auth_service.domain.entities import (
     WorkspaceSettings as WorkspaceSettingsEntity,
 )
+from agentverse_api.auth_service.domain.exceptions import CustomRoleNotFoundError
 from agentverse_api.auth_service.domain.invitation_target_type import InvitationTargetType
+from agentverse_api.auth_service.domain.permission import Permission
 from agentverse_api.auth_service.domain.role import Role
 from agentverse_api.auth_service.domain.sso import SsoPreset, SsoProtocol
 from agentverse_api.auth_service.infrastructure.models import (
@@ -54,6 +63,7 @@ from agentverse_api.auth_service.infrastructure.models import (
     AuditLog,
     Organization,
     OrganizationMember,
+    OrganizationSettings,
     ResourcePermission,
     ScimToken,
     SsoConfiguration,
@@ -63,6 +73,12 @@ from agentverse_api.auth_service.infrastructure.models import (
     WorkspaceIpAllowlist,
     WorkspaceMember,
     WorkspaceSettings,
+)
+from agentverse_api.auth_service.infrastructure.models import (
+    CustomRole as CustomRoleModel,
+)
+from agentverse_api.auth_service.infrastructure.models import (
+    CustomRolePermission as CustomRolePermissionModel,
 )
 
 _WORKSPACE_INVITE_PREFIX = "workspace-invite"
@@ -158,6 +174,7 @@ def _to_member(row: WorkspaceMember) -> WorkspaceMemberEntity:
         user_id=row.user_id,
         role=row.role,
         created_at=row.created_at,
+        custom_role_id=row.custom_role_id,
     )
 
 
@@ -186,6 +203,20 @@ def _to_workspace_settings(row: WorkspaceSettings) -> WorkspaceSettingsEntity:
         custom_domain=row.custom_domain,
         retention_days=row.retention_days,
         storage_limit_mb=row.storage_limit_mb,
+        updated_at=row.updated_at,
+        updated_by_user_id=row.updated_by_user_id,
+    )
+
+
+def _to_organization_settings(row: OrganizationSettings) -> OrganizationSettingsEntity:
+    return OrganizationSettingsEntity(
+        organization_id=row.organization_id,
+        logo_url=row.logo_url,
+        brand_color=row.brand_color,
+        custom_domain=row.custom_domain,
+        website_url=row.website_url,
+        support_email=row.support_email,
+        description=row.description,
         updated_at=row.updated_at,
         updated_by_user_id=row.updated_by_user_id,
     )
@@ -312,7 +343,7 @@ class SqlOrganizationRepository:
     Never touches `workspace_members` or `WorkspaceMember` rows — every
     method here operates on organization membership or the purely
     additive `workspaces.organization_id` link, never on workspace
-    authorization itself (ADR-0006).
+    authorization itself (ADR-0011).
     """
 
     def __init__(self, session: AsyncSession) -> None:
@@ -526,6 +557,58 @@ class SqlWorkspaceSettingsRepository:
         return _to_workspace_settings(result.scalar_one())
 
 
+class SqlOrganizationSettingsRepository:
+    """Implements `domain.ports.OrganizationSettingsRepository` against Postgres."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get(self, organization_id: str) -> OrganizationSettingsEntity | None:
+        row = await self._session.get(OrganizationSettings, organization_id)
+        return _to_organization_settings(row) if row is not None else None
+
+    async def upsert(
+        self,
+        *,
+        organization_id: str,
+        logo_url: str | None,
+        brand_color: str | None,
+        custom_domain: str | None,
+        website_url: str | None,
+        support_email: str | None,
+        description: str | None,
+        updated_by_user_id: str,
+    ) -> OrganizationSettingsEntity:
+        now = datetime.now(UTC)
+        insert_stmt = pg_insert(OrganizationSettings).values(
+            organization_id=organization_id,
+            logo_url=logo_url,
+            brand_color=brand_color,
+            custom_domain=custom_domain,
+            website_url=website_url,
+            support_email=support_email,
+            description=description,
+            updated_at=now,
+            updated_by_user_id=updated_by_user_id,
+        )
+        upsert_stmt = insert_stmt.on_conflict_do_update(
+            index_elements=[OrganizationSettings.organization_id],
+            set_={
+                "logo_url": insert_stmt.excluded.logo_url,
+                "brand_color": insert_stmt.excluded.brand_color,
+                "custom_domain": insert_stmt.excluded.custom_domain,
+                "website_url": insert_stmt.excluded.website_url,
+                "support_email": insert_stmt.excluded.support_email,
+                "description": insert_stmt.excluded.description,
+                "updated_at": insert_stmt.excluded.updated_at,
+                "updated_by_user_id": insert_stmt.excluded.updated_by_user_id,
+            },
+        ).returning(OrganizationSettings)
+        result = await self._session.execute(upsert_stmt)
+        await self._session.flush()
+        return _to_organization_settings(result.scalar_one())
+
+
 class SqlApiKeyRepository:
     """Implements `domain.ports.ApiKeyRepository` against Postgres."""
 
@@ -577,19 +660,13 @@ class SqlApiKeyRepository:
     async def find_active_by_hash(self, hashed_key: str) -> ApiKeyEntity | None:
         # `hashed_key` is UNIQUE, so this is an index lookup on the
         # authentication hot path, not a scan.
-        stmt = select(ApiKey).where(
-            ApiKey.hashed_key == hashed_key, ApiKey.revoked_at.is_(None)
-        )
+        stmt = select(ApiKey).where(ApiKey.hashed_key == hashed_key, ApiKey.revoked_at.is_(None))
         result = await self._session.execute(stmt)
         row = result.scalar_one_or_none()
         return _to_api_key(row) if row is not None else None
 
     async def touch_last_used(self, api_key_id: str) -> None:
-        stmt = (
-            update(ApiKey)
-            .where(ApiKey.id == api_key_id)
-            .values(last_used_at=datetime.now(UTC))
-        )
+        stmt = update(ApiKey).where(ApiKey.id == api_key_id).values(last_used_at=datetime.now(UTC))
         await self._session.execute(stmt)
 
 
@@ -845,9 +922,7 @@ class SqlIpAllowlistRepository:
         self._session = session
 
     async def list_for_workspace(self, workspace_id: str) -> list[IpAllowlistEntry]:
-        stmt = select(WorkspaceIpAllowlist).where(
-            WorkspaceIpAllowlist.workspace_id == workspace_id
-        )
+        stmt = select(WorkspaceIpAllowlist).where(WorkspaceIpAllowlist.workspace_id == workspace_id)
         result = await self._session.execute(stmt)
         return [_to_ip_entry(row) for row in result.scalars().all()]
 
@@ -903,15 +978,11 @@ class SqlSsoConfigurationRepository:
         self._session = session
 
     async def list_for_organization(self, organization_id: str) -> list[SsoConfigurationEntity]:
-        stmt = select(SsoConfiguration).where(
-            SsoConfiguration.organization_id == organization_id
-        )
+        stmt = select(SsoConfiguration).where(SsoConfiguration.organization_id == organization_id)
         result = await self._session.execute(stmt)
         return [_to_sso_config(row) for row in result.scalars().all()]
 
-    async def get(
-        self, *, organization_id: str, config_id: str
-    ) -> SsoConfigurationEntity | None:
+    async def get(self, *, organization_id: str, config_id: str) -> SsoConfigurationEntity | None:
         stmt = select(SsoConfiguration).where(
             SsoConfiguration.id == config_id,
             SsoConfiguration.organization_id == organization_id,
@@ -1072,9 +1143,7 @@ class SqlScimTokenRepository:
 
     async def touch_last_used(self, token_id: str) -> None:
         await self._session.execute(
-            update(ScimToken)
-            .where(ScimToken.id == token_id)
-            .values(last_used_at=datetime.now(UTC))
+            update(ScimToken).where(ScimToken.id == token_id).values(last_used_at=datetime.now(UTC))
         )
 
     async def revoke(self, *, organization_id: str, token_id: str) -> bool:
@@ -1232,11 +1301,173 @@ class SqlScimRepository:
         result = await self._session.execute(stmt)
         return [_to_workspace(row) for row in result.scalars().all()]
 
-    async def get_group(
-        self, *, organization_id: str, workspace_id: str
-    ) -> WorkspaceEntity | None:
+    async def get_group(self, *, organization_id: str, workspace_id: str) -> WorkspaceEntity | None:
         stmt = select(Workspace).where(
             Workspace.id == workspace_id, Workspace.organization_id == organization_id
         )
         row = (await self._session.execute(stmt)).scalar_one_or_none()
         return None if row is None else _to_workspace(row)
+
+
+def _to_custom_role(row: CustomRoleModel, permissions: tuple[str, ...]) -> CustomRoleEntity:
+    return CustomRoleEntity(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        name=row.name,
+        description=row.description,
+        base_role=row.base_role,
+        created_by_user_id=row.created_by_user_id,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        permissions=permissions,
+    )
+
+
+class SqlCustomRoleRepository:
+    """Tenant-defined roles. Every query filters on `workspace_id` — the
+    role id alone is never a sufficient key (Rule 11).
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def _permissions_for(self, role_id: str) -> tuple[str, ...]:
+        stmt = select(CustomRolePermissionModel.permission).where(
+            CustomRolePermissionModel.role_id == role_id
+        )
+        result = await self._session.execute(stmt)
+        return tuple(sorted(result.scalars().all()))
+
+    async def _replace_permissions(self, role_id: str, permissions: list[str]) -> None:
+        await self._session.execute(
+            sa_delete(CustomRolePermissionModel).where(CustomRolePermissionModel.role_id == role_id)
+        )
+        now = datetime.now(UTC)
+        for permission in sorted(set(permissions)):
+            self._session.add(
+                CustomRolePermissionModel(
+                    id=str(uuid.uuid4()),
+                    role_id=role_id,
+                    permission=permission,
+                    created_at=now,
+                )
+            )
+
+    async def create(
+        self,
+        *,
+        workspace_id: str,
+        name: str,
+        description: str | None,
+        base_role: Role,
+        permissions: list[str],
+        created_by_user_id: str,
+    ) -> CustomRoleEntity:
+        role_id = str(uuid.uuid4())
+        self._session.add(
+            CustomRoleModel(
+                id=role_id,
+                workspace_id=workspace_id,
+                name=name,
+                description=description,
+                base_role=base_role,
+                created_by_user_id=created_by_user_id,
+                created_at=datetime.now(UTC),
+                updated_at=None,
+            )
+        )
+        await self._session.flush()
+        await self._replace_permissions(role_id, permissions)
+        await self._session.flush()
+        row = (
+            await self._session.execute(
+                select(CustomRoleModel).where(CustomRoleModel.id == role_id)
+            )
+        ).scalar_one()
+        return _to_custom_role(row, await self._permissions_for(role_id))
+
+    async def get(self, *, workspace_id: str, role_id: str) -> CustomRoleEntity | None:
+        stmt = select(CustomRoleModel).where(
+            CustomRoleModel.id == role_id, CustomRoleModel.workspace_id == workspace_id
+        )
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            return None
+        return _to_custom_role(row, await self._permissions_for(role_id))
+
+    async def update(
+        self,
+        *,
+        workspace_id: str,
+        role_id: str,
+        name: str | None,
+        description: str | None,
+        base_role: Role | None,
+        permissions: list[str] | None,
+    ) -> CustomRoleEntity:
+        stmt = select(CustomRoleModel).where(
+            CustomRoleModel.id == role_id, CustomRoleModel.workspace_id == workspace_id
+        )
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            raise CustomRoleNotFoundError(role_id)
+
+        if name is not None:
+            row.name = name
+        if description is not None:
+            row.description = description
+        if base_role is not None:
+            row.base_role = base_role
+        row.updated_at = datetime.now(UTC)
+
+        if permissions is not None:
+            await self._replace_permissions(role_id, permissions)
+        await self._session.flush()
+        return _to_custom_role(row, await self._permissions_for(role_id))
+
+    async def delete(self, *, workspace_id: str, role_id: str) -> None:
+        stmt = select(CustomRoleModel).where(
+            CustomRoleModel.id == role_id, CustomRoleModel.workspace_id == workspace_id
+        )
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            raise CustomRoleNotFoundError(role_id)
+        # `workspace_members.custom_role_id` is ON DELETE SET NULL, so
+        # members holding this role fall back to their `role` base tier
+        # rather than losing workspace access entirely.
+        await self._session.delete(row)
+        await self._session.flush()
+
+    async def list_for_workspace(self, workspace_id: str) -> list[CustomRoleEntity]:
+        stmt = (
+            select(CustomRoleModel)
+            .where(CustomRoleModel.workspace_id == workspace_id)
+            .order_by(CustomRoleModel.created_at)
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [_to_custom_role(row, await self._permissions_for(row.id)) for row in rows]
+
+    async def list_permissions(self, *, workspace_id: str, role_id: str) -> frozenset[Permission]:
+        # Joined to `roles` so the workspace filter applies — reading the
+        # grant table by `role_id` alone would answer for another
+        # tenant's role.
+        stmt = (
+            select(CustomRolePermissionModel.permission)
+            .join(CustomRoleModel, CustomRoleModel.id == CustomRolePermissionModel.role_id)
+            .where(
+                CustomRoleModel.id == role_id,
+                CustomRoleModel.workspace_id == workspace_id,
+            )
+        )
+        result = await self._session.execute(stmt)
+        resolved: set[Permission] = set()
+        for value in result.scalars().all():
+            try:
+                resolved.add(Permission(value))
+            except ValueError:
+                # A grant row whose permission no longer exists in the
+                # enum (removed in a later release). Skipped rather than
+                # raised: authorization must fail closed, and a 500 here
+                # would take out every request the member makes.
+                continue
+        return frozenset(resolved)

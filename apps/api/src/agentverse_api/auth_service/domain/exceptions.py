@@ -121,3 +121,37 @@ class InvalidCidrError(Exception):
     def __init__(self, cidr: str) -> None:
         self.cidr = cidr
         super().__init__(f"{cidr!r} is not a valid IP address or CIDR range")
+
+
+class CustomRoleNotFoundError(Exception):
+    """No such custom role in this workspace.
+
+    Deliberately does not distinguish "does not exist" from "belongs to
+    another workspace" — the caller must not learn that a role id is
+    real elsewhere (Rule 11: deny without leaking existence).
+    """
+
+    def __init__(self, role_id: str) -> None:
+        self.role_id = role_id
+        super().__init__("Custom role not found")
+
+
+class CustomRoleNameTakenError(Exception):
+    """Another role in this workspace already uses that name."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        super().__init__(f"A role named {name!r} already exists in this workspace")
+
+
+class InvalidPermissionError(Exception):
+    """A submitted grant isn't a member of the `Permission` enum.
+
+    Raised at the service boundary rather than silently dropped: an
+    admin who mistypes a permission must be told, not left believing a
+    grant took effect.
+    """
+
+    def __init__(self, permission: str) -> None:
+        self.permission = permission
+        super().__init__(f"{permission!r} is not a recognised permission")

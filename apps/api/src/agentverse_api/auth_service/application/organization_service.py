@@ -1,5 +1,5 @@
 """Organization/membership use cases — mirrors `workspace_service.py`
-structurally (ADR-0006). Attaching/detaching a workspace never touches
+structurally (ADR-0011). Attaching/detaching a workspace never touches
 `workspace_members`; the workspace's own RBAC is untouched by anything
 in this file.
 """
@@ -85,7 +85,7 @@ class OrganizationService:
         # `workspaces.organization_id` has `ON DELETE SET NULL` — deleting
         # the row below detaches every attached workspace at the database
         # level. No application-layer detach step is needed or correct to
-        # add (ADR-0006): this method must never touch `workspace_members`.
+        # add (ADR-0011): this method must never touch `workspace_members`.
         await self.organizations.delete_organization(organization_id)
 
     async def invite_member(

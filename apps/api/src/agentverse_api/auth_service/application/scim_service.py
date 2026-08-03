@@ -11,7 +11,7 @@ owns only the directory.
 
 **What SCIM can and cannot reach.** A token provisions organization
 membership. It cannot grant workspace access, because organization
-membership never implies workspace access (ADR-0006) — so SCIM Groups
+membership never implies workspace access (ADR-0011) — so SCIM Groups
 are read-only, exposing the organization's workspaces as a directory
 rather than as something an IdP can write into. Making Groups writable
 would quietly invert that ADR from an identity provider's config page,
@@ -96,9 +96,7 @@ class ScimService:
     async def revoke_token(
         self, *, organization_id: str, token_id: str, actor_user_id: str
     ) -> bool:
-        revoked = await self.tokens.revoke(
-            organization_id=organization_id, token_id=token_id
-        )
+        revoked = await self.tokens.revoke(organization_id=organization_id, token_id=token_id)
         if revoked:
             await self.audit.record(
                 action="scim_token.revoked",
@@ -137,9 +135,7 @@ class ScimService:
         )
 
     async def get_user(self, *, organization_id: str, user_id: str) -> ScimUser | None:
-        return await self.directory.get_user(
-            organization_id=organization_id, user_id=user_id
-        )
+        return await self.directory.get_user(organization_id=organization_id, user_id=user_id)
 
     async def provision_user(
         self, *, organization_id: str, email: str, display_name: str
@@ -184,9 +180,7 @@ class ScimService:
         )
 
     async def deprovision_user(self, *, organization_id: str, user_id: str) -> bool:
-        removed = await self.directory.remove_user(
-            organization_id=organization_id, user_id=user_id
-        )
+        removed = await self.directory.remove_user(organization_id=organization_id, user_id=user_id)
         if removed:
             await self.audit.record(
                 action="scim.user_deprovisioned",
@@ -200,9 +194,7 @@ class ScimService:
     async def list_groups(self, organization_id: str) -> list[Workspace]:
         return await self.directory.list_groups(organization_id)
 
-    async def get_group(
-        self, *, organization_id: str, workspace_id: str
-    ) -> Workspace | None:
+    async def get_group(self, *, organization_id: str, workspace_id: str) -> Workspace | None:
         return await self.directory.get_group(
             organization_id=organization_id, workspace_id=workspace_id
         )

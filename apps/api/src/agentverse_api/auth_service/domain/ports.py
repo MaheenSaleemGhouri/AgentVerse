@@ -13,10 +13,12 @@ from agentverse_api.auth_service.domain.api_key_scope import ApiKeyScope
 from agentverse_api.auth_service.domain.entities import (
     ApiKey,
     AuditLogEntry,
+    CustomRole,
     Invitation,
     IpAllowlistEntry,
     Organization,
     OrganizationMember,
+    OrganizationSettings,
     OrganizationSummary,
     ResourcePermission,
     ScimToken,
@@ -29,6 +31,7 @@ from agentverse_api.auth_service.domain.entities import (
     WorkspaceSummary,
 )
 from agentverse_api.auth_service.domain.invitation_target_type import InvitationTargetType
+from agentverse_api.auth_service.domain.permission import Permission
 from agentverse_api.auth_service.domain.role import Role
 from agentverse_api.auth_service.domain.sso import SsoPreset, SsoProtocol
 
@@ -75,6 +78,23 @@ class WorkspaceSettingsRepository(Protocol):
         storage_limit_mb: int | None,
         updated_by_user_id: str,
     ) -> WorkspaceSettings: ...
+
+
+class OrganizationSettingsRepository(Protocol):
+    async def get(self, organization_id: str) -> OrganizationSettings | None: ...
+
+    async def upsert(
+        self,
+        *,
+        organization_id: str,
+        logo_url: str | None,
+        brand_color: str | None,
+        custom_domain: str | None,
+        website_url: str | None,
+        support_email: str | None,
+        description: str | None,
+        updated_by_user_id: str,
+    ) -> OrganizationSettings: ...
 
 
 class ApiKeyRepository(Protocol):
@@ -141,9 +161,7 @@ class OrganizationRepository(Protocol):
         self, *, organization_id: str, user_id: str, role: Role
     ) -> OrganizationMember: ...
 
-    async def suspend_member(
-        self, *, organization_id: str, user_id: str
-    ) -> OrganizationMember: ...
+    async def suspend_member(self, *, organization_id: str, user_id: str) -> OrganizationMember: ...
 
     async def reinstate_member(
         self, *, organization_id: str, user_id: str
@@ -237,6 +255,55 @@ class ResourcePermissionRepository(Protocol):
     async def list_for_workspace(self, workspace_id: str) -> list[ResourcePermission]: ...
 
 
+class CustomRoleRepository(Protocol):
+    """Tenant-defined roles. Every method is `workspace_id`-scoped: a role
+    is a tenant's own vocabulary, and an unscoped lookup here would be a
+    cross-tenant read on a Rule 11 model.
+    """
+
+    async def create(
+        self,
+        *,
+        workspace_id: str,
+        name: str,
+        description: str | None,
+        base_role: Role,
+        permissions: list[str],
+        created_by_user_id: str,
+    ) -> CustomRole: ...
+
+    async def update(
+        self,
+        *,
+        workspace_id: str,
+        role_id: str,
+        name: str | None,
+        description: str | None,
+        base_role: Role | None,
+        permissions: list[str] | None,
+    ) -> CustomRole:
+        """Raises `CustomRoleNotFoundError` when the role belongs to
+        another workspace, rather than reporting a distinguishable
+        \"exists but not yours\" — same non-leaking contract the rest of
+        this layer holds to.
+        """
+        ...
+
+    async def delete(self, *, workspace_id: str, role_id: str) -> None: ...
+
+    async def get(self, *, workspace_id: str, role_id: str) -> CustomRole | None: ...
+
+    async def list_for_workspace(self, workspace_id: str) -> list[CustomRole]: ...
+
+    async def list_permissions(self, *, workspace_id: str, role_id: str) -> frozenset[Permission]:
+        """The role's additive grants, or an empty set if it does not
+        belong to this workspace. Returns empty rather than raising
+        because this sits on the authorization hot path — a missing role
+        must fail closed, not 500.
+        """
+        ...
+
+
 class IpAllowlistRepository(Protocol):
     async def list_for_workspace(self, workspace_id: str) -> list[IpAllowlistEntry]: ...
 
@@ -250,9 +317,7 @@ class IpAllowlistRepository(Protocol):
 class SsoConfigurationRepository(Protocol):
     async def list_for_organization(self, organization_id: str) -> list[SsoConfiguration]: ...
 
-    async def get(
-        self, *, organization_id: str, config_id: str
-    ) -> SsoConfiguration | None: ...
+    async def get(self, *, organization_id: str, config_id: str) -> SsoConfiguration | None: ...
 
     async def upsert(
         self,
@@ -353,9 +418,7 @@ class ScimRepository(Protocol):
 
     async def list_groups(self, organization_id: str) -> list[Workspace]: ...
 
-    async def get_group(
-        self, *, organization_id: str, workspace_id: str
-    ) -> Workspace | None: ...
+    async def get_group(self, *, organization_id: str, workspace_id: str) -> Workspace | None: ...
 
 
 class AuditLogRepository(Protocol):

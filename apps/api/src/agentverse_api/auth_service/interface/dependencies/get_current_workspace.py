@@ -67,7 +67,12 @@ async def get_current_workspace(
     if membership is None:
         raise _NOT_FOUND
 
-    return WorkspaceContext(workspace_id=workspace_id, user_id=user_id, role=membership.role)
+    return WorkspaceContext(
+        workspace_id=workspace_id,
+        user_id=user_id,
+        role=membership.role,
+        custom_role_id=membership.custom_role_id,
+    )
 
 
 async def _context_from_api_key(
@@ -114,4 +119,8 @@ async def _context_from_api_key(
         user_id=key.created_by_user_id,
         role=effective_role(key.scope, membership.role),
         api_key_id=key.id,
+        # The issuer's custom role travels with the key, so a key never
+        # holds a grant its issuer lost — the same re-read-per-request
+        # rule the base role already follows.
+        custom_role_id=membership.custom_role_id,
     )

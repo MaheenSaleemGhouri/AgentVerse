@@ -2,9 +2,11 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { ApiError } from "@/lib/api/client";
+import { getOrganizationSettings } from "@/lib/api/organization-settings";
 import { getOrganization, listOrgWorkspaces } from "@/lib/api/organizations";
 import { listMyWorkspaces } from "@/lib/api/workspaces";
 
+import { OrganizationProfileForm } from "@/components/organizations/organization-profile-form";
 import { OrganizationSettingsPanel } from "@/components/organizations/organization-settings-panel";
 import { PageHeader } from "@/components/patterns/page-header";
 import { Button } from "@/components/ui/button";
@@ -17,11 +19,16 @@ export default async function OrganizationSettingsPage({
   const { organizationId } = await params;
 
   try {
-    const [organization, attachedWorkspaces, myWorkspaces] = await Promise.all([
+    // The settings read is viewer-gated, so it is fetched for every
+    // member — seeing the organization's own identity is not an admin
+    // privilege, only changing it is.
+    const [organization, attachedWorkspaces, myWorkspaces, settings] = await Promise.all([
       getOrganization(organizationId),
       listOrgWorkspaces(organizationId),
       listMyWorkspaces(),
+      getOrganizationSettings(organizationId),
     ]);
+    const canManageOrg = organization.role === "owner" || organization.role === "admin";
 
     return (
       <div className="flex flex-col gap-6">
@@ -38,6 +45,11 @@ export default async function OrganizationSettingsPage({
               </Button>
             </div>
           }
+        />
+        <OrganizationProfileForm
+          organizationId={organizationId}
+          initialSettings={settings}
+          canManage={canManageOrg}
         />
         <OrganizationSettingsPanel
           organization={organization}

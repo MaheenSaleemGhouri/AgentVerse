@@ -16,8 +16,14 @@ from agentverse_api.auth_service.interface.routes.invitations import (
 from agentverse_api.auth_service.interface.routes.ip_allowlist import (
     router as ip_allowlist_router,
 )
+from agentverse_api.auth_service.interface.routes.organization_settings import (
+    router as organization_settings_router,
+)
 from agentverse_api.auth_service.interface.routes.organizations import (
     router as organizations_router,
+)
+from agentverse_api.auth_service.interface.routes.rbac import (
+    router as rbac_router,
 )
 from agentverse_api.auth_service.interface.routes.resource_permissions import (
     router as resource_permissions_router,
@@ -82,8 +88,10 @@ def create_app() -> FastAPI:
     app.include_router(workspaces_router)
     app.include_router(workspace_settings_router)
     app.include_router(organizations_router)
+    app.include_router(organization_settings_router)
     app.include_router(invitations_router)
     app.include_router(resource_permissions_router)
+    app.include_router(rbac_router)
     app.include_router(ip_allowlist_router)
     app.include_router(sso_router)
     app.include_router(scim_tokens_router)

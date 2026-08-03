@@ -196,7 +196,7 @@ async def test_suspend_then_reinstate_member_round_trips(
 async def test_delete_organization_detaches_but_does_not_delete_its_workspaces(
     service: tuple[OrganizationService, FakeAuditLogRepository],
 ) -> None:
-    """The core ADR-0006 invariant, exercised at the service layer: a
+    """The core ADR-0011 invariant, exercised at the service layer: a
     deleted organization's workspaces survive, merely detached."""
     org_service, audit_repo = service
     organization = await org_service.create_organization(name="Acme", owner_user_id="owner")
@@ -242,9 +242,5 @@ async def test_attach_and_detach_workspace_round_trip(
     )
     remaining = await org_service.list_workspaces(organization.id)
     assert remaining == []
-    assert any(
-        entry.action == "organization.workspace_attached" for entry in audit_repo.entries
-    )
-    assert any(
-        entry.action == "organization.workspace_detached" for entry in audit_repo.entries
-    )
+    assert any(entry.action == "organization.workspace_attached" for entry in audit_repo.entries)
+    assert any(entry.action == "organization.workspace_detached" for entry in audit_repo.entries)

@@ -47,7 +47,7 @@ class ChangeOrgMemberRoleRequest(BaseModel):
 class OrganizationWorkspaceResponse(BaseModel):
     """A workspace attached to an organization — deliberately carries no
     role: attachment grants no workspace access, so there is no role to
-    report here (ADR-0006). See `WorkspaceResponse` for the caller's own
+    report here (ADR-0011). See `WorkspaceResponse` for the caller's own
     workspace-scoped role.
     """
 

@@ -5,7 +5,7 @@ Revises: cc70c017a8d3
 Create Date: 2026-08-01
 
 Organizations are an additive, non-isolating grouping layer over
-existing workspaces (ADR-0006): a single org groups N workspaces for
+existing workspaces (ADR-0011): a single org groups N workspaces for
 billing rollup / SSO config / branding only. `workspace_id` remains the
 sole tenant-isolation boundary (Rule 11) — attaching a workspace to an
 organization grants zero implicit access; `workspace_members` is never
@@ -51,9 +51,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_organizations_slug"), "organizations", ["slug"], unique=True
-    )
+    op.create_index(op.f("ix_organizations_slug"), "organizations", ["slug"], unique=True)
 
     op.create_table(
         "organization_members",
@@ -120,9 +118,7 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_workspaces_organization_id"), table_name="workspaces")
     op.drop_column("workspaces", "organization_id")
 
-    op.drop_index(
-        op.f("ix_organization_members_user_id"), table_name="organization_members"
-    )
+    op.drop_index(op.f("ix_organization_members_user_id"), table_name="organization_members")
     op.drop_index(
         op.f("ix_organization_members_organization_id"), table_name="organization_members"
     )

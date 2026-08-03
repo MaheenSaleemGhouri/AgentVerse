@@ -253,9 +253,7 @@ async def test_a_token_cannot_see_another_organizations_people(
     admin_client = as_user(admin)
 
     _, mine_token = await _org_with_scim_token(admin_client, name=f"iso-mine-{unique_name}")
-    _, theirs_token = await _org_with_scim_token(
-        admin_client, name=f"iso-theirs-{unique_name}"
-    )
+    _, theirs_token = await _org_with_scim_token(admin_client, name=f"iso-theirs-{unique_name}")
 
     idp = as_idp()
     email = f"theirs-{unique_name}@example.com"
@@ -291,9 +289,7 @@ async def test_a_revoked_token_stops_working(
     admin = f"rev-admin-{unique_name}"
     await _make_user(db_session, admin)
     admin_client = as_user(admin)
-    organization_id, token = await _org_with_scim_token(
-        admin_client, name=f"rev-org-{unique_name}"
-    )
+    organization_id, token = await _org_with_scim_token(admin_client, name=f"rev-org-{unique_name}")
 
     idp = as_idp()
     auth = {"Authorization": f"Bearer {token}"}
@@ -335,7 +331,7 @@ async def test_group_writes_are_refused_explicitly(
     unique_name: str,
 ) -> None:
     """Push-groups must fail loudly: organization membership grants no
-    workspace access (ADR-0006), so silently accepting a group write
+    workspace access (ADR-0011), so silently accepting a group write
     would leave an admin believing access had been provisioned.
     """
     as_user, as_idp = clients

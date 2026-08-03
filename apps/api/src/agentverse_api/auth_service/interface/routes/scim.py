@@ -14,7 +14,7 @@ The organization is resolved from the bearer token, never the path
 
 **Groups are read-only.** They expose the organization's workspaces as a
 directory so an IdP can display them; they cannot be written, because
-organization membership grants no workspace access (ADR-0006) and a
+organization membership grants no workspace access (ADR-0011) and a
 writable Groups endpoint would invert that from an IdP config page.
 """
 
@@ -255,9 +255,7 @@ async def delete_user(
     organization_id: str = Depends(get_scim_organization),
     service: ScimService = Depends(get_scim_service),
 ) -> Response:
-    removed = await service.deprovision_user(
-        organization_id=organization_id, user_id=user_id
-    )
+    removed = await service.deprovision_user(organization_id=organization_id, user_id=user_id)
     if not removed:
         return _scim_error(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -287,9 +285,7 @@ async def get_group(
     organization_id: str = Depends(get_scim_organization),
     service: ScimService = Depends(get_scim_service),
 ) -> JSONResponse:
-    workspace = await service.get_group(
-        organization_id=organization_id, workspace_id=group_id
-    )
+    workspace = await service.get_group(organization_id=organization_id, workspace_id=group_id)
     if workspace is None:
         return _scim_error(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
     return _scim_json(_group_resource(workspace))

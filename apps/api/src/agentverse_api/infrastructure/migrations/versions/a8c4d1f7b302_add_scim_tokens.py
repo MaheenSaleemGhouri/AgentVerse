@@ -5,7 +5,7 @@ Revises: f4b8d1e6c037
 Create Date: 2026-08-02
 
 SCIM 2.0 provisioning is org-scoped, for the same reason SSO is
-(ADR-0006): the identity provider that authenticates an organization's
+(ADR-0011): the identity provider that authenticates an organization's
 people is the one that should also create and deprovision them.
 
 The bearer token an IdP presents is hashed at rest with the same fast

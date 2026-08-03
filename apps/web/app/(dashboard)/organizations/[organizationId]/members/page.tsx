@@ -29,7 +29,7 @@ export default async function OrganizationMembersPage({
       <div className="flex flex-col gap-6">
         <PageHeader
           title={`${organization.name} members`}
-          description="Organization membership — independent of any workspace's own members (ADR-0006)."
+          description="Organization membership — independent of any workspace's own members (ADR-0011)."
           actions={
             <div className="flex items-center gap-2">
               {canManage && <InviteMemberDialog scope={scope} />}

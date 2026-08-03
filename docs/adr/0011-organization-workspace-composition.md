@@ -1,4 +1,4 @@
-# ADR-0006: Organization/Workspace Composition
+# ADR-0011: Organization/Workspace Composition
 
 ## Context
 

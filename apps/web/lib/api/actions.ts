@@ -103,6 +103,11 @@ import {
   listAuditLogs as listAuditLogsApi,
 } from "@/lib/api/audit-logs";
 import {
+  type OrganizationSettings,
+  type UpdateOrganizationSettingsRequest,
+  updateOrganizationSettings as updateOrganizationSettingsApi,
+} from "@/lib/api/organization-settings";
+import {
   type UpdateWorkspaceSettingsRequest,
   updateWorkspaceSettings as updateWorkspaceSettingsApi,
   type WorkspaceSettings,
@@ -128,6 +133,17 @@ import {
   listIpAllowlist as listIpAllowlistApi,
   removeIpAllowlistEntry as removeIpAllowlistEntryApi,
 } from "@/lib/api/ip-allowlist";
+import {
+  type CreateCustomRoleRequest,
+  createCustomRole as createCustomRoleApi,
+  type CustomRole,
+  deleteCustomRole as deleteCustomRoleApi,
+  listBuiltinRoles as listBuiltinRolesApi,
+  listCustomRoles as listCustomRolesApi,
+  type RoleDescriptor,
+  type UpdateCustomRoleRequest,
+  updateCustomRole as updateCustomRoleApi,
+} from "@/lib/api/roles";
 import {
   type GrantResourcePermissionRequest,
   grantResourcePermission as grantResourcePermissionApi,
@@ -588,6 +604,13 @@ export async function updateWorkspaceSettingsAction(
   return updateWorkspaceSettingsApi(workspaceId, body);
 }
 
+export async function updateOrganizationSettingsAction(
+  organizationId: string,
+  body: UpdateOrganizationSettingsRequest
+): Promise<OrganizationSettings> {
+  return updateOrganizationSettingsApi(organizationId, body);
+}
+
 export async function listMyOrganizationsAction(): Promise<Organization[]> {
   return listMyOrganizationsApi();
 }
@@ -734,4 +757,31 @@ export async function revokeScimTokenAction(
   tokenId: string
 ): Promise<void> {
   await revokeScimTokenApi(organizationId, tokenId);
+}
+
+export async function listBuiltinRolesAction(workspaceId: string): Promise<RoleDescriptor[]> {
+  return listBuiltinRolesApi(workspaceId);
+}
+
+export async function listCustomRolesAction(workspaceId: string): Promise<CustomRole[]> {
+  return listCustomRolesApi(workspaceId);
+}
+
+export async function createCustomRoleAction(
+  workspaceId: string,
+  body: CreateCustomRoleRequest
+): Promise<CustomRole> {
+  return createCustomRoleApi(workspaceId, body);
+}
+
+export async function updateCustomRoleAction(
+  workspaceId: string,
+  roleId: string,
+  body: UpdateCustomRoleRequest
+): Promise<CustomRole> {
+  return updateCustomRoleApi(workspaceId, roleId, body);
+}
+
+export async function deleteCustomRoleAction(workspaceId: string, roleId: string): Promise<void> {
+  return deleteCustomRoleApi(workspaceId, roleId);
 }

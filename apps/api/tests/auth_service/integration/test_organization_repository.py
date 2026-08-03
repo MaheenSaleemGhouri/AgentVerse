@@ -65,9 +65,7 @@ async def test_deleting_an_organization_detaches_its_workspaces_not_deletes_them
     surviving = await workspace_repo.get_workspace(workspace.id)
     assert surviving is not None
     assert surviving.organization_id is None
-    membership = await workspace_repo.get_membership(
-        workspace_id=workspace.id, user_id=owner_id
-    )
+    membership = await workspace_repo.get_membership(workspace_id=workspace.id, user_id=owner_id)
     assert membership is not None
     assert membership.role is Role.OWNER
 
@@ -97,7 +95,7 @@ async def test_deleting_an_organization_cascades_its_membership_rows(
 async def test_attaching_a_workspace_never_creates_a_workspace_members_row(
     db_session: AsyncSession, unique_name: str
 ) -> None:
-    """The ADR-0006 invariant at the repository layer: attach touches only
+    """The ADR-0011 invariant at the repository layer: attach touches only
     `workspaces.organization_id`, never `workspace_members`."""
     org_owner = f"org-owner-{unique_name}"
     workspace_owner = f"ws-owner-{unique_name}"
@@ -118,7 +116,5 @@ async def test_attaching_a_workspace_never_creates_a_workspace_members_row(
 
     # The org owner has no workspace membership at all — attaching granted
     # them nothing.
-    membership = await workspace_repo.get_membership(
-        workspace_id=workspace.id, user_id=org_owner
-    )
+    membership = await workspace_repo.get_membership(workspace_id=workspace.id, user_id=org_owner)
     assert membership is None

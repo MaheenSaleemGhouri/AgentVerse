@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 /**
- * Organizations sit above workspaces (ADR-0006) — this route group is
+ * Organizations sit above workspaces (ADR-0011) — this route group is
  * deliberately chrome-free of the workspace `[workspaceId]/layout.tsx`
  * sidebar/topbar, the same way `/dashboard` (the workspace picker) is,
  * since neither has a workspace to build that chrome around.

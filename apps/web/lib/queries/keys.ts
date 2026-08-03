@@ -14,6 +14,8 @@ export const queryKeys = {
 
   organizationWorkspaces: (organizationId: string) =>
     ["organizations", organizationId, "workspaces"] as const,
+  organizationSettings: (organizationId: string) =>
+    ["organizations", organizationId, "settings"] as const,
 
   // Shared by workspace- and organization-scoped member lists (`lib/api/members.ts`)
   // — scoped by `scope.type` first so switching scope can never serve the
@@ -36,6 +38,11 @@ export const queryKeys = {
 
   resourcePermissions: (workspaceId: string) =>
     ["workspaces", workspaceId, "resource-permissions"] as const,
+
+  builtinRoles: (workspaceId: string) =>
+    ["workspaces", workspaceId, "roles", "builtin"] as const,
+
+  customRoles: (workspaceId: string) => ["workspaces", workspaceId, "roles"] as const,
 
   agents: {
     all: (workspaceId: string) => ["workspaces", workspaceId, "agents"] as const,

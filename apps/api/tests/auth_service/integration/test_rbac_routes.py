@@ -314,7 +314,7 @@ async def test_cross_organization_access_is_404_not_403(
     unique_name: str,
 ) -> None:
     """Increment 4: mirrors `test_cross_workspace_access_is_404_not_403`
-    for the new, fully independent organization RBAC chain (ADR-0006)."""
+    for the new, fully independent organization RBAC chain (ADR-0011)."""
     user_a = f"org-user-a-{unique_name}"
     user_b = f"org-user-b-{unique_name}"
     await _make_user(db_session, user_a)
@@ -409,7 +409,7 @@ async def test_attach_detach_and_delete_organization_leave_workspace_rbac_untouc
     make_client: Callable[[str], AsyncClient],
     unique_name: str,
 ) -> None:
-    """End-to-end acceptance test for ADR-0006's core invariant: attaching
+    """End-to-end acceptance test for ADR-0011's core invariant: attaching
     a workspace to an organization changes nothing about who can access
     that workspace, and deleting the organization only detaches it."""
     owner = f"both-owner-{unique_name}"
@@ -443,9 +443,7 @@ async def test_attach_detach_and_delete_organization_leave_workspace_rbac_untouc
     member_ids = {member["user_id"] for member in members.json()}
     assert member_ids == {owner, workspace_member}
 
-    detach = await owner_client.delete(
-        f"/api/v1/organizations/{org_id}/workspaces/{workspace_id}"
-    )
+    detach = await owner_client.delete(f"/api/v1/organizations/{org_id}/workspaces/{workspace_id}")
     assert detach.status_code == 204
     detached_workspace = await owner_client.get(f"/api/v1/workspaces/{workspace_id}")
     assert detached_workspace.json()["organization_id"] is None
@@ -478,9 +476,7 @@ async def test_invite_by_email_adds_an_existing_user_directly(
     owner_client = make_client(owner)
     invitee_client = make_client(invitee)
 
-    create = await owner_client.post(
-        "/api/v1/workspaces", json={"name": f"inv-ws-{unique_name}"}
-    )
+    create = await owner_client.post("/api/v1/workspaces", json={"name": f"inv-ws-{unique_name}"})
     workspace_id = create.json()["id"]
 
     response = await owner_client.post(
@@ -507,9 +503,7 @@ async def test_invite_by_email_for_an_unknown_address_requires_admin_and_returns
     owner_client = make_client(owner)
     member_client = make_client(member)
 
-    create = await owner_client.post(
-        "/api/v1/workspaces", json={"name": f"inv-ws2-{unique_name}"}
-    )
+    create = await owner_client.post("/api/v1/workspaces", json={"name": f"inv-ws2-{unique_name}"})
     workspace_id = create.json()["id"]
     await owner_client.post(
         f"/api/v1/workspaces/{workspace_id}/members",
@@ -545,9 +539,7 @@ async def test_accept_invite_end_to_end_via_the_real_token(
 
     owner_client = make_client(owner)
 
-    create = await owner_client.post(
-        "/api/v1/workspaces", json={"name": f"inv-ws3-{unique_name}"}
-    )
+    create = await owner_client.post("/api/v1/workspaces", json={"name": f"inv-ws3-{unique_name}"})
     workspace_id = create.json()["id"]
 
     invite = await owner_client.post(
@@ -558,7 +550,9 @@ async def test_accept_invite_end_to_end_via_the_real_token(
     assert invite.json()["status"] == "invited"
 
     result = await db_session.execute(
-        select(Verification).where(Verification.identifier.like(f"workspace-invite:%:{invitee}@example.com"))
+        select(Verification).where(
+            Verification.identifier.like(f"workspace-invite:%:{invitee}@example.com")
+        )
     )
     row = result.scalars().one()
     token = row.value
@@ -594,9 +588,7 @@ async def test_accept_invite_rejects_a_different_users_email(
     owner_client = make_client(owner)
     interloper_client = make_client(interloper)
 
-    create = await owner_client.post(
-        "/api/v1/workspaces", json={"name": f"inv-ws4-{unique_name}"}
-    )
+    create = await owner_client.post("/api/v1/workspaces", json={"name": f"inv-ws4-{unique_name}"})
     workspace_id = create.json()["id"]
 
     # invitee already has an account, so this is added directly — force a

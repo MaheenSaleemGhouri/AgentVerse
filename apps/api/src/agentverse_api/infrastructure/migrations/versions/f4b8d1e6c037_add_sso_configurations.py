@@ -4,7 +4,7 @@ Revision ID: f4b8d1e6c037
 Revises: e3a7c2d5b926
 Create Date: 2026-08-01
 
-Increment 8a: org-scoped SSO configuration (ADR-0006 — SSO is one of the
+Increment 8a: org-scoped SSO configuration (ADR-0011 — SSO is one of the
 three things an organization actually groups workspaces *for*).
 
 `protocol` is plain TEXT, app-validated, **not** a Postgres ENUM: 8b adds
@@ -98,7 +98,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index("uq_sso_enabled_per_org_protocol", table_name="sso_configurations")
-    op.drop_index(
-        op.f("ix_sso_configurations_organization_id"), table_name="sso_configurations"
-    )
+    op.drop_index(op.f("ix_sso_configurations_organization_id"), table_name="sso_configurations")
     op.drop_table("sso_configurations")

@@ -48,9 +48,18 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
+/**
+ * Tone by tier, not one colour per role: `brand` marks ownership, `info`
+ * marks the tiers that carry governance or authoring power, and
+ * `neutral` marks the read-mostly tiers. Seven distinct colours would
+ * read as a legend to memorise rather than a signal.
+ */
 const ROLE_TONE: Record<Role, "brand" | "info" | "neutral"> = {
   owner: "brand",
   admin: "info",
+  manager: "info",
+  developer: "info",
+  analyst: "neutral",
   member: "neutral",
   viewer: "neutral",
 };

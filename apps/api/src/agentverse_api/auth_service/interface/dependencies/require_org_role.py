@@ -1,6 +1,6 @@
 """Deny-by-default role check for organizations — structurally identical
 to `require_role.py`, composed on top of `get_current_organization`
-(ADR-0006). A denial is written to `audit_logs` from this single
+(ADR-0011). A denial is written to `audit_logs` from this single
 enforcement point, mirroring `require_role`'s own contract.
 """
 

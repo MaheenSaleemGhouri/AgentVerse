@@ -205,6 +205,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizations/{organization_id}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Organization Settings Route */
+        get: operations["get_organization_settings_route_api_v1_organizations__organization_id__settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Organization Settings Route */
+        patch: operations["update_organization_settings_route_api_v1_organizations__organization_id__settings_patch"];
+        trace?: never;
+    };
     "/api/v1/organizations/{organization_id}/sso": {
         parameters: {
             query?: never;
@@ -998,6 +1016,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Custom Roles */
+        get: operations["list_custom_roles_api_v1_workspaces__workspace_id__roles_get"];
+        put?: never;
+        /** Create Custom Role */
+        post: operations["create_custom_role_api_v1_workspaces__workspace_id__roles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/roles/builtin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Builtin Roles
+         * @description The seven built-in tiers and their fully-inherited permission sets.
+         */
+        get: operations["list_builtin_roles_api_v1_workspaces__workspace_id__roles_builtin_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/roles/{role_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Custom Role */
+        get: operations["get_custom_role_api_v1_workspaces__workspace_id__roles__role_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Custom Role */
+        delete: operations["delete_custom_role_api_v1_workspaces__workspace_id__roles__role_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Custom Role */
+        patch: operations["update_custom_role_api_v1_workspaces__workspace_id__roles__role_id__patch"];
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/settings": {
         parameters: {
             query?: never;
@@ -1760,6 +1835,16 @@ export interface components {
             agent: components["schemas"]["AgentResponse"];
             version: components["schemas"]["AgentVersionResponse"];
         };
+        /** CreateCustomRoleRequest */
+        CreateCustomRoleRequest: {
+            base_role: components["schemas"]["Role"];
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name: string;
+            /** Permissions */
+            permissions?: string[];
+        };
         /** CreateKnowledgeBaseRequest */
         CreateKnowledgeBaseRequest: {
             /** Description */
@@ -1844,6 +1929,29 @@ export interface components {
             key: string;
             /** Last Rotated At */
             last_rotated_at: string | null;
+        };
+        /** CustomRoleResponse */
+        CustomRoleResponse: {
+            base_role: components["schemas"]["Role"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By User Id */
+            created_by_user_id: string | null;
+            /** Description */
+            description: string | null;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Permissions */
+            permissions: string[];
+            /** Updated At */
+            updated_at: string | null;
+            /** Workspace Id */
+            workspace_id: string;
         };
         /** ExecuteTeamRequest */
         ExecuteTeamRequest: {
@@ -2366,11 +2474,32 @@ export interface components {
             /** Slug */
             slug: string;
         };
+        /** OrganizationSettingsResponse */
+        OrganizationSettingsResponse: {
+            /** Brand Color */
+            brand_color: string | null;
+            /** Custom Domain */
+            custom_domain: string | null;
+            /** Description */
+            description: string | null;
+            /** Logo Url */
+            logo_url: string | null;
+            /** Organization Id */
+            organization_id: string;
+            /** Support Email */
+            support_email: string | null;
+            /** Updated At */
+            updated_at: string | null;
+            /** Updated By User Id */
+            updated_by_user_id: string | null;
+            /** Website Url */
+            website_url: string | null;
+        };
         /**
          * OrganizationWorkspaceResponse
          * @description A workspace attached to an organization — deliberately carries no
          *     role: attachment grants no workspace access, so there is no role to
-         *     report here (ADR-0006). See `WorkspaceResponse` for the caller's own
+         *     report here (ADR-0011). See `WorkspaceResponse` for the caller's own
          *     workspace-scoped role.
          */
         OrganizationWorkspaceResponse: {
@@ -2386,6 +2515,16 @@ export interface components {
             /** Slug */
             slug: string;
         };
+        /**
+         * Permission
+         * @description `<resource>:<action>`, covering the resources CLAUDE.md §5 names.
+         *
+         *     Typed rather than free-form strings so a misspelled permission is a
+         *     static error at the call site instead of a check that silently never
+         *     matches.
+         * @enum {string}
+         */
+        Permission: "agent:view" | "agent:create" | "agent:edit" | "agent:delete" | "agent:run" | "team:view" | "team:create" | "team:edit" | "team:delete" | "knowledge:view" | "knowledge:create" | "knowledge:edit" | "knowledge:delete" | "mcp:view" | "mcp:install" | "mcp:edit" | "mcp:delete" | "billing:view" | "billing:manage" | "settings:view" | "settings:manage" | "api_key:view" | "api_key:create" | "api_key:rotate" | "api_key:revoke" | "analytics:view" | "analytics:export" | "audit_log:view" | "audit_log:export" | "member:view" | "member:invite" | "member:remove" | "member:assign_role";
         /** PermissionResponse */
         PermissionResponse: {
             /** Agent Id */
@@ -2567,7 +2706,22 @@ export interface components {
          * Role
          * @enum {string}
          */
-        Role: "owner" | "admin" | "member" | "viewer";
+        Role: "owner" | "admin" | "manager" | "developer" | "analyst" | "member" | "viewer";
+        /**
+         * RoleDescriptor
+         * @description One built-in tier and everything it can do, inherited grants included.
+         *
+         *     Served rather than duplicated in the frontend so the UI's permission
+         *     matrix and the server's enforcement can never drift — there is one
+         *     source of truth (CLAUDE.md Rule 3), and it is the server's.
+         */
+        RoleDescriptor: {
+            /** Permissions */
+            permissions: components["schemas"]["Permission"][];
+            /** Rank */
+            rank: number;
+            role: components["schemas"]["Role"];
+        };
         /** RunAgentRequest */
         RunAgentRequest: {
             /** Input */
@@ -2981,6 +3135,23 @@ export interface components {
             /** Tools */
             tools?: string[];
         };
+        /**
+         * UpdateCustomRoleRequest
+         * @description Every field optional — an omitted field is left unchanged.
+         *
+         *     `permissions` is replace-not-merge when present: a PATCH that sends
+         *     the list sets exactly that list. Merging would make removing a grant
+         *     impossible through this endpoint.
+         */
+        UpdateCustomRoleRequest: {
+            base_role?: components["schemas"]["Role"] | null;
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Permissions */
+            permissions?: string[] | null;
+        };
         /** UpdateInstalledServerRequest */
         UpdateInstalledServerRequest: {
             /** Config */
@@ -2991,6 +3162,21 @@ export interface components {
             display_name?: string | null;
             /** Status */
             status?: ("active" | "disabled") | null;
+        };
+        /** UpdateOrganizationSettingsRequest */
+        UpdateOrganizationSettingsRequest: {
+            /** Brand Color */
+            brand_color?: string | null;
+            /** Custom Domain */
+            custom_domain?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Logo Url */
+            logo_url?: string | null;
+            /** Support Email */
+            support_email?: string | null;
+            /** Website Url */
+            website_url?: string | null;
         };
         /**
          * UpdateTeamRequest
@@ -3626,6 +3812,72 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_organization_settings_route_api_v1_organizations__organization_id__settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_organization_settings_route_api_v1_organizations__organization_id__settings_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateOrganizationSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationSettingsResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -5550,6 +5802,201 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_custom_roles_api_v1_workspaces__workspace_id__roles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomRoleResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_custom_role_api_v1_workspaces__workspace_id__roles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCustomRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomRoleResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_builtin_roles_api_v1_workspaces__workspace_id__roles_builtin_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleDescriptor"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_custom_role_api_v1_workspaces__workspace_id__roles__role_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomRoleResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_custom_role_api_v1_workspaces__workspace_id__roles__role_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_custom_role_api_v1_workspaces__workspace_id__roles__role_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCustomRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomRoleResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
