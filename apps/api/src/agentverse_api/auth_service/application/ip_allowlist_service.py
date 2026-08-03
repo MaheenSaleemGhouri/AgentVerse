@@ -40,9 +40,7 @@ class IpAllowlistService:
         )
         return entry
 
-    async def remove_entry(
-        self, *, workspace_id: str, entry_id: str, actor_user_id: str
-    ) -> None:
+    async def remove_entry(self, *, workspace_id: str, entry_id: str, actor_user_id: str) -> None:
         await self.entries.remove_by_id(workspace_id=workspace_id, entry_id=entry_id)
         await self.audit.record(
             action="ip_allowlist.removed",

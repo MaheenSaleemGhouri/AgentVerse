@@ -67,10 +67,7 @@ async def workspace_with_permission(
 
     async with session_factory() as db:
         await db.execute(
-            text(
-                "INSERT INTO workspaces (id, name, slug, created_at) "
-                "VALUES (:id, :n, :s, :now)"
-            ),
+            text("INSERT INTO workspaces (id, name, slug, created_at) VALUES (:id, :n, :s, :now)"),
             {
                 "id": ids["workspace_id"],
                 "n": "permission-repo-test",

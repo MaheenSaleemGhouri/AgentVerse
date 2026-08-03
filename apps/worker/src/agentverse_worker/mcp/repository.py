@@ -502,9 +502,7 @@ class WorkerIntegrationRepository:
                     display_name=row["display_name"],
                     transport=str(row["transport"]),
                     command=row["catalog_command"] if is_catalog else None,
-                    command_args=(
-                        tuple(row["catalog_command_args"] or ()) if is_catalog else ()
-                    ),
+                    command_args=(tuple(row["catalog_command_args"] or ()) if is_catalog else ()),
                     env=env,
                     endpoint_url=(
                         row["catalog_endpoint_url"] if is_catalog else row["endpoint_url"]

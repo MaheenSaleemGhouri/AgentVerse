@@ -35,9 +35,7 @@ def upgrade() -> None:
         "verifications",
         sa.Column("consumed_at", sa.DateTime(timezone=True), nullable=True),
     )
-    op.create_index(
-        op.f("ix_verifications_value"), "verifications", ["value"], unique=False
-    )
+    op.create_index(op.f("ix_verifications_value"), "verifications", ["value"], unique=False)
 
 
 def downgrade() -> None:

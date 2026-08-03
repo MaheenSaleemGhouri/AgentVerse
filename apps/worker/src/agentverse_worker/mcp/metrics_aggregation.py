@@ -76,9 +76,7 @@ async def aggregate_bucket(session: AsyncSession, *, bucket_start: datetime) -> 
                     calls.c.tool_name,
                     func.count(calls.c.id).label("call_count"),
                     func.count(calls.c.id).filter(calls.c.status == "error").label("error_count"),
-                    func.count(calls.c.id)
-                    .filter(calls.c.status == "denied")
-                    .label("denied_count"),
+                    func.count(calls.c.id).filter(calls.c.status == "denied").label("denied_count"),
                     func.count(calls.c.id)
                     .filter(calls.c.status == "timeout")
                     .label("timeout_count"),
@@ -194,9 +192,7 @@ class ToolMetricsAggregator:
         one Redis lock per interval, so N worker replicas produce one
         rollup, not N races over the same upsert.
         """
-        lock = DistributedLock(
-            self._redis, LOCK_KEY, ttl_ms=int(self._interval_seconds * 1000)
-        )
+        lock = DistributedLock(self._redis, LOCK_KEY, ttl_ms=int(self._interval_seconds * 1000))
         if not await lock.acquire():
             return 0
 

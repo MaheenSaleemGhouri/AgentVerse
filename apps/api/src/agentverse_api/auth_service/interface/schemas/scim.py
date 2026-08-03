@@ -45,7 +45,7 @@ def parse_username_filter(filter_expression: str | None) -> str | None:
     match = _USERNAME_FILTER.match(filter_expression)
     if match is None:
         raise ScimFilterUnsupportedError(
-            'Only filters of the form \'userName eq "value"\' are supported.'
+            "Only filters of the form 'userName eq \"value\"' are supported."
         )
     return match.group("value")
 

@@ -400,8 +400,7 @@ async def execute_tool(
                 return await _record(
                     _refusal(
                         "denied",
-                        f"this run has already made {grant.max_calls_per_run} calls "
-                        "to this server",
+                        f"this run has already made {grant.max_calls_per_run} calls to this server",
                     ),
                     denial_category="budget_exceeded",
                 )
@@ -440,9 +439,7 @@ async def execute_tool(
             except TimeoutError:
                 excluded_seconds += time.monotonic() - attempt_started
                 last_error = f"the tool did not respond within {timeout}s"
-                await breaker.record_failure(
-                    workspace_id=context.workspace_id, server_id=server_id
-                )
+                await breaker.record_failure(workspace_id=context.workspace_id, server_id=server_id)
             except EgressDeniedError as exc:
                 # Not retried and not counted against the breaker: the
                 # destination is not going to become permitted, and a
@@ -467,9 +464,7 @@ async def execute_tool(
                     current.name,
                     attempt,
                 )
-                await breaker.record_failure(
-                    workspace_id=context.workspace_id, server_id=server_id
-                )
+                await breaker.record_failure(workspace_id=context.workspace_id, server_id=server_id)
             else:
                 excluded_seconds += time.monotonic() - attempt_started
                 # 7. Sanitise before the result re-enters the model
@@ -480,9 +475,7 @@ async def execute_tool(
                         f"[Automatically retried with '{current.name}' after "
                         f"'{substituted_from}' failed.]\n{content}"
                     )
-                await breaker.record_success(
-                    workspace_id=context.workspace_id, server_id=server_id
-                )
+                await breaker.record_success(workspace_id=context.workspace_id, server_id=server_id)
                 if grant.cache_ttl_seconds > 0:
                     await cache.put(
                         workspace_id=context.workspace_id,

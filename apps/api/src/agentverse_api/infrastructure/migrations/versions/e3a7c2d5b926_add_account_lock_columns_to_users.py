@@ -33,9 +33,7 @@ def upgrade() -> None:
         "users",
         sa.Column("failed_login_count", sa.Integer(), nullable=False, server_default="0"),
     )
-    op.add_column(
-        "users", sa.Column("locked_until", sa.DateTime(timezone=True), nullable=True)
-    )
+    op.add_column("users", sa.Column("locked_until", sa.DateTime(timezone=True), nullable=True))
 
 
 def downgrade() -> None:

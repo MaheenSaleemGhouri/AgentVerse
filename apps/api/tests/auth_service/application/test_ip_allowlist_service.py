@@ -79,9 +79,7 @@ async def test_remove_entry_reopens_the_workspace_and_is_audited(
     )
     assert not await ip_service.is_allowed(workspace_id="ws-1", client_ip="203.0.113.9")
 
-    await ip_service.remove_entry(
-        workspace_id="ws-1", entry_id=entry.id, actor_user_id="owner"
-    )
+    await ip_service.remove_entry(workspace_id="ws-1", entry_id=entry.id, actor_user_id="owner")
 
     assert await ip_service.is_allowed(workspace_id="ws-1", client_ip="203.0.113.9")
     assert any(e.action == "ip_allowlist.removed" for e in audit_repo.entries)
@@ -95,8 +93,6 @@ async def test_remove_entry_does_not_remove_another_workspaces_entry(
         workspace_id="ws-1", cidr="10.0.0.0/8", label=None, actor_user_id="owner"
     )
 
-    await ip_service.remove_entry(
-        workspace_id="ws-2", entry_id=entry.id, actor_user_id="intruder"
-    )
+    await ip_service.remove_entry(workspace_id="ws-2", entry_id=entry.id, actor_user_id="intruder")
 
     assert len(await ip_service.list_entries("ws-1")) == 1

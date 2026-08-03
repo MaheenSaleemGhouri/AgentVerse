@@ -60,9 +60,7 @@ def upgrade() -> None:
 
     op.add_column(
         "users",
-        sa.Column(
-            "two_factor_enabled", sa.Boolean(), nullable=False, server_default=sa.false()
-        ),
+        sa.Column("two_factor_enabled", sa.Boolean(), nullable=False, server_default=sa.false()),
     )
 
     # Grandfather every existing account — see the module docstring.

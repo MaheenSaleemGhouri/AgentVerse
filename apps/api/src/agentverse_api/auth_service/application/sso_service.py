@@ -133,9 +133,7 @@ class SsoService:
             actor_user_id=actor_user_id,
             target=config_id,
         )
-        await self.configurations.delete(
-            organization_id=organization_id, config_id=config_id
-        )
+        await self.configurations.delete(organization_id=organization_id, config_id=config_id)
 
     async def resolve_enabled_oidc_providers(self) -> list[ResolvedSsoProvider]:
         """Opens the sealed secret for every enabled OIDC config.

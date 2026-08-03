@@ -226,9 +226,7 @@ async def test_revoke_removes_the_grant_and_is_workspace_scoped(
         f"/api/v1/workspaces/{workspace_b}/resource-permissions/{permission_id}"
     )
     assert cross_workspace.status_code == 204
-    still_listed = await owner_client.get(
-        f"/api/v1/workspaces/{workspace_a}/resource-permissions"
-    )
+    still_listed = await owner_client.get(f"/api/v1/workspaces/{workspace_a}/resource-permissions")
     assert len(still_listed.json()) == 1
 
     revoke = await owner_client.delete(

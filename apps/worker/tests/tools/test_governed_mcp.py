@@ -278,9 +278,7 @@ class TestFallbackTool:
         is_mutating=False,
     )
 
-    async def test_a_failed_call_falls_through_to_the_configured_fallback(
-        self, redis: Any
-    ) -> None:
+    async def test_a_failed_call_falls_through_to_the_configured_fallback(self, redis: Any) -> None:
         recorder = FakeRecorder()
         inner = RoutingStubMcpServer(
             {

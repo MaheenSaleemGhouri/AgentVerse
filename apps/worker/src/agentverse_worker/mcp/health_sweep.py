@@ -99,9 +99,7 @@ class HealthSweeper:
                 # the sweep permanently — the next interval tries again.
                 logger.exception("mcp_health_sweep_cycle_failed")
             with contextlib.suppress(TimeoutError):
-                await asyncio.wait_for(
-                    self._stopping.wait(), timeout=self._interval_seconds
-                )
+                await asyncio.wait_for(self._stopping.wait(), timeout=self._interval_seconds)
 
     async def run_once(self) -> list[HealthReport]:
         """Runs one sweep cycle if this replica wins the interval's lock.
@@ -111,9 +109,7 @@ class HealthSweeper:
         nothing installed to check, which is why callers (and tests)
         should not read "empty" as "the sweep is broken."
         """
-        lock = DistributedLock(
-            self._redis, LOCK_KEY, ttl_ms=int(self._interval_seconds * 1000)
-        )
+        lock = DistributedLock(self._redis, LOCK_KEY, ttl_ms=int(self._interval_seconds * 1000))
         if not await lock.acquire():
             return []
 

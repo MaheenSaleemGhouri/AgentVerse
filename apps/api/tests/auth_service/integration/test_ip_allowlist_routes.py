@@ -200,9 +200,7 @@ async def test_allowlist_management_is_admin_gated_and_rejects_bad_cidr(
     owner_client = make_client(owner)
     member_client = make_client(member)
 
-    create = await owner_client.post(
-        "/api/v1/workspaces", json={"name": f"ip-ws4-{unique_name}"}
-    )
+    create = await owner_client.post("/api/v1/workspaces", json={"name": f"ip-ws4-{unique_name}"})
     workspace_id = create.json()["id"]
     await owner_client.post(
         f"/api/v1/workspaces/{workspace_id}/members",

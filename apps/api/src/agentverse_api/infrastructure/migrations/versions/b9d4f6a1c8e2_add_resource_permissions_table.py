@@ -85,7 +85,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        op.f("ix_resource_permissions_workspace_id"), table_name="resource_permissions"
-    )
+    op.drop_index(op.f("ix_resource_permissions_workspace_id"), table_name="resource_permissions")
     op.drop_table("resource_permissions")

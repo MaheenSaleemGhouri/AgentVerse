@@ -71,8 +71,7 @@ async def _seed_workspace(session: AsyncSession) -> tuple[str, str, str]:
     )
     await session.execute(
         text(
-            "INSERT INTO workspaces (id, name, slug, created_at) "
-            "VALUES (:id, :name, :slug, :now)"
+            "INSERT INTO workspaces (id, name, slug, created_at) VALUES (:id, :name, :slug, :now)"
         ),
         {"id": workspace_id, "name": f"ws-{suffix}", "slug": f"ws-{suffix}", "now": now},
     )
@@ -194,9 +193,7 @@ async def test_purging_a_run_takes_its_steps_with_it(session: AsyncSession) -> N
     )
     await session.commit()
 
-    await purge_workspace(
-        session, workspace_id=workspace_id, retention_days=30, batch_size=1000
-    )
+    await purge_workspace(session, workspace_id=workspace_id, retention_days=30, batch_size=1000)
 
     steps = await session.execute(
         text("SELECT count(*) FROM agent_run_steps WHERE run_id = :run"), {"run": run_id}
@@ -216,9 +213,7 @@ async def test_a_purge_records_itself_in_the_append_only_audit_log(
         created_at=datetime.now(UTC) - timedelta(days=90),
     )
 
-    await purge_workspace(
-        session, workspace_id=workspace_id, retention_days=7, batch_size=1000
-    )
+    await purge_workspace(session, workspace_id=workspace_id, retention_days=7, batch_size=1000)
 
     result = await session.execute(
         text(

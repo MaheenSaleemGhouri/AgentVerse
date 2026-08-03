@@ -59,9 +59,7 @@ async def test_revoke_api_key_sets_revoked_at_and_audits() -> None:
 
 async def test_revoke_refuses_a_key_owned_by_another_workspace() -> None:
     service, key_repo, _audit_repo = _service()
-    issued = await service.issue_api_key(
-        workspace_id="ws1", name="theirs", created_by_user_id="u1"
-    )
+    issued = await service.issue_api_key(workspace_id="ws1", name="theirs", created_by_user_id="u1")
 
     with pytest.raises(ApiKeyNotFoundError):
         await service.revoke_api_key(
@@ -73,9 +71,7 @@ async def test_revoke_refuses_a_key_owned_by_another_workspace() -> None:
 
 async def test_authenticate_resolves_an_active_key_and_rejects_the_rest() -> None:
     service, key_repo, _audit_repo = _service()
-    issued = await service.issue_api_key(
-        workspace_id="ws1", name="live", created_by_user_id="u1"
-    )
+    issued = await service.issue_api_key(workspace_id="ws1", name="live", created_by_user_id="u1")
 
     resolved = await service.authenticate(issued.plaintext_key)
     assert resolved is not None

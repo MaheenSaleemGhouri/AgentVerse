@@ -104,9 +104,7 @@ async def purge_workspace(
     # type-checked instead of being waved through.
     result = cast(
         "CursorResult[Any]",
-        await session.execute(
-            delete(agent_runs_table).where(agent_runs_table.c.id.in_(expiring))
-        ),
+        await session.execute(delete(agent_runs_table).where(agent_runs_table.c.id.in_(expiring))),
     )
     deleted = result.rowcount or 0
 

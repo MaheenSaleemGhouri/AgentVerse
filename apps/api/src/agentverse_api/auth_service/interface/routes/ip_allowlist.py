@@ -22,9 +22,7 @@ from agentverse_api.auth_service.interface.schemas.ip_allowlist import (
     IpAllowlistEntryResponse,
 )
 
-router = APIRouter(
-    prefix="/api/v1/workspaces/{workspace_id}/ip-allowlist", tags=["ip-allowlist"]
-)
+router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}/ip-allowlist", tags=["ip-allowlist"])
 
 
 @router.get("", response_model=list[IpAllowlistEntryResponse])
@@ -34,8 +32,7 @@ async def list_ip_allowlist(
 ) -> list[IpAllowlistEntryResponse]:
     entries = await service.list_entries(context.workspace_id)
     return [
-        IpAllowlistEntryResponse.model_validate(entry, from_attributes=True)
-        for entry in entries
+        IpAllowlistEntryResponse.model_validate(entry, from_attributes=True) for entry in entries
     ]
 
 

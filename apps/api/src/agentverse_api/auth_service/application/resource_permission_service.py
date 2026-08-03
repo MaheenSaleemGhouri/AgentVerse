@@ -53,9 +53,7 @@ class ResourcePermissionService:
         )
         return grant
 
-    async def revoke(
-        self, *, workspace_id: str, permission_id: str, actor_user_id: str
-    ) -> None:
+    async def revoke(self, *, workspace_id: str, permission_id: str, actor_user_id: str) -> None:
         await self.resource_permissions.revoke_by_id(
             workspace_id=workspace_id, permission_id=permission_id
         )

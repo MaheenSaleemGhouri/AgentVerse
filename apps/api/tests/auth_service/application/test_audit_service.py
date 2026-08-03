@@ -56,9 +56,7 @@ async def test_list_for_workspace_orders_newest_first_and_respects_limit(
 ) -> None:
     audit_service, _ = service
     for i in range(5):
-        await audit_service.record(
-            action=f"event.{i}", outcome="success", workspace_id="ws-1"
-        )
+        await audit_service.record(action=f"event.{i}", outcome="success", workspace_id="ws-1")
 
     page = await audit_service.list_for_workspace(workspace_id="ws-1", limit=3)
 

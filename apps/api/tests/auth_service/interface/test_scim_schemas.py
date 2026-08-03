@@ -38,9 +38,7 @@ class TestUsernameFilter:
             "active eq true",
         ],
     )
-    def test_an_unsupported_filter_is_refused_not_silently_widened(
-        self, unsupported: str
-    ) -> None:
+    def test_an_unsupported_filter_is_refused_not_silently_widened(self, unsupported: str) -> None:
         # Treating an unparsed filter as "match everything" would tell an
         # IdP a user already exists when they do not — the failure mode
         # this test exists to prevent.

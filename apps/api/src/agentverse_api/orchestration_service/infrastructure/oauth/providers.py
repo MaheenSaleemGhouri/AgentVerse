@@ -41,7 +41,10 @@ class OAuthProviderConfig:
 #: provider name, so `build_oauth_providers` can look one up directly
 #: from the installed server's catalog entry with no second mapping.
 _ENDPOINTS: dict[str, tuple[str, str]] = {
-    "notion": ("https://api.notion.com/v1/oauth/authorize", "https://api.notion.com/v1/oauth/token"),
+    "notion": (
+        "https://api.notion.com/v1/oauth/authorize",
+        "https://api.notion.com/v1/oauth/token",
+    ),
     "linear": ("https://linear.app/oauth/authorize", "https://api.linear.app/oauth/token"),
     "jira": (
         "https://auth.atlassian.com/authorize",

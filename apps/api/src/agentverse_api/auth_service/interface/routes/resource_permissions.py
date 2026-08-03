@@ -34,8 +34,7 @@ async def list_resource_permissions(
 ) -> list[ResourcePermissionResponse]:
     grants = await service.list_for_workspace(context.workspace_id)
     return [
-        ResourcePermissionResponse.model_validate(grant, from_attributes=True)
-        for grant in grants
+        ResourcePermissionResponse.model_validate(grant, from_attributes=True) for grant in grants
     ]
 
 
@@ -56,9 +55,7 @@ async def grant_resource_permission(
     return ResourcePermissionResponse.model_validate(grant, from_attributes=True)
 
 
-@router.delete(
-    "/{permission_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None
-)
+@router.delete("/{permission_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def revoke_resource_permission(
     permission_id: str,
     context: WorkspaceContext = Depends(require_admin),

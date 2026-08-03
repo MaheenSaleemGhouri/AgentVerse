@@ -18,9 +18,7 @@ from agentverse_api.auth_service.interface.schemas.sso import (
     SsoConfigurationResponse,
 )
 
-router = APIRouter(
-    prefix="/api/v1/organizations/{organization_id}/sso", tags=["sso"]
-)
+router = APIRouter(prefix="/api/v1/organizations/{organization_id}/sso", tags=["sso"])
 
 
 @router.get("", response_model=list[SsoConfigurationResponse])
@@ -30,8 +28,7 @@ async def list_sso_configurations(
 ) -> list[SsoConfigurationResponse]:
     configs = await service.list_configurations(context.organization_id)
     return [
-        SsoConfigurationResponse.model_validate(config, from_attributes=True)
-        for config in configs
+        SsoConfigurationResponse.model_validate(config, from_attributes=True) for config in configs
     ]
 
 

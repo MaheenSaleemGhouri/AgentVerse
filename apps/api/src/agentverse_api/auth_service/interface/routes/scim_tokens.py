@@ -56,9 +56,7 @@ async def list_scim_tokens(
     service: ScimService = Depends(get_scim_service),
 ) -> list[ScimTokenResponse]:
     tokens = await service.list_tokens(context.organization_id)
-    return [
-        ScimTokenResponse.model_validate(token, from_attributes=True) for token in tokens
-    ]
+    return [ScimTokenResponse.model_validate(token, from_attributes=True) for token in tokens]
 
 
 @router.delete("/{token_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
@@ -73,6 +71,4 @@ async def revoke_scim_token(
         actor_user_id=context.user_id,
     )
     if not revoked:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="SCIM token not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="SCIM token not found")
