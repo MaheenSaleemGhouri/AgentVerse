@@ -529,6 +529,29 @@
         "title": "Body_upload_document_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__documents_post",
         "type": "object"
       },
+      "CancelRequest": {
+        "properties": {
+          "at_period_end": {
+            "default": true,
+            "title": "At Period End",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 280,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "CancelRequest",
+        "type": "object"
+      },
       "ChangeMemberRoleRequest": {
         "properties": {
           "role": {
@@ -582,6 +605,53 @@
           "violations"
         ],
         "title": "CheckPasswordResponse",
+        "type": "object"
+      },
+      "CheckoutRequest": {
+        "properties": {
+          "coupon_code": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coupon Code"
+          },
+          "interval": {
+            "$ref": "#/components/schemas/BillingInterval",
+            "default": "monthly"
+          },
+          "plan_slug": {
+            "$ref": "#/components/schemas/PlanTier"
+          }
+        },
+        "required": [
+          "plan_slug"
+        ],
+        "title": "CheckoutRequest",
+        "type": "object"
+      },
+      "CheckoutResponse": {
+        "description": "A URL to redirect the browser to.\n\nNo subscription exists yet at this point, deliberately: it is created\nwhen the provider confirms payment. A client that treats this\nresponse as \"subscribed\" is wrong, which is why the field is named\nfor what it is.",
+        "properties": {
+          "checkout_url": {
+            "title": "Checkout Url",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "checkout_url",
+          "session_id"
+        ],
+        "title": "CheckoutResponse",
         "type": "object"
       },
       "CitationResponse": {
@@ -1869,6 +1939,123 @@
         "title": "InviteOrgMemberRequest",
         "type": "object"
       },
+      "InvoiceListResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/InvoiceResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "InvoiceListResponse",
+        "type": "object"
+      },
+      "InvoiceResponse": {
+        "properties": {
+          "amount_due_cents": {
+            "title": "Amount Due Cents",
+            "type": "integer"
+          },
+          "amount_paid_cents": {
+            "title": "Amount Paid Cents",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "hosted_invoice_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hosted Invoice Url"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "invoice_pdf_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Pdf Url"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "amount_due_cents",
+          "amount_paid_cents",
+          "currency",
+          "created_at",
+          "period_start",
+          "period_end",
+          "hosted_invoice_url",
+          "invoice_pdf_url"
+        ],
+        "title": "InvoiceResponse",
+        "type": "object"
+      },
       "IpAllowlistEntryResponse": {
         "properties": {
           "cidr": {
@@ -2917,6 +3104,89 @@
         "title": "PasswordPolicyResponse",
         "type": "object"
       },
+      "PaymentMethodListResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentMethodResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "PaymentMethodListResponse",
+        "type": "object"
+      },
+      "PaymentMethodResponse": {
+        "description": "The non-sensitive remainder of a card.\n\nBrand, last four and expiry \u2014 read from the provider per request and\nnever stored. There is no field here, or in any table, that a PAN or\nCVC could live in.",
+        "properties": {
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand"
+          },
+          "exp_month": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exp Month"
+          },
+          "exp_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exp Year"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "last4": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last4"
+          }
+        },
+        "required": [
+          "id",
+          "brand",
+          "last4",
+          "exp_month",
+          "exp_year",
+          "is_default"
+        ],
+        "title": "PaymentMethodResponse",
+        "type": "object"
+      },
       "Permission": {
         "description": "`<resource>:<action>`, covering the resources CLAUDE.md \u00a75 names.\n\nTyped rather than free-form strings so a misspelled permission is a\nstatic error at the call site instead of a check that silently never\nmatches.",
         "enum": [
@@ -3046,6 +3316,54 @@
           "created_at"
         ],
         "title": "PermissionResponse",
+        "type": "object"
+      },
+      "PlanChangeQuoteResponse": {
+        "properties": {
+          "from_plan": {
+            "title": "From Plan",
+            "type": "string"
+          },
+          "interval": {
+            "title": "Interval",
+            "type": "string"
+          },
+          "is_upgrade": {
+            "title": "Is Upgrade",
+            "type": "boolean"
+          },
+          "proration": {
+            "$ref": "#/components/schemas/ProrationResponse"
+          },
+          "to_plan": {
+            "title": "To Plan",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from_plan",
+          "to_plan",
+          "interval",
+          "is_upgrade",
+          "proration"
+        ],
+        "title": "PlanChangeQuoteResponse",
+        "type": "object"
+      },
+      "PlanChangeRequest": {
+        "properties": {
+          "interval": {
+            "$ref": "#/components/schemas/BillingInterval",
+            "default": "monthly"
+          },
+          "plan_slug": {
+            "$ref": "#/components/schemas/PlanTier"
+          }
+        },
+        "required": [
+          "plan_slug"
+        ],
+        "title": "PlanChangeRequest",
         "type": "object"
       },
       "PlanListResponse": {
@@ -3206,6 +3524,48 @@
         "title": "PlanTier",
         "type": "string"
       },
+      "PortalResponse": {
+        "properties": {
+          "portal_url": {
+            "title": "Portal Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "portal_url"
+        ],
+        "title": "PortalResponse",
+        "type": "object"
+      },
+      "ProrationResponse": {
+        "description": "Both halves separately, never one net figure.\n\n`saas-strategist`'s standard: an invoice itemizes the credit and the\ncharge, because a single number cannot be decomposed back into\n\"credit for unused Pro time\" and \"prorated Team charge\", which is\nwhat a customer actually needs to check the maths.",
+        "properties": {
+          "net_cents": {
+            "title": "Net Cents",
+            "type": "integer"
+          },
+          "prorated_charge_cents": {
+            "title": "Prorated Charge Cents",
+            "type": "integer"
+          },
+          "remaining_fraction_ppm": {
+            "title": "Remaining Fraction Ppm",
+            "type": "integer"
+          },
+          "unused_credit_cents": {
+            "title": "Unused Credit Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "unused_credit_cents",
+          "prorated_charge_cents",
+          "net_cents",
+          "remaining_fraction_ppm"
+        ],
+        "title": "ProrationResponse",
+        "type": "object"
+      },
       "ProviderTestRequest": {
         "properties": {
           "model": {
@@ -3304,6 +3664,58 @@
           "user_id"
         ],
         "title": "RecordAuthEventRequest",
+        "type": "object"
+      },
+      "RefundRequest": {
+        "properties": {
+          "amount_cents": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Cents"
+          },
+          "invoice_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Invoice Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 280,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "invoice_id"
+        ],
+        "title": "RefundRequest",
+        "type": "object"
+      },
+      "RefundResponse": {
+        "properties": {
+          "refund_id": {
+            "title": "Refund Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "refund_id"
+        ],
+        "title": "RefundResponse",
         "type": "object"
       },
       "RegisterCustomServerRequest": {
@@ -5683,6 +6095,20 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "WebhookAckResponse": {
+        "description": "Acknowledgement, not a result.\n\nReturned 200 for a duplicate and for an ignored event as well as a\nprocessed one: all three mean \"do not retry this\". A non-2xx would\nmake the provider redeliver an event that was handled correctly.",
+        "properties": {
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome"
+        ],
+        "title": "WebhookAckResponse",
+        "type": "object"
+      },
       "WorkspaceResponse": {
         "properties": {
           "created_at": {
@@ -5839,6 +6265,55 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/billing/webhooks/stripe": {
+      "post": {
+        "operationId": "stripe_webhook_route_api_v1_billing_webhooks_stripe_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Stripe-Signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Stripe-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookAckResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stripe Webhook Route",
+        "tags": [
+          "billing-webhooks"
+        ]
+      }
+    },
     "/api/v1/integrations/oauth/callback": {
       "get": {
         "description": "Exchanges the code and redirects back into the product.\n\nEvery outcome \u2014 success, a provider-side denial, or an exchange\nfailure \u2014 ends in a redirect to a page a human is looking at, never\na bare JSON error: the party making this request is a browser\nfollowing a 302, not an API client that would parse one.",
@@ -8709,6 +9184,64 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspace_id}/billing/checkout-session": {
+      "post": {
+        "description": "Start a hosted checkout.\n\nNo subscription row is created here \u2014 it is created when the provider\nconfirms payment via webhook. Creating one optimistically would leave\na phantom subscription for every customer who opened the page and\nclosed the tab.",
+        "operationId": "create_checkout_route_api_v1_workspaces__workspace_id__billing_checkout_session_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Checkout Route",
+        "tags": [
+          "billing-actions"
+        ]
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/billing/entitlements": {
       "get": {
         "operationId": "get_entitlements_route_api_v1_workspaces__workspace_id__billing_entitlements_get",
@@ -8753,6 +9286,234 @@
         "summary": "Get Entitlements Route",
         "tags": [
           "billing-entitlements"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/billing/invoices": {
+      "get": {
+        "description": "Read straight from the provider, never a local mirror.\n\nInvoice PDFs are the provider's to hold; a cached copy here would be\none more thing that can be stale and one more place financial\ndocuments live.",
+        "operationId": "list_invoices_route_api_v1_workspaces__workspace_id__billing_invoices_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 24,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Invoices Route",
+        "tags": [
+          "billing-actions"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/billing/payment-methods": {
+      "get": {
+        "description": "Brand, last four and expiry only \u2014 read per request, never stored.\n\nAdding or removing a card happens on the provider's hosted portal, so\nno card field exists anywhere in this codebase.",
+        "operationId": "list_payment_methods_route_api_v1_workspaces__workspace_id__billing_payment_methods_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentMethodListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Payment Methods Route",
+        "tags": [
+          "billing-actions"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/billing/portal-session": {
+      "post": {
+        "description": "The provider's own management surface \u2014 payment methods, plan\nchanges, cancellation, invoice history.\n\nPreferred over rebuilding each of those here: it is where the card\nform lives, and every card field this product does not build is PCI\nscope it does not carry.",
+        "operationId": "create_portal_route_api_v1_workspaces__workspace_id__billing_portal_session_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Portal Route",
+        "tags": [
+          "billing-actions"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/billing/refunds": {
+      "post": {
+        "description": "Refund an invoice, fully or partially.\n\nNever automatic: a downgrade produces a credit against the next\ninvoice, and money actually leaving the company is a separate,\ndeliberately authorized action. The invoice is checked to belong to\nthis workspace's customer before anything is refunded \u2014 an invoice id\nfrom another tenant must not refund their charge (Rule 11).",
+        "operationId": "refund_route_api_v1_workspaces__workspace_id__billing_refunds_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Refund Route",
+        "tags": [
+          "billing-actions"
         ]
       }
     },
@@ -8804,6 +9565,137 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspace_id}/billing/subscription/cancel": {
+      "post": {
+        "operationId": "cancel_subscription_route_api_v1_workspaces__workspace_id__billing_subscription_cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cancel Subscription Route",
+        "tags": [
+          "billing-actions"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/billing/subscription/change-plan": {
+      "post": {
+        "description": "Change plan mid-cycle.\n\n`Idempotency-Key` is required (CLAUDE.md \u00a77: billing-affecting\nendpoints enforce it). Without one, a retried request after a\ntimeout would apply a second plan change \u2014 and each one becomes an\ninvoice line.",
+        "operationId": "change_plan_route_api_v1_workspaces__workspace_id__billing_subscription_change_plan_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Change Plan Route",
+        "tags": [
+          "billing-actions"
+        ]
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/billing/subscription/events": {
       "get": {
         "description": "The transition log, newest first.\n\nReturns an empty list rather than 404 for a workspace with no\nsubscription: \"this workspace has no billing history\" is a true,\nrenderable answer, and the timeline component should show an empty\nstate rather than an error.",
@@ -8849,6 +9741,206 @@
         "summary": "List Subscription Events Route",
         "tags": [
           "billing-subscription"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/billing/subscription/pause": {
+      "post": {
+        "operationId": "pause_subscription_route_api_v1_workspaces__workspace_id__billing_subscription_pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Pause Subscription Route",
+        "tags": [
+          "billing-actions"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/billing/subscription/quote": {
+      "post": {
+        "description": "What a plan change costs, without making it.\n\nShown before the confirm button: a customer should never first learn\na proration figure from their statement.",
+        "operationId": "quote_plan_change_route_api_v1_workspaces__workspace_id__billing_subscription_quote_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanChangeQuoteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Quote Plan Change Route",
+        "tags": [
+          "billing-actions"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/billing/subscription/resume": {
+      "post": {
+        "description": "Undo a scheduled cancellation while the paid period is still open.",
+        "operationId": "resume_subscription_route_api_v1_workspaces__workspace_id__billing_subscription_resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resume Subscription Route",
+        "tags": [
+          "billing-actions"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/billing/subscription/unpause": {
+      "post": {
+        "operationId": "unpause_subscription_route_api_v1_workspaces__workspace_id__billing_subscription_unpause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Unpause Subscription Route",
+        "tags": [
+          "billing-actions"
         ]
       }
     },

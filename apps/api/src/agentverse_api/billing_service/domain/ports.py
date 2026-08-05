@@ -144,6 +144,41 @@ class SubscriptionRepository(Protocol):
         ...
 
 
+class WebhookEventRepository(Protocol):
+    """The provider-event delivery log.
+
+    `claim` and `resolve` are separate calls because the work between
+    them is the state change the event causes: claiming first, in the
+    same transaction, is what makes a concurrent redelivery lose the race
+    at the database rather than duplicate the effect.
+    """
+
+    async def claim(
+        self,
+        *,
+        provider: str,
+        provider_event_id: str,
+        event_type: str,
+        workspace_id: str | None,
+    ) -> bool:
+        """Record this event as received. `False` if it was already
+        recorded — meaning some other delivery of the same event owns it
+        and this one must do nothing.
+        """
+        ...
+
+    async def resolve(
+        self,
+        *,
+        provider: str,
+        provider_event_id: str,
+        status: str,
+        error: str | None,
+    ) -> None: ...
+
+    async def was_processed(self, *, provider: str, provider_event_id: str) -> bool: ...
+
+
 class CustomerRepository(Protocol):
     async def get_for_workspace(self, workspace_id: str) -> BillingCustomer | None: ...
 

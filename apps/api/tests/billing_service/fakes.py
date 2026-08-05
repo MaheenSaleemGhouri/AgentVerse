@@ -17,6 +17,14 @@ from datetime import UTC, datetime
 
 from agentverse_api.billing_service.domain.customer import BillingCustomer, PaymentProvider
 from agentverse_api.billing_service.domain.entitlements import ResourceUsage
+from agentverse_api.billing_service.domain.payment_provider import (
+    CheckoutSession,
+    PortalSession,
+    ProviderEvent,
+    ProviderInvoice,
+    ProviderPaymentMethod,
+    ProviderSubscriptionState,
+)
 from agentverse_api.billing_service.domain.plan import BillingInterval, Plan, PlanTier
 from agentverse_api.billing_service.domain.subscription import (
     Subscription,
@@ -229,6 +237,177 @@ class FakeSubscriptionRepository:
         ]
         matching.reverse()
         return matching[:limit]
+
+
+class FakeWebhookEventRepository:
+    """Enforces the unique-index behaviour the real table has: a second
+    claim on the same `(provider, event_id)` loses.
+    """
+
+    def __init__(self) -> None:
+        self.claimed: dict[tuple[str, str], str] = {}
+        self.errors: dict[tuple[str, str], str | None] = {}
+
+    async def claim(
+        self,
+        *,
+        provider: str,
+        provider_event_id: str,
+        event_type: str,
+        workspace_id: str | None,
+    ) -> bool:
+        del event_type, workspace_id
+        key = (provider, provider_event_id)
+        if key in self.claimed:
+            return False
+        self.claimed[key] = "received"
+        return True
+
+    async def resolve(
+        self, *, provider: str, provider_event_id: str, status: str, error: str | None
+    ) -> None:
+        key = (provider, provider_event_id)
+        self.claimed[key] = status
+        self.errors[key] = error
+
+    async def was_processed(self, *, provider: str, provider_event_id: str) -> bool:
+        return self.claimed.get((provider, provider_event_id)) in ("processed", "ignored")
+
+
+@dataclass
+class _ProviderCall:
+    method: str
+    kwargs: dict[str, object]
+
+
+class FakePaymentProvider:
+    """A recording stand-in for `PaymentProviderPort`.
+
+    Records every call so tests can assert *ordering* — specifically that
+    the provider is called before this system's own state changes, which
+    is the rule that keeps a failed provider call from leaving a customer
+    marked canceled here and still charged there.
+    """
+
+    def __init__(self) -> None:
+        self.calls: list[_ProviderCall] = []
+        self.invoices: list[ProviderInvoice] = []
+        self.payment_methods: list[ProviderPaymentMethod] = []
+        self.subscription_states: dict[str, ProviderSubscriptionState] = {}
+        self.verified_event: ProviderEvent | None = None
+        self.fail_with: Exception | None = None
+        self.next_customer_id = "cus_fake"
+
+    def _record(self, method: str, **kwargs: object) -> None:
+        if self.fail_with is not None:
+            raise self.fail_with
+        self.calls.append(_ProviderCall(method=method, kwargs=kwargs))
+
+    def called(self, method: str) -> bool:
+        return any(call.method == method for call in self.calls)
+
+    async def ensure_customer(
+        self, *, workspace_id: str, email: str | None, name: str | None
+    ) -> str:
+        self._record("ensure_customer", workspace_id=workspace_id, email=email, name=name)
+        return self.next_customer_id
+
+    async def create_checkout_session(
+        self,
+        *,
+        workspace_id: str,
+        provider_customer_id: str,
+        plan_slug: PlanTier,
+        interval: BillingInterval,
+        success_url: str,
+        cancel_url: str,
+        trial_days: int | None,
+        coupon_code: str | None,
+    ) -> CheckoutSession:
+        self._record(
+            "create_checkout_session",
+            workspace_id=workspace_id,
+            plan_slug=plan_slug,
+            interval=interval,
+            trial_days=trial_days,
+            coupon_code=coupon_code,
+        )
+        return CheckoutSession(session_id="cs_fake", url="https://provider.test/checkout/cs_fake")
+
+    async def create_portal_session(
+        self, *, provider_customer_id: str, return_url: str
+    ) -> PortalSession:
+        self._record(
+            "create_portal_session",
+            provider_customer_id=provider_customer_id,
+            return_url=return_url,
+        )
+        return PortalSession(url="https://provider.test/portal")
+
+    async def cancel_subscription(
+        self, *, provider_subscription_id: str, at_period_end: bool
+    ) -> None:
+        self._record(
+            "cancel_subscription",
+            provider_subscription_id=provider_subscription_id,
+            at_period_end=at_period_end,
+        )
+
+    async def resume_subscription(self, *, provider_subscription_id: str) -> None:
+        self._record("resume_subscription", provider_subscription_id=provider_subscription_id)
+
+    async def pause_subscription(self, *, provider_subscription_id: str) -> None:
+        self._record("pause_subscription", provider_subscription_id=provider_subscription_id)
+
+    async def unpause_subscription(self, *, provider_subscription_id: str) -> None:
+        self._record("unpause_subscription", provider_subscription_id=provider_subscription_id)
+
+    async def change_subscription_plan(
+        self,
+        *,
+        provider_subscription_id: str,
+        plan_slug: PlanTier,
+        interval: BillingInterval,
+    ) -> None:
+        self._record(
+            "change_subscription_plan",
+            provider_subscription_id=provider_subscription_id,
+            plan_slug=plan_slug,
+            interval=interval,
+        )
+
+    async def list_invoices(
+        self, *, provider_customer_id: str, limit: int
+    ) -> list[ProviderInvoice]:
+        self._record("list_invoices", provider_customer_id=provider_customer_id, limit=limit)
+        return self.invoices
+
+    async def list_payment_methods(
+        self, *, provider_customer_id: str
+    ) -> list[ProviderPaymentMethod]:
+        self._record("list_payment_methods", provider_customer_id=provider_customer_id)
+        return self.payment_methods
+
+    async def refund_payment(
+        self, *, provider_invoice_id: str, amount_cents: int | None, reason: str | None
+    ) -> str:
+        self._record(
+            "refund_payment",
+            provider_invoice_id=provider_invoice_id,
+            amount_cents=amount_cents,
+            reason=reason,
+        )
+        return "re_fake"
+
+    async def get_subscription_state(
+        self, *, provider_subscription_id: str
+    ) -> ProviderSubscriptionState | None:
+        self._record("get_subscription_state", provider_subscription_id=provider_subscription_id)
+        return self.subscription_states.get(provider_subscription_id)
+
+    def verify_webhook(self, *, payload: bytes, signature: str) -> ProviderEvent | None:
+        del payload, signature
+        return self.verified_event
 
 
 class FakeCustomerRepository:

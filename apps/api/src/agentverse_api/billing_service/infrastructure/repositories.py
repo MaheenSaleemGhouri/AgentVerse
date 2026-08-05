@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +29,7 @@ from agentverse_api.billing_service.infrastructure.models import (
     BillingSubscriptionModel,
     PlanModel,
     SubscriptionEventModel,
+    WebhookEventModel,
 )
 from agentverse_api.orchestration_service.infrastructure.integration_repository import (
     SqlIntegrationRepository,
@@ -320,6 +321,73 @@ class SqlSubscriptionRepository:
             .limit(limit)
         )
         return [(row[0], row[1], row[2], row[3], row[4]) for row in result.all()]
+
+
+class SqlWebhookEventRepository:
+    """Implements `domain.ports.WebhookEventRepository`."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def claim(
+        self,
+        *,
+        provider: str,
+        provider_event_id: str,
+        event_type: str,
+        workspace_id: str | None,
+    ) -> bool:
+        # ON CONFLICT DO NOTHING, not select-then-insert: two deliveries
+        # of the same event can be in flight at once, and the read-then-
+        # write version lets both pass the check before either writes.
+        # The unique index decides, and the loser is told it lost.
+        stmt = (
+            pg_insert(WebhookEventModel)
+            .values(
+                id=str(uuid.uuid4()),
+                provider=provider,
+                provider_event_id=provider_event_id,
+                event_type=event_type,
+                workspace_id=workspace_id,
+                status="received",
+            )
+            .on_conflict_do_nothing(
+                index_elements=[
+                    WebhookEventModel.provider,
+                    WebhookEventModel.provider_event_id,
+                ]
+            )
+            .returning(WebhookEventModel.id)
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
+    async def resolve(
+        self,
+        *,
+        provider: str,
+        provider_event_id: str,
+        status: str,
+        error: str | None,
+    ) -> None:
+        await self._session.execute(
+            update(WebhookEventModel)
+            .where(
+                WebhookEventModel.provider == provider,
+                WebhookEventModel.provider_event_id == provider_event_id,
+            )
+            .values(status=status, error=error, processed_at=func.now())
+        )
+
+    async def was_processed(self, *, provider: str, provider_event_id: str) -> bool:
+        result = await self._session.execute(
+            select(WebhookEventModel.status).where(
+                WebhookEventModel.provider == provider,
+                WebhookEventModel.provider_event_id == provider_event_id,
+            )
+        )
+        status = result.scalar_one_or_none()
+        return status in ("processed", "ignored")
 
 
 class SqlCustomerRepository:

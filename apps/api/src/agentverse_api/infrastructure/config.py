@@ -121,6 +121,66 @@ class Settings(BaseSettings):
     cloudflare_oauth_client_id: str | None = None
     cloudflare_oauth_client_secret: str | None = None
 
+    # Phase 9 — Stripe. Optional as a pair, deliberately: local
+    # development, CI, and preview environments legitimately run with no
+    # payment provider, and the routes that need one answer 503 rather
+    # than 500-ing on a `None`. Same shape as the OAuth pairs above — a
+    # provider without credentials is absent, not a button that fails on
+    # click.
+    #
+    # These are secrets (Rule 1): they live in the environment or the
+    # secrets manager, never in source, and are never logged. There is no
+    # `os.environ.get(..., "sk_test_changeme")` fallback anywhere — a
+    # placeholder default would let a misconfigured production process
+    # start and silently take no money.
+    stripe_secret_key: str | None = None
+    stripe_webhook_secret: str | None = None
+
+    # Pinned, never "latest": Stripe changes response shapes between API
+    # versions, and inheriting whatever the account's default happens to
+    # be makes this service's behaviour depend on a dashboard setting
+    # nobody in this repo can see or review.
+    stripe_api_version: str = "2025-10-29.clover"
+
+    @property
+    def stripe_configured(self) -> bool:
+        """Both halves, or neither. A secret key without a webhook secret
+        would take payments this service could never learn the outcome
+        of — worse than not being configured at all.
+        """
+        return bool(self.stripe_secret_key and self.stripe_webhook_secret)
+
+    @property
+    def stripe_is_live_mode(self) -> bool:
+        return bool(self.stripe_secret_key and self.stripe_secret_key.startswith("sk_live_"))
+
+    def validate_stripe_mode(self) -> None:
+        """Refuse a key whose mode contradicts the environment.
+
+        Both directions are real incidents rather than hypotheticals. A
+        test key in production means customers complete checkout and are
+        never charged, while the product behaves as though they were. A
+        live key outside production means a developer running the test
+        suite, or a preview environment handling a stray webhook, can
+        move real money.
+
+        Called at startup so the process dies loudly rather than
+        discovering this on the first checkout.
+        """
+        if not self.stripe_secret_key:
+            return
+        if self.environment == "production" and not self.stripe_is_live_mode:
+            raise ValueError(
+                "Refusing to start: AGENTVERSE_API_STRIPE_SECRET_KEY is not a live-mode "
+                "key (expected the sk_live_ prefix) but the environment is production. "
+                "Customers would complete checkout without ever being charged."
+            )
+        if self.environment != "production" and self.stripe_is_live_mode:
+            raise ValueError(
+                f"Refusing to start: a live-mode Stripe key is configured in the "
+                f"{self.environment!r} environment. This process could move real money."
+            )
+
 
 @lru_cache
 def get_settings() -> Settings:

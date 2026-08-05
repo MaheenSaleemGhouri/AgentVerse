@@ -290,3 +290,65 @@ class SubscriptionEventModel(Base):
     idempotency_key: Mapped[str] = mapped_column(Text, unique=True, index=True)
     event_metadata: Mapped[dict[str, object]] = mapped_column("metadata", JSONB, default=dict)
     occurred_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class WebhookEventModel(Base):
+    """Every payment-provider webhook this service has seen.
+
+    The provider guarantees at-least-once delivery, not exactly-once, so
+    the same event *will* arrive twice — during a retry after a timeout,
+    or simply because the provider decided to. The unique index on
+    `(provider, provider_event_id)` is what makes the second delivery a
+    no-op, and it is a database constraint rather than an application
+    check because the two deliveries can be in flight concurrently.
+
+    Rows are written *before* the event is processed, in the same
+    transaction as the state change it causes. A row that exists with
+    `processed_at IS NULL` after a crash is a real finding — it means an
+    event was received and its effect was rolled back — and the
+    reconciliation job looks for exactly that.
+    """
+
+    __tablename__ = "billing_webhook_events"
+    __table_args__ = (
+        CheckConstraint("provider IN ('stripe')", name="ck_billing_webhook_events_provider"),
+        CheckConstraint(
+            "status IN ('received', 'processed', 'ignored', 'failed')",
+            name="ck_billing_webhook_events_status",
+        ),
+        Index(
+            "uq_billing_webhook_events_provider_event",
+            "provider",
+            "provider_event_id",
+            unique=True,
+        ),
+        # The stuck-event sweep: anything received and not yet resolved,
+        # oldest first. Partial, because that query never looks at the
+        # resolved majority.
+        Index(
+            "ix_billing_webhook_events_unresolved",
+            "received_at",
+            postgresql_where="status = 'received'",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    provider: Mapped[str] = mapped_column(Text, default="stripe")
+    provider_event_id: Mapped[str] = mapped_column(Text, index=True)
+    event_type: Mapped[str] = mapped_column(Text)
+    # Nullable: an event can arrive that this service cannot attribute to
+    # a workspace (a customer created outside the product, say). Recorded
+    # anyway — an unattributable event is worth seeing, and discarding it
+    # would hide it.
+    workspace_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("workspaces.id", ondelete="SET NULL"),
+        default=None,
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(Text, default="received")
+    error: Mapped[str | None] = mapped_column(Text, default=None)
+    received_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    processed_at: Mapped[datetime | None] = mapped_column(default=None)

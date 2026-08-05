@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/v1/billing/webhooks/stripe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stripe Webhook Route */
+        post: operations["stripe_webhook_route_api_v1_billing_webhooks_stripe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/integrations/oauth/callback": {
         parameters: {
             query?: never;
@@ -736,6 +753,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/billing/checkout-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Checkout Route
+         * @description Start a hosted checkout.
+         *
+         *     No subscription row is created here — it is created when the provider
+         *     confirms payment via webhook. Creating one optimistically would leave
+         *     a phantom subscription for every customer who opened the page and
+         *     closed the tab.
+         */
+        post: operations["create_checkout_route_api_v1_workspaces__workspace_id__billing_checkout_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/billing/entitlements": {
         parameters: {
             query?: never;
@@ -747,6 +789,104 @@ export interface paths {
         get: operations["get_entitlements_route_api_v1_workspaces__workspace_id__billing_entitlements_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/billing/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Invoices Route
+         * @description Read straight from the provider, never a local mirror.
+         *
+         *     Invoice PDFs are the provider's to hold; a cached copy here would be
+         *     one more thing that can be stale and one more place financial
+         *     documents live.
+         */
+        get: operations["list_invoices_route_api_v1_workspaces__workspace_id__billing_invoices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/billing/payment-methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Payment Methods Route
+         * @description Brand, last four and expiry only — read per request, never stored.
+         *
+         *     Adding or removing a card happens on the provider's hosted portal, so
+         *     no card field exists anywhere in this codebase.
+         */
+        get: operations["list_payment_methods_route_api_v1_workspaces__workspace_id__billing_payment_methods_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/billing/portal-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Portal Route
+         * @description The provider's own management surface — payment methods, plan
+         *     changes, cancellation, invoice history.
+         *
+         *     Preferred over rebuilding each of those here: it is where the card
+         *     form lives, and every card field this product does not build is PCI
+         *     scope it does not carry.
+         */
+        post: operations["create_portal_route_api_v1_workspaces__workspace_id__billing_portal_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/billing/refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refund Route
+         * @description Refund an invoice, fully or partially.
+         *
+         *     Never automatic: a downgrade produces a credit against the next
+         *     invoice, and money actually leaving the company is a separate,
+         *     deliberately authorized action. The invoice is checked to belong to
+         *     this workspace's customer before anything is refunded — an invoice id
+         *     from another tenant must not refund their charge (Rule 11).
+         */
+        post: operations["refund_route_api_v1_workspaces__workspace_id__billing_refunds_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -778,6 +918,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/billing/subscription/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Subscription Route */
+        post: operations["cancel_subscription_route_api_v1_workspaces__workspace_id__billing_subscription_cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/billing/subscription/change-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change Plan Route
+         * @description Change plan mid-cycle.
+         *
+         *     `Idempotency-Key` is required (CLAUDE.md §7: billing-affecting
+         *     endpoints enforce it). Without one, a retried request after a
+         *     timeout would apply a second plan change — and each one becomes an
+         *     invoice line.
+         */
+        post: operations["change_plan_route_api_v1_workspaces__workspace_id__billing_subscription_change_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/billing/subscription/events": {
         parameters: {
             query?: never;
@@ -797,6 +979,83 @@ export interface paths {
         get: operations["list_subscription_events_route_api_v1_workspaces__workspace_id__billing_subscription_events_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/billing/subscription/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pause Subscription Route */
+        post: operations["pause_subscription_route_api_v1_workspaces__workspace_id__billing_subscription_pause_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/billing/subscription/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Quote Plan Change Route
+         * @description What a plan change costs, without making it.
+         *
+         *     Shown before the confirm button: a customer should never first learn
+         *     a proration figure from their statement.
+         */
+        post: operations["quote_plan_change_route_api_v1_workspaces__workspace_id__billing_subscription_quote_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/billing/subscription/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume Subscription Route
+         * @description Undo a scheduled cancellation while the paid period is still open.
+         */
+        post: operations["resume_subscription_route_api_v1_workspaces__workspace_id__billing_subscription_resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/billing/subscription/unpause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unpause Subscription Route */
+        post: operations["unpause_subscription_route_api_v1_workspaces__workspace_id__billing_subscription_unpause_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2112,6 +2371,16 @@ export interface components {
              */
             file: string;
         };
+        /** CancelRequest */
+        CancelRequest: {
+            /**
+             * At Period End
+             * @default true
+             */
+            at_period_end: boolean;
+            /** Reason */
+            reason?: string | null;
+        };
         /** ChangeMemberRoleRequest */
         ChangeMemberRoleRequest: {
             role: components["schemas"]["Role"];
@@ -2129,6 +2398,29 @@ export interface components {
         CheckPasswordResponse: {
             /** Violations */
             violations: string[];
+        };
+        /** CheckoutRequest */
+        CheckoutRequest: {
+            /** Coupon Code */
+            coupon_code?: string | null;
+            /** @default monthly */
+            interval: components["schemas"]["BillingInterval"];
+            plan_slug: components["schemas"]["PlanTier"];
+        };
+        /**
+         * CheckoutResponse
+         * @description A URL to redirect the browser to.
+         *
+         *     No subscription exists yet at this point, deliberately: it is created
+         *     when the provider confirms payment. A client that treats this
+         *     response as "subscribed" is wrong, which is why the field is named
+         *     for what it is.
+         */
+        CheckoutResponse: {
+            /** Checkout Url */
+            checkout_url: string;
+            /** Session Id */
+            session_id: string;
         };
         /** CitationResponse */
         CitationResponse: {
@@ -2623,6 +2915,39 @@ export interface components {
             /** User Id */
             user_id: string;
         };
+        /** InvoiceListResponse */
+        InvoiceListResponse: {
+            /** Data */
+            data: components["schemas"]["InvoiceResponse"][];
+        };
+        /** InvoiceResponse */
+        InvoiceResponse: {
+            /** Amount Due Cents */
+            amount_due_cents: number;
+            /** Amount Paid Cents */
+            amount_paid_cents: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Currency */
+            currency: string;
+            /** Hosted Invoice Url */
+            hosted_invoice_url: string | null;
+            /** Id */
+            id: string;
+            /** Invoice Pdf Url */
+            invoice_pdf_url: string | null;
+            /** Number */
+            number: string | null;
+            /** Period End */
+            period_end: string | null;
+            /** Period Start */
+            period_start: string | null;
+            /** Status */
+            status: string;
+        };
         /** IpAllowlistEntryResponse */
         IpAllowlistEntryResponse: {
             /** Cidr */
@@ -3022,6 +3347,33 @@ export interface components {
             /** Require Uppercase */
             require_uppercase: boolean;
         };
+        /** PaymentMethodListResponse */
+        PaymentMethodListResponse: {
+            /** Data */
+            data: components["schemas"]["PaymentMethodResponse"][];
+        };
+        /**
+         * PaymentMethodResponse
+         * @description The non-sensitive remainder of a card.
+         *
+         *     Brand, last four and expiry — read from the provider per request and
+         *     never stored. There is no field here, or in any table, that a PAN or
+         *     CVC could live in.
+         */
+        PaymentMethodResponse: {
+            /** Brand */
+            brand: string | null;
+            /** Exp Month */
+            exp_month: number | null;
+            /** Exp Year */
+            exp_year: number | null;
+            /** Id */
+            id: string;
+            /** Is Default */
+            is_default: boolean;
+            /** Last4 */
+            last4: string | null;
+        };
         /**
          * Permission
          * @description `<resource>:<action>`, covering the resources CLAUDE.md §5 names.
@@ -3064,6 +3416,24 @@ export interface components {
             team_id: string | null;
             /** Timeout Seconds */
             timeout_seconds: number;
+        };
+        /** PlanChangeQuoteResponse */
+        PlanChangeQuoteResponse: {
+            /** From Plan */
+            from_plan: string;
+            /** Interval */
+            interval: string;
+            /** Is Upgrade */
+            is_upgrade: boolean;
+            proration: components["schemas"]["ProrationResponse"];
+            /** To Plan */
+            to_plan: string;
+        };
+        /** PlanChangeRequest */
+        PlanChangeRequest: {
+            /** @default monthly */
+            interval: components["schemas"]["BillingInterval"];
+            plan_slug: components["schemas"]["PlanTier"];
         };
         /** PlanListResponse */
         PlanListResponse: {
@@ -3118,6 +3488,30 @@ export interface components {
          * @enum {string}
          */
         PlanTier: "free" | "pro" | "team" | "enterprise";
+        /** PortalResponse */
+        PortalResponse: {
+            /** Portal Url */
+            portal_url: string;
+        };
+        /**
+         * ProrationResponse
+         * @description Both halves separately, never one net figure.
+         *
+         *     `saas-strategist`'s standard: an invoice itemizes the credit and the
+         *     charge, because a single number cannot be decomposed back into
+         *     "credit for unused Pro time" and "prorated Team charge", which is
+         *     what a customer actually needs to check the maths.
+         */
+        ProrationResponse: {
+            /** Net Cents */
+            net_cents: number;
+            /** Prorated Charge Cents */
+            prorated_charge_cents: number;
+            /** Remaining Fraction Ppm */
+            remaining_fraction_ppm: number;
+            /** Unused Credit Cents */
+            unused_credit_cents: number;
+        };
         /** ProviderTestRequest */
         ProviderTestRequest: {
             /** Model */
@@ -3154,6 +3548,20 @@ export interface components {
             event_type: "auth.signup" | "auth.login" | "auth.session_revoked" | "auth.account_locked";
             /** User Id */
             user_id: string;
+        };
+        /** RefundRequest */
+        RefundRequest: {
+            /** Amount Cents */
+            amount_cents?: number | null;
+            /** Invoice Id */
+            invoice_id: string;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** RefundResponse */
+        RefundResponse: {
+            /** Refund Id */
+            refund_id: string;
         };
         /**
          * RegisterCustomServerRequest
@@ -3971,6 +4379,18 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /**
+         * WebhookAckResponse
+         * @description Acknowledgement, not a result.
+         *
+         *     Returned 200 for a duplicate and for an ignored event as well as a
+         *     processed one: all three mean "do not retry this". A non-2xx would
+         *     make the provider redeliver an event that was handled correctly.
+         */
+        WebhookAckResponse: {
+            /** Outcome */
+            outcome: string;
+        };
         /** WorkspaceResponse */
         WorkspaceResponse: {
             /**
@@ -4016,6 +4436,37 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    stripe_webhook_route_api_v1_billing_webhooks_stripe_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Stripe-Signature"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookAckResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     oauth_callback_route_api_v1_integrations_oauth_callback_get: {
         parameters: {
             query: {
@@ -5721,6 +6172,41 @@ export interface operations {
             };
         };
     };
+    create_checkout_route_api_v1_workspaces__workspace_id__billing_checkout_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_entitlements_route_api_v1_workspaces__workspace_id__billing_entitlements_get: {
         parameters: {
             query?: never;
@@ -5739,6 +6225,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EntitlementsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_invoices_route_api_v1_workspaces__workspace_id__billing_invoices_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_payment_methods_route_api_v1_workspaces__workspace_id__billing_payment_methods_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentMethodListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_portal_route_api_v1_workspaces__workspace_id__billing_portal_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refund_route_api_v1_workspaces__workspace_id__billing_refunds_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefundRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5783,6 +6401,78 @@ export interface operations {
             };
         };
     };
+    cancel_subscription_route_api_v1_workspaces__workspace_id__billing_subscription_cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_plan_route_api_v1_workspaces__workspace_id__billing_subscription_change_plan_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_subscription_events_route_api_v1_workspaces__workspace_id__billing_subscription_events_get: {
         parameters: {
             query?: never;
@@ -5801,6 +6491,134 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubscriptionHistoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pause_subscription_route_api_v1_workspaces__workspace_id__billing_subscription_pause_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    quote_plan_change_route_api_v1_workspaces__workspace_id__billing_subscription_quote_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanChangeQuoteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_subscription_route_api_v1_workspaces__workspace_id__billing_subscription_resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unpause_subscription_route_api_v1_workspaces__workspace_id__billing_subscription_unpause_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionResponse"];
                 };
             };
             /** @description Validation Error */

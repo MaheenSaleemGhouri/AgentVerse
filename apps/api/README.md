@@ -18,10 +18,10 @@ src/agentverse_api/
 │   └── interface/         # get_current_identity, get_current_workspace, require_role dependencies; routes; schemas
 ├── orchestration_service/                                # bounded context: agents, runs, teams, knowledge, integrations
 └── billing_service/                                      # bounded context (docs/adr/0012)
-    ├── domain/          # Plan/limits/capabilities + overage arithmetic; subscription state machine, proration, dunning clock
-    ├── application/      # PlanCatalogService, EntitlementService, SubscriptionService
-    ├── infrastructure/    # billing models, repositories, read-time plan-config validation
-    └── interface/         # /api/v1/plans, .../billing/entitlements, .../billing/subscription
+    ├── domain/          # Plan/limits/capabilities + overage arithmetic; subscription state machine, proration, dunning clock; the payment-provider port
+    ├── application/      # PlanCatalogService, EntitlementService, SubscriptionService, BillingActionsService, WebhookService, ReconciliationService
+    ├── infrastructure/    # billing models, repositories, read-time plan-config validation, stripe/ (the only module importing the Stripe SDK)
+    └── interface/         # /api/v1/plans, .../billing/*, /api/v1/billing/webhooks/stripe
 ```
 
 Dependencies point inward (`CLAUDE.md` §5). Each context is a self-contained vertical slice, ready to be extracted into its own deployable if `microservices-architect`'s "concrete pain" threshold is ever reached (`docs/adr/0004`).
@@ -30,7 +30,17 @@ Dependencies point inward (`CLAUDE.md` §5). Each context is a self-contained ve
 
 ## Datastore
 
-Owns (via Alembic, `src/agentverse_api/infrastructure/migrations/`): `users`, `sessions`, `accounts`, `verifications` (Better Auth's schema, ADR-0005 — Alembic authors it, Better Auth only reads/writes through it), `workspaces`, `workspace_members`, `api_keys`, `audit_logs` (this platform's own domain), and the billing tables: `plans` (the subscription-plan catalog — seeded by migration, edited operationally rather than by deploy; `docs/adr/0012`), `billing_customers` (one payment-processor identity per workspace, kept for the workspace's whole life), `billing_subscriptions` (at most one live row per workspace, enforced by a partial unique index), and `subscription_events` (append-only transition log; `idempotency_key` is unique, which is what makes a redelivered webhook a no-op rather than a second transition).
+Owns (via Alembic, `src/agentverse_api/infrastructure/migrations/`): `users`, `sessions`, `accounts`, `verifications` (Better Auth's schema, ADR-0005 — Alembic authors it, Better Auth only reads/writes through it), `workspaces`, `workspace_members`, `api_keys`, `audit_logs` (this platform's own domain), and the billing tables: `plans` (the subscription-plan catalog — seeded by migration, edited operationally rather than by deploy; `docs/adr/0012`), `billing_customers` (one payment-processor identity per workspace, kept for the workspace's whole life), `billing_subscriptions` (at most one live row per workspace, enforced by a partial unique index), `subscription_events` (append-only transition log; `idempotency_key` is unique, which is what makes a redelivered webhook a no-op rather than a second transition), and `billing_webhook_events` (the provider delivery log — its unique `(provider, provider_event_id)` index is what serializes two concurrent deliveries of the same event).
+
+## Payment provider
+
+Stripe sits behind `billing_service/domain/payment_provider.py`. Nothing above `billing_service/infrastructure/stripe/` imports the Stripe SDK or knows a `cus_`/`sub_` prefix exists — the same provider-abstraction rule Rule 16 sets for LLM providers.
+
+`AGENTVERSE_API_STRIPE_SECRET_KEY` and `AGENTVERSE_API_STRIPE_WEBHOOK_SECRET` are optional **as a pair**: local development, CI and preview environments run without them, and the routes that need a provider answer `503` rather than failing on a `None`. A secret key without a webhook secret counts as *not configured* — it would take payments whose outcome this service could never learn.
+
+Startup refuses a key whose mode contradicts the environment (`sk_test_` in production, `sk_live_` anywhere else). Both directions are silent until money is involved.
+
+Card data never reaches this service: collection happens on Stripe-hosted Checkout and Billing Portal pages, and no table or schema here has a field a PAN or CVC could occupy.
 
 ## Dependencies
 

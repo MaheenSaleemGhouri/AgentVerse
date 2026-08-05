@@ -1,6 +1,7 @@
 """ASGI entrypoint: `uvicorn agentverse_api.main:app`."""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from agentverse_api.auth_service.interface.routes.api_keys import router as api_keys_router
 from agentverse_api.auth_service.interface.routes.audit_logs import router as audit_logs_router
@@ -44,12 +45,22 @@ from agentverse_api.auth_service.interface.routes.workspace_settings import (
     router as workspace_settings_router,
 )
 from agentverse_api.auth_service.interface.routes.workspaces import router as workspaces_router
+from agentverse_api.billing_service.domain.payment_provider import (
+    ProviderError,
+    ProviderNotConfiguredError,
+)
+from agentverse_api.billing_service.interface.routes.billing_actions import (
+    router as billing_actions_router,
+)
 from agentverse_api.billing_service.interface.routes.entitlements import (
     router as entitlements_router,
 )
 from agentverse_api.billing_service.interface.routes.plans import router as plans_router
 from agentverse_api.billing_service.interface.routes.subscriptions import (
     router as subscriptions_router,
+)
+from agentverse_api.billing_service.interface.routes.webhooks import (
+    router as billing_webhooks_router,
 )
 from agentverse_api.infrastructure.config import get_settings
 from agentverse_api.infrastructure.logging import configure_logging
@@ -87,6 +98,11 @@ from agentverse_api.orchestration_service.interface.routers.teams import (
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
+    # Fails startup rather than the first checkout: a test-mode key in
+    # production means customers complete payment and are never charged,
+    # and a live-mode key outside production means a test run can move
+    # real money. Both are silent until money is involved.
+    settings.validate_stripe_mode()
 
     app = FastAPI(
         title="AgentVerse API",
@@ -94,6 +110,26 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json" if settings.environment != "production" else None,
     )
     app.middleware("http")(request_id_middleware)
+
+    # Payment-provider failures get their own mapping so a provider
+    # outage reads as one (502/503) rather than as a bug in this service
+    # (500) — and so a provider's exception text never reaches a
+    # response body verbatim.
+    @app.exception_handler(ProviderNotConfiguredError)
+    async def _provider_unconfigured(
+        request: Request, exc: ProviderNotConfiguredError
+    ) -> JSONResponse:
+        del request
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+    @app.exception_handler(ProviderError)
+    async def _provider_failed(request: Request, exc: ProviderError) -> JSONResponse:
+        del request
+        return JSONResponse(
+            status_code=502,
+            content={"detail": exc.detail, "retryable": exc.retryable},
+        )
+
     app.include_router(health_router)
     app.include_router(workspaces_router)
     app.include_router(workspace_settings_router)
@@ -120,6 +156,8 @@ def create_app() -> FastAPI:
     app.include_router(plans_router)
     app.include_router(entitlements_router)
     app.include_router(subscriptions_router)
+    app.include_router(billing_actions_router)
+    app.include_router(billing_webhooks_router)
     app.include_router(api_keys_router)
     app.include_router(audit_logs_router)
     app.include_router(internal_auth_events_router)

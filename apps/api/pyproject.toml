@@ -20,6 +20,7 @@ dependencies = [
     # runtime dependency, not a test-only one.
     "python-multipart>=0.0.20,<0.1",
     "agentverse-shared",
+    "stripe>=12,<13",
 ]
 
 [dependency-groups]
