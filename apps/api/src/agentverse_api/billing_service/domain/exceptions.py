@@ -21,6 +21,48 @@ class PlanNotFoundError(Exception):
         super().__init__(f"No active plan with slug {slug!r}")
 
 
+class SubscriptionNotFoundError(Exception):
+    """This workspace has no live subscription. Maps to HTTP 404.
+
+    Not an error state for the workspace itself — a Free workspace has
+    never subscribed and is operating exactly as intended. It is an error
+    only for callers that asked specifically for a subscription.
+    """
+
+    def __init__(self, workspace_id: str) -> None:
+        self.workspace_id = workspace_id
+        super().__init__(f"Workspace {workspace_id!r} has no live subscription")
+
+
+class SubscriptionAlreadyExistsError(Exception):
+    """The workspace already has a live subscription. Maps to HTTP 409.
+
+    Enforced in the database too, by a partial unique index on
+    non-canceled rows. Two live subscriptions would make "what plan is
+    this workspace on" a coin flip and could bill the same workspace
+    twice in one period.
+    """
+
+    def __init__(self, workspace_id: str) -> None:
+        self.workspace_id = workspace_id
+        super().__init__(f"Workspace {workspace_id!r} already has a live subscription")
+
+
+class PlanNotPurchasableError(Exception):
+    """The target plan cannot be subscribed to directly. Maps to HTTP 422.
+
+    Covers the two real cases: Enterprise is quoted by sales and has no
+    published price to charge, and a deactivated legacy plan still
+    resolves for the workspaces grandfathered onto it but must not accept
+    new ones.
+    """
+
+    def __init__(self, slug: str, detail: str) -> None:
+        self.slug = slug
+        self.detail = detail
+        super().__init__(f"Plan {slug!r} is not directly purchasable: {detail}")
+
+
 class CatalogIncompleteError(Exception):
     """The catalog is missing a tier the platform cannot run without.
 

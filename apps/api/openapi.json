@@ -1114,6 +1114,37 @@
         "title": "CustomRoleResponse",
         "type": "object"
       },
+      "DunningStatusResponse": {
+        "description": "Where a past-due subscription is in its recovery window.\n\nPresent only while past due. `deadline` is the date the subscription\ncancels if nothing recovers it \u2014 a concrete date, because \"your\naccount may be suspended soon\" gives a customer nothing to act on.",
+        "properties": {
+          "days_remaining": {
+            "title": "Days Remaining",
+            "type": "integer"
+          },
+          "deadline": {
+            "format": "date-time",
+            "title": "Deadline",
+            "type": "string"
+          },
+          "next_action": {
+            "title": "Next Action",
+            "type": "string"
+          },
+          "since": {
+            "format": "date-time",
+            "title": "Since",
+            "type": "string"
+          }
+        },
+        "required": [
+          "since",
+          "deadline",
+          "days_remaining",
+          "next_action"
+        ],
+        "title": "DunningStatusResponse",
+        "type": "object"
+      },
       "EntitlementLineResponse": {
         "description": "One dimension's headroom.\n\n`limit`, `remaining` and `percent_used` are all `null` together when\nthe dimension is unlimited. The client must branch on `limit is null`\nand render \"Unlimited\" \u2014 a progress bar with a null maximum has\nnothing truthful to draw.",
         "properties": {
@@ -4303,6 +4334,148 @@
         ],
         "title": "SsoProtocol",
         "type": "string"
+      },
+      "SubscriptionEventResponse": {
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "from_status": {
+            "title": "From Status",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "to_status": {
+            "title": "To Status",
+            "type": "string"
+          },
+          "trigger": {
+            "title": "Trigger",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trigger",
+          "from_status",
+          "to_status",
+          "actor",
+          "occurred_at"
+        ],
+        "title": "SubscriptionEventResponse",
+        "type": "object"
+      },
+      "SubscriptionHistoryResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionEventResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "SubscriptionHistoryResponse",
+        "type": "object"
+      },
+      "SubscriptionResponse": {
+        "properties": {
+          "billing_interval": {
+            "title": "Billing Interval",
+            "type": "string"
+          },
+          "cancel_at_period_end": {
+            "title": "Cancel At Period End",
+            "type": "boolean"
+          },
+          "canceled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canceled At"
+          },
+          "current_period_end": {
+            "format": "date-time",
+            "title": "Current Period End",
+            "type": "string"
+          },
+          "current_period_start": {
+            "format": "date-time",
+            "title": "Current Period Start",
+            "type": "string"
+          },
+          "dunning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DunningStatusResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "entitles": {
+            "title": "Entitles",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "plan_slug": {
+            "title": "Plan Slug",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "trial_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trial End"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "plan_slug",
+          "status",
+          "billing_interval",
+          "current_period_start",
+          "current_period_end",
+          "trial_end",
+          "cancel_at_period_end",
+          "canceled_at",
+          "entitles",
+          "dunning"
+        ],
+        "title": "SubscriptionResponse",
+        "type": "object"
       },
       "TeamAnalyticsResponse": {
         "properties": {
@@ -8580,6 +8753,102 @@
         "summary": "Get Entitlements Route",
         "tags": [
           "billing-entitlements"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/billing/subscription": {
+      "get": {
+        "description": "404 when the workspace has never subscribed.\n\nA Free workspace is operating exactly as intended, so this is not an\nerror *about the workspace* \u2014 but the caller asked for a\nsubscription, and there is none. Clients read Free from the\nentitlements endpoint, which always answers.",
+        "operationId": "get_subscription_route_api_v1_workspaces__workspace_id__billing_subscription_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Subscription Route",
+        "tags": [
+          "billing-subscription"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/billing/subscription/events": {
+      "get": {
+        "description": "The transition log, newest first.\n\nReturns an empty list rather than 404 for a workspace with no\nsubscription: \"this workspace has no billing history\" is a true,\nrenderable answer, and the timeline component should show an empty\nstate rather than an error.",
+        "operationId": "list_subscription_events_route_api_v1_workspaces__workspace_id__billing_subscription_events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionHistoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Subscription Events Route",
+        "tags": [
+          "billing-subscription"
         ]
       }
     },

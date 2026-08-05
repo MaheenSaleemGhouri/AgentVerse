@@ -48,6 +48,9 @@ from agentverse_api.billing_service.interface.routes.entitlements import (
     router as entitlements_router,
 )
 from agentverse_api.billing_service.interface.routes.plans import router as plans_router
+from agentverse_api.billing_service.interface.routes.subscriptions import (
+    router as subscriptions_router,
+)
 from agentverse_api.infrastructure.config import get_settings
 from agentverse_api.infrastructure.logging import configure_logging
 from agentverse_api.interface.middleware import request_id_middleware
@@ -116,6 +119,7 @@ def create_app() -> FastAPI:
     app.include_router(team_session_stream_router)
     app.include_router(plans_router)
     app.include_router(entitlements_router)
+    app.include_router(subscriptions_router)
     app.include_router(api_keys_router)
     app.include_router(audit_logs_router)
     app.include_router(internal_auth_events_router)

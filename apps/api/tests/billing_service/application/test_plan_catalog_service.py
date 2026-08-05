@@ -10,6 +10,7 @@ from agentverse_api.billing_service.domain.exceptions import (
     PlanNotFoundError,
 )
 from agentverse_api.billing_service.domain.plan import Plan, PlanTier
+from tests.billing_service.fakes import FakePlanRepository
 
 
 def _plan(slug: PlanTier, *, is_public: bool = True, sort_order: int = 0) -> Plan:
@@ -32,25 +33,10 @@ def _plan(slug: PlanTier, *, is_public: bool = True, sort_order: int = 0) -> Pla
     )
 
 
-class FakePlanRepository:
-    """Mirrors `SqlPlanRepository`'s filtering, including the
-    `public_only` predicate — a fake that skipped it would let a test
-    pass while the real query hid the row.
-    """
-
-    def __init__(self, plans: list[Plan]) -> None:
-        self._plans = plans
-
-    async def list_active(self, *, public_only: bool) -> list[Plan]:
-        return [
-            plan for plan in self._plans if plan.is_active and (plan.is_public or not public_only)
-        ]
-
-    async def get_by_slug(self, slug: PlanTier) -> Plan | None:
-        for plan in self._plans:
-            if plan.slug == slug and plan.is_active:
-                return plan
-        return None
+# `FakePlanRepository` lives in `tests.billing_service.fakes` alongside
+# the other billing fakes — it mirrors `SqlPlanRepository`'s filtering,
+# including the `public_only` predicate, since a fake that skipped that
+# would let a test pass while the real query hid the row.
 
 
 class TestListPlans:

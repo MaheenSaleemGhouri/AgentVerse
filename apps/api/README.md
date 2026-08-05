@@ -18,10 +18,10 @@ src/agentverse_api/
 │   └── interface/         # get_current_identity, get_current_workspace, require_role dependencies; routes; schemas
 ├── orchestration_service/                                # bounded context: agents, runs, teams, knowledge, integrations
 └── billing_service/                                      # bounded context (docs/adr/0012)
-    ├── domain/          # Plan, PlanTier, ResourceLimit, MeteredDimension, Capability, overage arithmetic
-    ├── application/      # PlanCatalogService, EntitlementService
-    ├── infrastructure/    # `plans` model, repositories, read-time plan-config validation
-    └── interface/         # /api/v1/plans, /api/v1/workspaces/{id}/billing/entitlements
+    ├── domain/          # Plan/limits/capabilities + overage arithmetic; subscription state machine, proration, dunning clock
+    ├── application/      # PlanCatalogService, EntitlementService, SubscriptionService
+    ├── infrastructure/    # billing models, repositories, read-time plan-config validation
+    └── interface/         # /api/v1/plans, .../billing/entitlements, .../billing/subscription
 ```
 
 Dependencies point inward (`CLAUDE.md` §5). Each context is a self-contained vertical slice, ready to be extracted into its own deployable if `microservices-architect`'s "concrete pain" threshold is ever reached (`docs/adr/0004`).
@@ -30,7 +30,7 @@ Dependencies point inward (`CLAUDE.md` §5). Each context is a self-contained ve
 
 ## Datastore
 
-Owns (via Alembic, `src/agentverse_api/infrastructure/migrations/`): `users`, `sessions`, `accounts`, `verifications` (Better Auth's schema, ADR-0005 — Alembic authors it, Better Auth only reads/writes through it), `workspaces`, `workspace_members`, `api_keys`, `audit_logs` (this platform's own domain), and `plans` (the subscription-plan catalog — seeded by migration, edited operationally rather than by deploy; `docs/adr/0012`).
+Owns (via Alembic, `src/agentverse_api/infrastructure/migrations/`): `users`, `sessions`, `accounts`, `verifications` (Better Auth's schema, ADR-0005 — Alembic authors it, Better Auth only reads/writes through it), `workspaces`, `workspace_members`, `api_keys`, `audit_logs` (this platform's own domain), and the billing tables: `plans` (the subscription-plan catalog — seeded by migration, edited operationally rather than by deploy; `docs/adr/0012`), `billing_customers` (one payment-processor identity per workspace, kept for the workspace's whole life), `billing_subscriptions` (at most one live row per workspace, enforced by a partial unique index), and `subscription_events` (append-only transition log; `idempotency_key` is unique, which is what makes a redelivered webhook a no-op rather than a second transition).
 
 ## Dependencies
 

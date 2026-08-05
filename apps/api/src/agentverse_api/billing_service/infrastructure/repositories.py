@@ -2,14 +2,34 @@
 
 from __future__ import annotations
 
+import uuid
+from datetime import datetime
+
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentverse_api.auth_service.infrastructure.repositories import SqlWorkspaceRepository
+from agentverse_api.billing_service.domain.customer import BillingCustomer, PaymentProvider
 from agentverse_api.billing_service.domain.entitlements import ResourceUsage
-from agentverse_api.billing_service.domain.plan import Plan, PlanTier, tier_rank
+from agentverse_api.billing_service.domain.plan import (
+    BillingInterval,
+    Plan,
+    PlanTier,
+    tier_rank,
+)
+from agentverse_api.billing_service.domain.subscription import (
+    Subscription,
+    SubscriptionStatus,
+    SubscriptionTrigger,
+)
 from agentverse_api.billing_service.infrastructure import plan_config
-from agentverse_api.billing_service.infrastructure.models import PlanModel
+from agentverse_api.billing_service.infrastructure.models import (
+    BillingCustomerModel,
+    BillingSubscriptionModel,
+    PlanModel,
+    SubscriptionEventModel,
+)
 from agentverse_api.orchestration_service.infrastructure.integration_repository import (
     SqlIntegrationRepository,
 )
@@ -69,6 +89,297 @@ class SqlPlanRepository:
         )
         row = result.scalar_one_or_none()
         return None if row is None else _to_plan(row)
+
+
+def _to_subscription(row: BillingSubscriptionModel, plan_slug: PlanTier) -> Subscription:
+    return Subscription(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        plan_id=row.plan_id,
+        plan_slug=plan_slug,
+        status=SubscriptionStatus(row.status),
+        interval=BillingInterval(row.billing_interval),
+        current_period_start=row.current_period_start,
+        current_period_end=row.current_period_end,
+        trial_end=row.trial_end,
+        cancel_at_period_end=row.cancel_at_period_end,
+        canceled_at=row.canceled_at,
+        past_due_since=row.past_due_since,
+        provider_subscription_id=row.provider_subscription_id,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+#: Columns `record_transition` is allowed to write alongside a status
+#: change. An explicit allowlist rather than `setattr` over whatever the
+#: caller passed: `changes` originates several layers up, and without
+#: this a typo'd key would be silently ignored while a well-chosen one
+#: could rewrite `workspace_id` and move a subscription between tenants.
+_MUTABLE_ON_TRANSITION: frozenset[str] = frozenset(
+    {
+        "current_period_start",
+        "current_period_end",
+        "trial_end",
+        "cancel_at_period_end",
+        "canceled_at",
+        "past_due_since",
+        "provider_subscription_id",
+    }
+)
+
+
+class UnknownSubscriptionFieldError(KeyError):
+    """`changes` named a column that is not writable on a transition."""
+
+
+class SqlSubscriptionRepository:
+    """Implements `domain.ports.SubscriptionRepository`.
+
+    Writes only; it does not commit. The unit of work is the request's
+    session (the same convention the other contexts' repositories
+    follow), so a transition and whatever else the use case does land in
+    one transaction or not at all.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def _row_with_slug(
+        self, subscription_id: str
+    ) -> tuple[BillingSubscriptionModel, PlanTier] | None:
+        result = await self._session.execute(
+            select(BillingSubscriptionModel, PlanModel.slug)
+            .join(PlanModel, PlanModel.id == BillingSubscriptionModel.plan_id)
+            .where(BillingSubscriptionModel.id == subscription_id)
+        )
+        row = result.one_or_none()
+        return None if row is None else (row[0], row[1])
+
+    async def get_for_workspace(self, workspace_id: str) -> Subscription | None:
+        # Excludes canceled rows: "what is this workspace on right now"
+        # has one answer, and the partial unique index guarantees at most
+        # one non-canceled row exists to return.
+        result = await self._session.execute(
+            select(BillingSubscriptionModel, PlanModel.slug)
+            .join(PlanModel, PlanModel.id == BillingSubscriptionModel.plan_id)
+            .where(
+                BillingSubscriptionModel.workspace_id == workspace_id,
+                BillingSubscriptionModel.status != SubscriptionStatus.CANCELED.value,
+            )
+        )
+        row = result.one_or_none()
+        return None if row is None else _to_subscription(row[0], row[1])
+
+    async def get_by_id(self, subscription_id: str) -> Subscription | None:
+        found = await self._row_with_slug(subscription_id)
+        return None if found is None else _to_subscription(*found)
+
+    async def create(
+        self,
+        *,
+        workspace_id: str,
+        plan_id: str,
+        status: SubscriptionStatus,
+        interval: BillingInterval,
+        current_period_start: datetime,
+        current_period_end: datetime,
+        trial_end: datetime | None,
+        provider_subscription_id: str | None,
+        idempotency_key: str,
+        actor: str,
+    ) -> Subscription:
+        subscription_id = str(uuid.uuid4())
+        self._session.add(
+            BillingSubscriptionModel(
+                id=subscription_id,
+                workspace_id=workspace_id,
+                plan_id=plan_id,
+                status=status.value,
+                billing_interval=interval.value,
+                current_period_start=current_period_start,
+                current_period_end=current_period_end,
+                trial_end=trial_end,
+                provider_subscription_id=provider_subscription_id,
+            )
+        )
+        # Creation is itself a transition — from nothing to the opening
+        # status — and gets an event row for the same reason every other
+        # one does: the history has to start somewhere, and a
+        # subscription whose first event is its second transition cannot
+        # be reconciled.
+        self._session.add(
+            SubscriptionEventModel(
+                id=str(uuid.uuid4()),
+                subscription_id=subscription_id,
+                workspace_id=workspace_id,
+                trigger=SubscriptionTrigger.TRIAL_STARTED.value
+                if status is SubscriptionStatus.TRIALING
+                else SubscriptionTrigger.PAYMENT_SUCCEEDED.value,
+                from_status=status.value,
+                to_status=status.value,
+                actor=actor,
+                reason="subscription created",
+                idempotency_key=idempotency_key,
+                event_metadata={"plan_id": plan_id, "interval": interval.value},
+            )
+        )
+        await self._session.flush()
+        found = await self._row_with_slug(subscription_id)
+        assert found is not None  # noqa: S101 - just inserted in this session
+        return _to_subscription(*found)
+
+    async def record_transition(
+        self,
+        *,
+        subscription_id: str,
+        trigger: SubscriptionTrigger,
+        from_status: SubscriptionStatus,
+        to_status: SubscriptionStatus,
+        idempotency_key: str,
+        actor: str,
+        reason: str | None,
+        metadata: dict[str, object],
+        changes: dict[str, object],
+    ) -> Subscription:
+        found = await self._row_with_slug(subscription_id)
+        if found is None:
+            raise LookupError(f"No subscription {subscription_id!r}")
+        row, _ = found
+        unknown = set(changes) - _MUTABLE_ON_TRANSITION
+        if unknown:
+            raise UnknownSubscriptionFieldError(f"not writable on a transition: {sorted(unknown)}")
+        row.status = to_status.value
+        for field, value in changes.items():
+            setattr(row, field, value)
+        self._session.add(
+            SubscriptionEventModel(
+                id=str(uuid.uuid4()),
+                subscription_id=subscription_id,
+                workspace_id=row.workspace_id,
+                trigger=trigger.value,
+                from_status=from_status.value,
+                to_status=to_status.value,
+                actor=actor,
+                reason=reason,
+                idempotency_key=idempotency_key,
+                event_metadata=metadata,
+            )
+        )
+        await self._session.flush()
+        refreshed = await self._row_with_slug(subscription_id)
+        assert refreshed is not None  # noqa: S101 - loaded above
+        return _to_subscription(*refreshed)
+
+    async def set_cancel_at_period_end(
+        self, *, subscription_id: str, cancel_at_period_end: bool
+    ) -> Subscription:
+        found = await self._row_with_slug(subscription_id)
+        if found is None:
+            raise LookupError(f"No subscription {subscription_id!r}")
+        row, slug = found
+        row.cancel_at_period_end = cancel_at_period_end
+        await self._session.flush()
+        return _to_subscription(row, slug)
+
+    async def change_plan(
+        self, *, subscription_id: str, plan_id: str, interval: BillingInterval
+    ) -> Subscription:
+        found = await self._row_with_slug(subscription_id)
+        if found is None:
+            raise LookupError(f"No subscription {subscription_id!r}")
+        row, _ = found
+        row.plan_id = plan_id
+        row.billing_interval = interval.value
+        await self._session.flush()
+        refreshed = await self._row_with_slug(subscription_id)
+        assert refreshed is not None  # noqa: S101 - loaded above
+        return _to_subscription(*refreshed)
+
+    async def find_event_by_idempotency_key(self, key: str) -> str | None:
+        result = await self._session.execute(
+            select(SubscriptionEventModel.subscription_id).where(
+                SubscriptionEventModel.idempotency_key == key
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def list_events(
+        self, *, subscription_id: str, limit: int
+    ) -> list[tuple[str, str, str, str, datetime]]:
+        result = await self._session.execute(
+            select(
+                SubscriptionEventModel.trigger,
+                SubscriptionEventModel.from_status,
+                SubscriptionEventModel.to_status,
+                SubscriptionEventModel.actor,
+                SubscriptionEventModel.occurred_at,
+            )
+            .where(SubscriptionEventModel.subscription_id == subscription_id)
+            .order_by(SubscriptionEventModel.occurred_at.desc())
+            .limit(limit)
+        )
+        return [(row[0], row[1], row[2], row[3], row[4]) for row in result.all()]
+
+
+class SqlCustomerRepository:
+    """Implements `domain.ports.CustomerRepository`."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_for_workspace(self, workspace_id: str) -> BillingCustomer | None:
+        result = await self._session.execute(
+            select(BillingCustomerModel).where(BillingCustomerModel.workspace_id == workspace_id)
+        )
+        row = result.scalar_one_or_none()
+        return None if row is None else self._to_domain(row)
+
+    async def upsert(
+        self,
+        *,
+        workspace_id: str,
+        provider: PaymentProvider,
+        provider_customer_id: str,
+        billing_email: str | None,
+    ) -> BillingCustomer:
+        # ON CONFLICT rather than select-then-insert: the caller is
+        # usually reacting to a processor event that can be delivered
+        # twice concurrently, and the read-then-write version loses that
+        # race by creating a second row the unique index then rejects
+        # with a 500 instead of succeeding idempotently.
+        stmt = (
+            pg_insert(BillingCustomerModel)
+            .values(
+                id=str(uuid.uuid4()),
+                workspace_id=workspace_id,
+                provider=provider.value,
+                provider_customer_id=provider_customer_id,
+                billing_email=billing_email,
+            )
+            .on_conflict_do_update(
+                index_elements=[BillingCustomerModel.workspace_id],
+                set_={
+                    "provider_customer_id": provider_customer_id,
+                    "billing_email": billing_email,
+                },
+            )
+            .returning(BillingCustomerModel)
+        )
+        result = await self._session.execute(stmt)
+        return self._to_domain(result.scalar_one())
+
+    @staticmethod
+    def _to_domain(row: BillingCustomerModel) -> BillingCustomer:
+        return BillingCustomer(
+            id=row.id,
+            workspace_id=row.workspace_id,
+            provider=PaymentProvider(row.provider),
+            provider_customer_id=row.provider_customer_id,
+            billing_email=row.billing_email,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+        )
 
 
 class SqlWorkspaceUsageRepository:

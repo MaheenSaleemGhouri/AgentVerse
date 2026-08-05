@@ -20,13 +20,15 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, Text, TypeDecorator
+from sqlalchemy import CheckConstraint, ForeignKey, Index, Text, TypeDecorator
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
 from agentverse_api.billing_service.domain.plan import PlanTier
 from agentverse_api.infrastructure.orm_base import Base
+
+_SUBSCRIPTION_STATUSES = ("trialing", "active", "past_due", "paused", "canceled")
 
 
 class PlanTierType(TypeDecorator[PlanTier]):
@@ -107,3 +109,184 @@ class PlanModel(Base):
     overage_rates: Mapped[dict[str, dict[str, int]]] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+
+class BillingCustomerModel(Base):
+    """One payment-processor account per workspace, for its whole life.
+
+    Survives cancellation on purpose: a returning customer reuses this
+    record, so their saved payment methods and invoice history come back
+    with them instead of starting empty.
+    """
+
+    __tablename__ = "billing_customers"
+    __table_args__ = (
+        CheckConstraint("provider IN ('stripe')", name="ck_billing_customers_provider"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    # Unique, not merely indexed: a workspace with two processor
+    # identities would have its invoices split across two accounts, with
+    # no way to tell which is authoritative.
+    workspace_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        unique=True,
+        index=True,
+    )
+    provider: Mapped[str] = mapped_column(Text, default="stripe")
+    # Also unique: two workspaces pointing at one processor customer
+    # would let either one's admin read the other's invoices.
+    provider_customer_id: Mapped[str] = mapped_column(Text, unique=True, index=True)
+    # Where invoices go, when it differs from the workspace owner's login
+    # address — finance teams rarely share a mailbox with engineers.
+    billing_email: Mapped[str | None] = mapped_column(Text, default=None)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+
+class BillingSubscriptionModel(Base):
+    """What a workspace is paying for, and where it is in its lifecycle."""
+
+    __tablename__ = "billing_subscriptions"
+    __table_args__ = (
+        CheckConstraint(
+            f"status IN {_SUBSCRIPTION_STATUSES}",
+            name="ck_billing_subscriptions_status",
+        ),
+        CheckConstraint(
+            "billing_interval IN ('monthly', 'annual')",
+            name="ck_billing_subscriptions_interval",
+        ),
+        CheckConstraint(
+            "current_period_end > current_period_start",
+            name="ck_billing_subscriptions_period_ordered",
+        ),
+        # A `past_due` row with no clock is the indefinite-dunning bug
+        # `billing-expert` warns about, made unrepresentable: without
+        # `past_due_since` nothing can compute when the window closes, so
+        # the subscription would sit unpaid and unserved-notice forever.
+        CheckConstraint(
+            "status <> 'past_due' OR past_due_since IS NOT NULL",
+            name="ck_billing_subscriptions_past_due_has_clock",
+        ),
+        CheckConstraint(
+            "status <> 'canceled' OR canceled_at IS NOT NULL",
+            name="ck_billing_subscriptions_canceled_has_timestamp",
+        ),
+        # At most one live subscription per workspace. Partial rather than
+        # a plain unique index because a workspace legitimately
+        # accumulates canceled rows over time — that is its billing
+        # history, and the constraint must not force us to delete it.
+        Index(
+            "uq_billing_subscriptions_one_live_per_workspace",
+            "workspace_id",
+            unique=True,
+            postgresql_where="status <> 'canceled'",
+        ),
+        Index("ix_billing_subscriptions_workspace_status", "workspace_id", "status"),
+        # Drives the dunning sweep: "every past_due subscription, oldest
+        # failure first". Partial, because that job never looks at any
+        # other status and the index has no reason to carry them.
+        Index(
+            "ix_billing_subscriptions_dunning",
+            "past_due_since",
+            postgresql_where="status = 'past_due'",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    # RESTRICT, not CASCADE or SET NULL: deleting a plan that live
+    # subscriptions reference must fail loudly. Cascading would delete
+    # paying customers' subscriptions, and nulling would leave rows
+    # nobody can price. Retiring a plan is `is_active = false`, which is
+    # exactly why that column exists.
+    plan_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("plans.id", ondelete="RESTRICT"), index=True
+    )
+    status: Mapped[str] = mapped_column(Text, index=True)
+    # `billing_interval`, not `interval` — INTERVAL is a reserved type
+    # name in Postgres, and a column called that needs quoting in every
+    # hand-written query forever.
+    billing_interval: Mapped[str] = mapped_column(Text, default="monthly")
+    current_period_start: Mapped[datetime] = mapped_column()
+    current_period_end: Mapped[datetime] = mapped_column()
+    trial_end: Mapped[datetime | None] = mapped_column(default=None)
+    # A flag, not a status. See the note in domain/subscription.py: a
+    # subscription scheduled to cancel is still active and still
+    # entitled, because the customer has already paid for the period.
+    cancel_at_period_end: Mapped[bool] = mapped_column(default=False)
+    canceled_at: Mapped[datetime | None] = mapped_column(default=None)
+    # When the *first* payment failed. The dunning clock runs from here
+    # and is not reset by subsequent failures, so a repeatedly-failing
+    # card cannot extend its own grace period indefinitely.
+    past_due_since: Mapped[datetime | None] = mapped_column(default=None)
+    provider_subscription_id: Mapped[str | None] = mapped_column(
+        Text, unique=True, index=True, default=None
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+
+class SubscriptionEventModel(Base):
+    """Append-only log of every subscription state transition.
+
+    Append-only in the same sense as `audit_logs` (CLAUDE.md §8): the
+    application never issues UPDATE or DELETE against it. A subscription
+    row shows the current state; this table is the only record of how it
+    got there, which is what makes a disputed charge answerable months
+    later.
+    """
+
+    __tablename__ = "subscription_events"
+    __table_args__ = (
+        CheckConstraint(
+            f"from_status IN {_SUBSCRIPTION_STATUSES}",
+            name="ck_subscription_events_from_status",
+        ),
+        CheckConstraint(
+            f"to_status IN {_SUBSCRIPTION_STATUSES}",
+            name="ck_subscription_events_to_status",
+        ),
+        Index("ix_subscription_events_workspace_time", "workspace_id", "occurred_at"),
+        Index("ix_subscription_events_subscription_time", "subscription_id", "occurred_at"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    subscription_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("billing_subscriptions.id", ondelete="CASCADE"),
+        index=True,
+    )
+    # Denormalized from the subscription so every read of this table can
+    # filter by tenant without a join (Rule 11: "every query carries and
+    # filters by workspace_id").
+    workspace_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    trigger: Mapped[str] = mapped_column(Text)
+    from_status: Mapped[str] = mapped_column(Text)
+    to_status: Mapped[str] = mapped_column(Text)
+    # Who or what caused it: a user id, or `system:<job>` /
+    # `provider:<name>` for machine-driven transitions. Free text rather
+    # than an FK because the majority of transitions have no user behind
+    # them at all, and a nullable FK plus a nullable label reads worse
+    # than one always-populated string.
+    actor: Mapped[str] = mapped_column(Text)
+    reason: Mapped[str | None] = mapped_column(Text, default=None)
+    # The natural key that makes replay safe: a redelivered webhook or a
+    # re-run job carries the same value, the unique index rejects the
+    # second write, and the transition happens exactly once
+    # (`billing-expert` operating principle 5).
+    idempotency_key: Mapped[str] = mapped_column(Text, unique=True, index=True)
+    event_metadata: Mapped[dict[str, object]] = mapped_column("metadata", JSONB, default=dict)
+    occurred_at: Mapped[datetime] = mapped_column(server_default=func.now())

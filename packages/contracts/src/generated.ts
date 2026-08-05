@@ -753,6 +753,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/billing/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Subscription Route
+         * @description 404 when the workspace has never subscribed.
+         *
+         *     A Free workspace is operating exactly as intended, so this is not an
+         *     error *about the workspace* — but the caller asked for a
+         *     subscription, and there is none. Clients read Free from the
+         *     entitlements endpoint, which always answers.
+         */
+        get: operations["get_subscription_route_api_v1_workspaces__workspace_id__billing_subscription_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/billing/subscription/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Subscription Events Route
+         * @description The transition log, newest first.
+         *
+         *     Returns an empty list rather than 404 for a workspace with no
+         *     subscription: "this workspace has no billing history" is a true,
+         *     renderable answer, and the timeline component should show an empty
+         *     state rather than an error.
+         */
+        get: operations["list_subscription_events_route_api_v1_workspaces__workspace_id__billing_subscription_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/integrations": {
         parameters: {
             query?: never;
@@ -2261,6 +2311,30 @@ export interface components {
             workspace_id: string;
         };
         /**
+         * DunningStatusResponse
+         * @description Where a past-due subscription is in its recovery window.
+         *
+         *     Present only while past due. `deadline` is the date the subscription
+         *     cancels if nothing recovers it — a concrete date, because "your
+         *     account may be suspended soon" gives a customer nothing to act on.
+         */
+        DunningStatusResponse: {
+            /** Days Remaining */
+            days_remaining: number;
+            /**
+             * Deadline
+             * Format: date-time
+             */
+            deadline: string;
+            /** Next Action */
+            next_action: string;
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+        };
+        /**
          * EntitlementLineResponse
          * @description One dimension's headroom.
          *
@@ -3492,6 +3566,59 @@ export interface components {
          * @enum {string}
          */
         SsoProtocol: "oidc" | "saml";
+        /** SubscriptionEventResponse */
+        SubscriptionEventResponse: {
+            /** Actor */
+            actor: string;
+            /** From Status */
+            from_status: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** To Status */
+            to_status: string;
+            /** Trigger */
+            trigger: string;
+        };
+        /** SubscriptionHistoryResponse */
+        SubscriptionHistoryResponse: {
+            /** Data */
+            data: components["schemas"]["SubscriptionEventResponse"][];
+        };
+        /** SubscriptionResponse */
+        SubscriptionResponse: {
+            /** Billing Interval */
+            billing_interval: string;
+            /** Cancel At Period End */
+            cancel_at_period_end: boolean;
+            /** Canceled At */
+            canceled_at: string | null;
+            /**
+             * Current Period End
+             * Format: date-time
+             */
+            current_period_end: string;
+            /**
+             * Current Period Start
+             * Format: date-time
+             */
+            current_period_start: string;
+            dunning: components["schemas"]["DunningStatusResponse"] | null;
+            /** Entitles */
+            entitles: boolean;
+            /** Id */
+            id: string;
+            /** Plan Slug */
+            plan_slug: string;
+            /** Status */
+            status: string;
+            /** Trial End */
+            trial_end: string | null;
+            /** Workspace Id */
+            workspace_id: string;
+        };
         /** TeamAnalyticsResponse */
         TeamAnalyticsResponse: {
             /** Average Cost Micro Usd */
@@ -5612,6 +5739,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EntitlementsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_subscription_route_api_v1_workspaces__workspace_id__billing_subscription_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_subscription_events_route_api_v1_workspaces__workspace_id__billing_subscription_events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionHistoryResponse"];
                 };
             };
             /** @description Validation Error */

@@ -1,13 +1,19 @@
 """Resolving what a workspace may do: its plan, set against its real
 counts.
 
-The plan lookup is deliberately a single named method
-(`_plan_for_workspace`) rather than inline: it is the seam where the
-subscription table plugs in. Today every workspace resolves to the
-default Free plan, which is not a placeholder — a workspace with no
-subscription genuinely *is* on Free, and that stays true after paid
-subscriptions exist. What changes is that the lookup gains a preceding
-step, in one place, instead of every entitlement call site growing one.
+The plan lookup is a single named method (`_plan_for_workspace`) so
+every entitlement decision in the platform reads the plan the same way.
+It answers with the subscribed plan when there is a live, entitling
+subscription, and with Free otherwise — which covers a workspace that
+never subscribed, one whose subscription was canceled, and one that is
+paused, all of which are genuinely on Free rather than in some
+intermediate state.
+
+`PAST_DUE` deliberately still entitles. Dunning exists because a failed
+charge is usually an expired card; cutting service at the first failure
+turns a recoverable billing problem into churn. Service stops when the
+dunning window closes and the subscription reaches `CANCELED`, which is
+bounded and scheduled (see `domain/dunning.py`).
 """
 
 from __future__ import annotations
@@ -21,26 +27,42 @@ from agentverse_api.billing_service.domain.entitlements import (
     metered_lines,
     resource_lines,
 )
+from agentverse_api.billing_service.domain.exceptions import (
+    CatalogIncompleteError,
+    PlanNotFoundError,
+)
 from agentverse_api.billing_service.domain.plan import (
     Capability,
     MeteredDimension,
     Plan,
     ResourceLimit,
 )
-from agentverse_api.billing_service.domain.ports import WorkspaceUsageRepository
+from agentverse_api.billing_service.domain.ports import (
+    SubscriptionRepository,
+    WorkspaceUsageRepository,
+)
 
 
 @dataclass(slots=True)
 class EntitlementService:
     catalog: PlanCatalogService
     usage: WorkspaceUsageRepository
+    subscriptions: SubscriptionRepository
 
     async def _plan_for_workspace(self, workspace_id: str) -> Plan:
-        # `workspace_id` is unused until subscriptions land, and is taken
-        # now rather than added later so the signature every caller
-        # depends on does not change when it starts mattering.
-        del workspace_id
-        return await self.catalog.default_plan()
+        subscription = await self.subscriptions.get_for_workspace(workspace_id)
+        if subscription is None or not subscription.entitles:
+            return await self.catalog.default_plan()
+        try:
+            return await self.catalog.get_plan(subscription.plan_slug)
+        except PlanNotFoundError as exc:
+            # A live subscription pointing at a deactivated plan. Not a
+            # 404 — the caller asked about their workspace, not about a
+            # plan — and emphatically not a silent downgrade to Free,
+            # which would revoke a paying customer's limits mid-request
+            # with no trace. It is an operator error in the catalog and
+            # must page, exactly like a missing Free row.
+            raise CatalogIncompleteError(subscription.plan_slug) from exc
 
     async def entitlements_for(self, workspace_id: str) -> Entitlements:
         """Everything the usage panel and the upgrade nudges need, in one
