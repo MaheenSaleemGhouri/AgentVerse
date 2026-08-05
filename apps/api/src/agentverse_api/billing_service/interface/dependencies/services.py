@@ -14,8 +14,11 @@ from agentverse_api.billing_service.application.billing_actions_service import (
     BillingActionsService,
 )
 from agentverse_api.billing_service.application.entitlement_service import EntitlementService
+from agentverse_api.billing_service.application.invoicing_service import InvoicingService
 from agentverse_api.billing_service.application.plan_catalog_service import PlanCatalogService
+from agentverse_api.billing_service.application.quota_service import QuotaService
 from agentverse_api.billing_service.application.subscription_service import SubscriptionService
+from agentverse_api.billing_service.application.usage_service import UsageService
 from agentverse_api.billing_service.application.webhook_service import WebhookService
 from agentverse_api.billing_service.domain.payment_provider import (
     PaymentProviderPort,
@@ -25,6 +28,7 @@ from agentverse_api.billing_service.infrastructure.repositories import (
     SqlCustomerRepository,
     SqlPlanRepository,
     SqlSubscriptionRepository,
+    SqlUsageRepository,
     SqlWebhookEventRepository,
     SqlWorkspaceUsageRepository,
 )
@@ -39,6 +43,24 @@ def get_plan_catalog_service(
     return PlanCatalogService(plans=SqlPlanRepository(session))
 
 
+def _subscription_service(session: AsyncSession) -> SubscriptionService:
+    return SubscriptionService(
+        subscriptions=SqlSubscriptionRepository(session),
+        customers=SqlCustomerRepository(session),
+        catalog=PlanCatalogService(plans=SqlPlanRepository(session)),
+    )
+
+
+def _usage_service(session: AsyncSession) -> UsageService:
+    return UsageService(
+        usage=SqlUsageRepository(session), subscriptions=_subscription_service(session)
+    )
+
+
+def get_usage_service(session: AsyncSession = Depends(get_db_session)) -> UsageService:
+    return _usage_service(session)
+
+
 def get_entitlement_service(
     session: AsyncSession = Depends(get_db_session),
 ) -> EntitlementService:
@@ -46,6 +68,27 @@ def get_entitlement_service(
         catalog=PlanCatalogService(plans=SqlPlanRepository(session)),
         usage=SqlWorkspaceUsageRepository(session),
         subscriptions=SqlSubscriptionRepository(session),
+        metered=_usage_service(session),
+    )
+
+
+def get_quota_service(session: AsyncSession = Depends(get_db_session)) -> QuotaService:
+    return QuotaService(
+        entitlements=EntitlementService(
+            catalog=PlanCatalogService(plans=SqlPlanRepository(session)),
+            usage=SqlWorkspaceUsageRepository(session),
+            subscriptions=SqlSubscriptionRepository(session),
+        ),
+        usage=_usage_service(session),
+    )
+
+
+def get_invoicing_service(
+    session: AsyncSession = Depends(get_db_session),
+) -> InvoicingService:
+    return InvoicingService(
+        usage=_usage_service(session),
+        catalog=PlanCatalogService(plans=SqlPlanRepository(session)),
     )
 
 

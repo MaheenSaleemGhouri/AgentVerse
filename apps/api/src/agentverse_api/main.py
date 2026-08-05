@@ -59,6 +59,9 @@ from agentverse_api.billing_service.interface.routes.plans import router as plan
 from agentverse_api.billing_service.interface.routes.subscriptions import (
     router as subscriptions_router,
 )
+from agentverse_api.billing_service.interface.routes.usage import (
+    router as billing_usage_router,
+)
 from agentverse_api.billing_service.interface.routes.webhooks import (
     router as billing_webhooks_router,
 )
@@ -157,6 +160,7 @@ def create_app() -> FastAPI:
     app.include_router(entitlements_router)
     app.include_router(subscriptions_router)
     app.include_router(billing_actions_router)
+    app.include_router(billing_usage_router)
     app.include_router(billing_webhooks_router)
     app.include_router(api_keys_router)
     app.include_router(audit_logs_router)

@@ -6,6 +6,7 @@ with the real DB session and Redis client both overridden (CLAUDE.md
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fakeredis.aioredis import FakeRedis
@@ -17,6 +18,9 @@ from agentverse_api.auth_service.interface.dependencies.require_role import (
     require_member,
     require_viewer,
 )
+from agentverse_api.billing_service.application.quota_service import QuotaDecision
+from agentverse_api.billing_service.domain.plan import MeteredDimension
+from agentverse_api.billing_service.interface.dependencies.services import get_quota_service
 from agentverse_api.main import create_app
 from agentverse_api.orchestration_service.domain.agent_entities import AgentConfig
 from agentverse_api.orchestration_service.infrastructure.queue.job_queue_producer import (
@@ -46,6 +50,29 @@ def _lock_factory(_key: str) -> _AlwaysAcquiresLock:
     return _AlwaysAcquiresLock()
 
 
+class _UnlimitedQuota:
+    """Stands in for `QuotaService` with an unlimited allowance.
+
+    Mirrors the real service's shape — `enforce` returns a decision and
+    raises on refusal — so a route that started ignoring the decision
+    would still be caught by the billing suite's own tests rather than
+    passing here for the wrong reason.
+    """
+
+    async def enforce(
+        self, *, workspace_id: str, dimension: MeteredDimension, requested: int = 1
+    ) -> QuotaDecision:
+        del workspace_id, requested
+        return QuotaDecision(
+            dimension=dimension,
+            allowed=True,
+            allowance=None,
+            used=0,
+            resets_at=datetime.now(UTC) + timedelta(days=30),
+            billable_overage=False,
+        )
+
+
 @pytest.fixture
 async def client_with_fakes(
     fake_redis: FakeRedis,
@@ -63,6 +90,13 @@ async def client_with_fakes(
         fake_redis, stream=STREAM
     )
     app.dependency_overrides[get_lock_factory] = lambda: _lock_factory  # type: ignore[dict-item]
+    # The run route enforces the metered agent-run quota before queuing.
+    # This suite exercises run *submission* against fake repositories, so
+    # the quota is stubbed to an unlimited plan — the enforcement itself
+    # is covered in tests/billing_service, and leaving it wired here
+    # would make every one of these tests depend on a real Postgres and
+    # a seeded plan catalog.
+    app.dependency_overrides[get_quota_service] = lambda: _UnlimitedQuota()
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +14,7 @@ from agentverse_api.billing_service.domain.customer import BillingCustomer, Paym
 from agentverse_api.billing_service.domain.entitlements import ResourceUsage
 from agentverse_api.billing_service.domain.plan import (
     BillingInterval,
+    MeteredDimension,
     Plan,
     PlanTier,
     tier_rank,
@@ -23,12 +24,20 @@ from agentverse_api.billing_service.domain.subscription import (
     SubscriptionStatus,
     SubscriptionTrigger,
 )
+from agentverse_api.billing_service.domain.usage import (
+    LEVEL_DIMENSIONS,
+    DimensionUsage,
+    PeriodUsage,
+    UsageEvent,
+)
 from agentverse_api.billing_service.infrastructure import plan_config
 from agentverse_api.billing_service.infrastructure.models import (
     BillingCustomerModel,
     BillingSubscriptionModel,
     PlanModel,
     SubscriptionEventModel,
+    UsageEventModel,
+    UsageRollupModel,
     WebhookEventModel,
 )
 from agentverse_api.orchestration_service.infrastructure.integration_repository import (
@@ -321,6 +330,169 @@ class SqlSubscriptionRepository:
             .limit(limit)
         )
         return [(row[0], row[1], row[2], row[3], row[4]) for row in result.all()]
+
+
+class SqlUsageRepository:
+    """Implements `domain.ports.UsageRepository`.
+
+    Every query filters on `workspace_id` and a period range, matching
+    `ix_billing_usage_events_workspace_period` — the index the table was
+    designed around. Aggregation happens in Postgres rather than by
+    pulling rows into Python: a busy workspace produces tens of thousands
+    of events per period, and fetching them to sum would move the whole
+    period over the wire to compute nine numbers.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def record(self, events: list[UsageEvent]) -> int:
+        if not events:
+            return 0
+        # One multi-row INSERT with ON CONFLICT DO NOTHING, not a
+        # row-by-row loop: the natural unit is a finished run emitting
+        # several dimensions at once, and the conflict clause is what
+        # makes a retried worker a no-op rather than a double charge.
+        stmt = (
+            pg_insert(UsageEventModel)
+            .values(
+                [
+                    {
+                        "id": str(uuid.uuid4()),
+                        "occurred_at": event.occurred_at,
+                        "workspace_id": event.workspace_id,
+                        "dimension": event.dimension.value,
+                        "source": event.source.value,
+                        "source_id": event.source_id,
+                        "quantity": event.quantity,
+                        "cost_micro_usd": event.cost_micro_usd,
+                        "idempotency_key": event.idempotency_key,
+                        "event_metadata": {},
+                    }
+                    for event in events
+                ]
+            )
+            .on_conflict_do_nothing(index_elements=["idempotency_key", "occurred_at"])
+            .returning(UsageEventModel.id)
+        )
+        result = await self._session.execute(stmt)
+        return len(result.scalars().all())
+
+    async def usage_for_period(
+        self, *, workspace_id: str, period_start: datetime, period_end: datetime
+    ) -> PeriodUsage:
+        # `sum` and `max` are both computed for every dimension, and the
+        # domain picks which one applies. Doing it here rather than
+        # branching in SQL keeps the accumulate-vs-level rule in exactly
+        # one place — `usage.LEVEL_DIMENSIONS` — instead of splitting it
+        # across a query and a module.
+        result = await self._session.execute(
+            select(
+                UsageEventModel.dimension,
+                func.sum(UsageEventModel.quantity),
+                func.max(UsageEventModel.quantity),
+                func.coalesce(func.sum(UsageEventModel.cost_micro_usd), 0),
+            )
+            .where(
+                UsageEventModel.workspace_id == workspace_id,
+                UsageEventModel.occurred_at >= period_start,
+                UsageEventModel.occurred_at < period_end,
+            )
+            .group_by(UsageEventModel.dimension)
+        )
+        dimensions: dict[MeteredDimension, DimensionUsage] = {}
+        for raw_dimension, total, peak, cost in result.all():
+            try:
+                dimension = MeteredDimension(raw_dimension)
+            except ValueError:
+                # A dimension this build does not know — a row written by
+                # a newer deploy during a rollout. Skipped rather than
+                # crashing the usage panel; the aggregation job on the
+                # newer build will account for it.
+                continue
+            quantity = int(peak or 0) if dimension in LEVEL_DIMENSIONS else int(total or 0)
+            dimensions[dimension] = DimensionUsage(
+                dimension=dimension, quantity=quantity, cost_micro_usd=int(cost or 0)
+            )
+        return PeriodUsage(
+            workspace_id=workspace_id,
+            period_start=period_start,
+            period_end=period_end,
+            dimensions=dimensions,
+        )
+
+    async def write_rollups(
+        self,
+        *,
+        workspace_id: str,
+        period_start: datetime,
+        period_end: datetime,
+        usage: PeriodUsage,
+        finalize: bool,
+    ) -> None:
+        if not usage.dimensions:
+            return
+        finalized_at = datetime.now(UTC) if finalize else None
+        stmt = (
+            pg_insert(UsageRollupModel)
+            .values(
+                [
+                    {
+                        "id": str(uuid.uuid4()),
+                        "workspace_id": workspace_id,
+                        "period_start": period_start,
+                        "period_end": period_end,
+                        "dimension": dimension.value,
+                        "quantity": row.quantity,
+                        "cost_micro_usd": row.cost_micro_usd,
+                        "finalized_at": finalized_at,
+                    }
+                    for dimension, row in usage.dimensions.items()
+                ]
+            )
+            .on_conflict_do_update(
+                index_elements=["workspace_id", "period_start", "dimension"],
+                set_={
+                    "quantity": text("excluded.quantity"),
+                    "cost_micro_usd": text("excluded.cost_micro_usd"),
+                    "period_end": text("excluded.period_end"),
+                    "finalized_at": text("excluded.finalized_at"),
+                    "computed_at": func.now(),
+                },
+            )
+        )
+        await self._session.execute(stmt)
+
+    async def finalized_rollups(
+        self, *, workspace_id: str, period_start: datetime
+    ) -> PeriodUsage | None:
+        result = await self._session.execute(
+            select(UsageRollupModel).where(
+                UsageRollupModel.workspace_id == workspace_id,
+                UsageRollupModel.period_start == period_start,
+                UsageRollupModel.finalized_at.is_not(None),
+            )
+        )
+        rows = list(result.scalars().all())
+        if not rows:
+            return None
+        dimensions: dict[MeteredDimension, DimensionUsage] = {}
+        for row in rows:
+            try:
+                dimension = MeteredDimension(row.dimension)
+            except ValueError:
+                continue
+            dimensions[dimension] = DimensionUsage(
+                dimension=dimension,
+                quantity=row.quantity,
+                cost_micro_usd=row.cost_micro_usd,
+            )
+        return PeriodUsage(
+            workspace_id=workspace_id,
+            period_start=period_start,
+            period_end=rows[0].period_end,
+            dimensions=dimensions,
+        )
 
 
 class SqlWebhookEventRepository:

@@ -18,6 +18,7 @@ from agentverse_api.billing_service.domain.subscription import (
     SubscriptionStatus,
     SubscriptionTrigger,
 )
+from agentverse_api.billing_service.domain.usage import PeriodUsage, UsageEvent
 
 
 class PlanRepository(Protocol):
@@ -140,6 +141,59 @@ class SubscriptionRepository(Protocol):
     ) -> list[tuple[str, str, str, str, datetime]]:
         """`(trigger, from_status, to_status, actor, occurred_at)`, newest
         first — the billing history the UI renders.
+        """
+        ...
+
+
+class UsageRepository(Protocol):
+    """Durable metered usage. The billing source of truth (Rule 13).
+
+    A Redis counter may drive a progress bar; the invoice reads these
+    rows.
+    """
+
+    async def record(self, events: list[UsageEvent]) -> int:
+        """Append events, skipping any whose idempotency key is already
+        present. Returns how many were actually written.
+
+        Takes a list rather than one event because the natural unit is a
+        finished run — several dimensions at once — and a row-by-row loop
+        is the bulk-write mistake `postgresql-expert` names explicitly.
+        """
+        ...
+
+    async def usage_for_period(
+        self, *, workspace_id: str, period_start: datetime, period_end: datetime
+    ) -> PeriodUsage:
+        """Live totals straight from the event partitions.
+
+        The live-panel query. Distinct from `finalized_rollups`, which is
+        what invoicing reads — mixing them would let an invoice change
+        after issue because a late event arrived.
+        """
+        ...
+
+    async def write_rollups(
+        self,
+        *,
+        workspace_id: str,
+        period_start: datetime,
+        period_end: datetime,
+        usage: PeriodUsage,
+        finalize: bool,
+    ) -> None:
+        """Upsert the period's totals, keyed by
+        `(workspace_id, period_start, dimension)` so a re-run recomputes
+        rather than double-counts.
+        """
+        ...
+
+    async def finalized_rollups(
+        self, *, workspace_id: str, period_start: datetime
+    ) -> PeriodUsage | None:
+        """The frozen totals for a closed period, or `None` if the period
+        has not been finalized. Invoicing refuses to proceed on `None`
+        rather than billing a period still in progress.
         """
         ...
 

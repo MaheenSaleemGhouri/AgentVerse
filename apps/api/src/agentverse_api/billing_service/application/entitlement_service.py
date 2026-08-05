@@ -19,6 +19,7 @@ bounded and scheduled (see `domain/dunning.py`).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Protocol
 
 from agentverse_api.billing_service.application.plan_catalog_service import PlanCatalogService
 from agentverse_api.billing_service.domain.entitlements import (
@@ -41,6 +42,19 @@ from agentverse_api.billing_service.domain.ports import (
     SubscriptionRepository,
     WorkspaceUsageRepository,
 )
+from agentverse_api.billing_service.domain.usage import PeriodUsage
+
+
+class MeteredUsageReader(Protocol):
+    """The one method entitlements needs from `UsageService`.
+
+    A Protocol rather than the concrete service so `application/` does
+    not depend on a sibling service's whole surface — and so this module
+    cannot start reaching for recording or finalization, which are not
+    its business.
+    """
+
+    async def current_period_usage(self, workspace_id: str) -> PeriodUsage: ...
 
 
 @dataclass(slots=True)
@@ -48,6 +62,21 @@ class EntitlementService:
     catalog: PlanCatalogService
     usage: WorkspaceUsageRepository
     subscriptions: SubscriptionRepository
+    #: Metered usage for the current billing period. Optional so the
+    #: entitlement path still answers in a deployment where metering has
+    #: not been wired — reporting zero for every metered dimension is
+    #: honest (nothing has been recorded), where failing the whole panel
+    #: because one of its two halves is unavailable is not.
+    metered: MeteredUsageReader | None = None
+
+    async def plan_for(self, workspace_id: str) -> Plan:
+        """The resolved plan, for callers outside this service.
+
+        The quota check needs the same answer every entitlement decision
+        uses, and resolving it a second way would let a workspace be
+        quota-checked against one plan and shown another.
+        """
+        return await self._plan_for_workspace(workspace_id)
 
     async def _plan_for_workspace(self, workspace_id: str) -> Plan:
         subscription = await self.subscriptions.get_for_workspace(workspace_id)
@@ -68,14 +97,17 @@ class EntitlementService:
         """Everything the usage panel and the upgrade nudges need, in one
         round of queries.
 
-        Metered lines report zero until the metering pipeline records
-        events. That is honest rather than fabricated: the dimensions are
-        real, the allowances are the plan's real allowances, and zero is
-        the true count of events recorded so far.
+        Metered lines report the period's real recorded usage. Zero is a
+        true answer, not a placeholder: a dimension with no events this
+        period has genuinely been used zero times, and the allowance
+        shown beside it is the plan's real allowance.
         """
         plan = await self._plan_for_workspace(workspace_id)
         resource_usage = await self.usage.resource_usage(workspace_id)
         period_usage: dict[MeteredDimension, int] = {}
+        if self.metered is not None:
+            period = await self.metered.current_period_usage(workspace_id)
+            period_usage = period.as_quantities()
         return Entitlements(
             workspace_id=workspace_id,
             plan=plan,

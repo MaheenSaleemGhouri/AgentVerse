@@ -795,6 +795,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/billing/invoice-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Invoice Route
+         * @description What this period would cost if it closed right now.
+         *
+         *     A forecast, deliberately built from live usage — which is correct
+         *     here and would be a mistake for an issued invoice, where the totals
+         *     must be frozen first so the number cannot move between being shown
+         *     and being paid.
+         */
+        get: operations["preview_invoice_route_api_v1_workspaces__workspace_id__billing_invoice_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/billing/invoices": {
         parameters: {
             query?: never;
@@ -1056,6 +1081,30 @@ export interface paths {
         put?: never;
         /** Unpause Subscription Route */
         post: operations["unpause_subscription_route_api_v1_workspaces__workspace_id__billing_subscription_unpause_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/billing/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Usage Route
+         * @description Live usage for the current billing period.
+         *
+         *     Read from the durable event rows, not a cached counter (Rule 13). A
+         *     dimension with no events reports zero, which is the true count rather
+         *     than a missing value — every dimension always has an answer.
+         */
+        get: operations["get_usage_route_api_v1_workspaces__workspace_id__billing_usage_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2602,6 +2651,45 @@ export interface components {
             /** Workspace Id */
             workspace_id: string;
         };
+        /** DimensionUsageResponse */
+        DimensionUsageResponse: {
+            /** Dimension */
+            dimension: string;
+            /** Is Level */
+            is_level: boolean;
+            /** Quantity */
+            quantity: number;
+        };
+        /**
+         * DraftInvoiceResponse
+         * @description The flat fee and each overage as separate lines, never one total.
+         *
+         *     A customer disputing a charge needs to see which dimension drove it;
+         *     a single number cannot be decomposed back into "Pro plan" plus
+         *     "4,000 agent runs over allowance".
+         */
+        DraftInvoiceResponse: {
+            /** Currency */
+            currency: string;
+            /** Has Overage */
+            has_overage: boolean;
+            /** Lines */
+            lines: components["schemas"]["InvoiceLineResponse"][];
+            /**
+             * Period End
+             * Format: date-time
+             */
+            period_end: string;
+            /**
+             * Period Start
+             * Format: date-time
+             */
+            period_start: string;
+            /** Subtotal Cents */
+            subtotal_cents: number;
+            /** Workspace Id */
+            workspace_id: string;
+        };
         /**
          * DunningStatusResponse
          * @description Where a past-due subscription is in its recovery window.
@@ -2914,6 +3002,21 @@ export interface components {
             role: components["schemas"]["Role"];
             /** User Id */
             user_id: string;
+        };
+        /** InvoiceLineResponse */
+        InvoiceLineResponse: {
+            /** Amount Cents */
+            amount_cents: number;
+            /** Description */
+            description: string;
+            /** Dimension */
+            dimension: string | null;
+            /** Kind */
+            kind: string;
+            /** Quantity */
+            quantity: number;
+            /** Unit Label */
+            unit_label: string;
         };
         /** InvoiceListResponse */
         InvoiceListResponse: {
@@ -3373,6 +3476,31 @@ export interface components {
             is_default: boolean;
             /** Last4 */
             last4: string | null;
+        };
+        /**
+         * PeriodUsageResponse
+         * @description Live usage for the current billing period.
+         *
+         *     Carries its period boundaries because "usage this month" and "usage
+         *     this billing period" are different questions for every customer whose
+         *     subscription did not start on the 1st — and the panel has to show
+         *     which one it is answering.
+         */
+        PeriodUsageResponse: {
+            /** Dimensions */
+            dimensions: components["schemas"]["DimensionUsageResponse"][];
+            /**
+             * Period End
+             * Format: date-time
+             */
+            period_end: string;
+            /**
+             * Period Start
+             * Format: date-time
+             */
+            period_start: string;
+            /** Workspace Id */
+            workspace_id: string;
         };
         /**
          * Permission
@@ -6238,6 +6366,37 @@ export interface operations {
             };
         };
     };
+    preview_invoice_route_api_v1_workspaces__workspace_id__billing_invoice_preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftInvoiceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_invoices_route_api_v1_workspaces__workspace_id__billing_invoices_get: {
         parameters: {
             query?: {
@@ -6619,6 +6778,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubscriptionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_usage_route_api_v1_workspaces__workspace_id__billing_usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodUsageResponse"];
                 };
             };
             /** @description Validation Error */

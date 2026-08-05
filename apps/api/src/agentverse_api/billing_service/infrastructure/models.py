@@ -20,7 +20,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, Text, TypeDecorator
+from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Index, Text, TypeDecorator
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -352,3 +352,122 @@ class WebhookEventModel(Base):
     error: Mapped[str | None] = mapped_column(Text, default=None)
     received_at: Mapped[datetime] = mapped_column(server_default=func.now())
     processed_at: Mapped[datetime | None] = mapped_column(default=None)
+
+
+class UsageEventModel(Base):
+    """Durable, append-only metered usage. The billing source of truth.
+
+    Partitioned by `occurred_at` (RANGE, monthly) from its first
+    migration rather than retrofitted — CLAUDE.md §8 names this table
+    specifically, and a billing table is the worst possible candidate for
+    a partitioning migration under production pain, because the fix
+    window is exactly when the rows cannot be moved.
+
+    The composite primary key is a Postgres requirement (the partition
+    key must appear in every unique key on a partitioned table), not a
+    modelling choice — same shape as `agent_run_steps`.
+
+    Redis is never the source here (Rule 13). A cached counter may drive
+    a progress bar; the invoice reads these rows.
+    """
+
+    __tablename__ = "billing_usage_events"
+    __table_args__ = (
+        CheckConstraint("quantity >= 0", name="ck_billing_usage_events_quantity"),
+        CheckConstraint(
+            "cost_micro_usd IS NULL OR cost_micro_usd >= 0",
+            name="ck_billing_usage_events_cost",
+        ),
+        # Primary access pattern: "everything this workspace used in this
+        # billing period, by dimension" — the aggregation job's only
+        # query, and the one behind the live usage panel. Leads with
+        # `workspace_id` per Rule 11 and §8.
+        Index(
+            "ix_billing_usage_events_workspace_period",
+            "workspace_id",
+            "occurred_at",
+            "dimension",
+        ),
+        # The replay guard. Includes `occurred_at` because Postgres
+        # requires the partition key in every unique index on a
+        # partitioned table; the key itself is derived from the source
+        # row, so a retried worker reproduces both halves.
+        Index(
+            "uq_billing_usage_events_idempotency",
+            "idempotency_key",
+            "occurred_at",
+            unique=True,
+        ),
+        {"postgresql_partition_by": "RANGE (occurred_at)"},
+    )
+
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    occurred_at: Mapped[datetime] = mapped_column(primary_key=True)
+    # No FK to `workspaces`: Postgres cannot enforce a foreign key from a
+    # partitioned table cheaply, and more importantly a billing record
+    # must survive its workspace being deleted — an invoice for a closed
+    # account still has to be explicable. Tenant scoping is enforced by
+    # every query carrying `workspace_id`, per Rule 11.
+    workspace_id: Mapped[str] = mapped_column(UUID(as_uuid=False), index=True)
+    dimension: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(Text)
+    # The row that produced this event (a run id, a tool-call id). Kept so
+    # an unexpected invoice line can be traced to the work that caused it.
+    source_id: Mapped[str | None] = mapped_column(Text, default=None)
+    quantity: Mapped[int] = mapped_column(BigInteger)
+    # Micro-USD (1e-6 USD), not cents: a single LLM call routinely costs a
+    # fraction of a cent, and rounding per call would round most to zero.
+    # Converted to cents exactly once, at the invoice boundary.
+    cost_micro_usd: Mapped[int | None] = mapped_column(BigInteger, default=None)
+    idempotency_key: Mapped[str] = mapped_column(Text)
+    event_metadata: Mapped[dict[str, object]] = mapped_column("metadata", JSONB, default=dict)
+
+
+class UsageRollupModel(Base):
+    """A billing period's finalized totals, one row per dimension.
+
+    Separate from the events on purpose. `billing-expert` requires usage
+    aggregation and invoice generation to be distinct, individually
+    testable steps: this table is the boundary between them. Invoicing
+    reads finalized rollups and never scans the event partitions, so an
+    invoice cannot change because a late event arrived after it was
+    issued.
+
+    Keyed by `(workspace_id, period_start, dimension)` so the aggregation
+    job is idempotent — re-running it recomputes the same row rather than
+    adding a second.
+    """
+
+    __tablename__ = "billing_usage_rollups"
+    __table_args__ = (
+        CheckConstraint("quantity >= 0", name="ck_billing_usage_rollups_quantity"),
+        CheckConstraint("cost_micro_usd >= 0", name="ck_billing_usage_rollups_cost"),
+        CheckConstraint(
+            "period_end > period_start", name="ck_billing_usage_rollups_period_ordered"
+        ),
+        Index(
+            "uq_billing_usage_rollups_key",
+            "workspace_id",
+            "period_start",
+            "dimension",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    workspace_id: Mapped[str] = mapped_column(UUID(as_uuid=False), index=True)
+    period_start: Mapped[datetime] = mapped_column()
+    period_end: Mapped[datetime] = mapped_column()
+    dimension: Mapped[str] = mapped_column(Text)
+    quantity: Mapped[int] = mapped_column(BigInteger, default=0)
+    cost_micro_usd: Mapped[int] = mapped_column(BigInteger, default=0)
+    # Set when the period closes and the totals stop moving. A rollup
+    # with `finalized_at` set is safe to invoice; one without is a live
+    # running total, and invoicing it would bill a period still in
+    # progress.
+    finalized_at: Mapped[datetime | None] = mapped_column(default=None)
+    computed_at: Mapped[datetime] = mapped_column(server_default=func.now())

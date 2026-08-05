@@ -1184,6 +1184,78 @@
         "title": "CustomRoleResponse",
         "type": "object"
       },
+      "DimensionUsageResponse": {
+        "properties": {
+          "dimension": {
+            "title": "Dimension",
+            "type": "string"
+          },
+          "is_level": {
+            "title": "Is Level",
+            "type": "boolean"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dimension",
+          "quantity",
+          "is_level"
+        ],
+        "title": "DimensionUsageResponse",
+        "type": "object"
+      },
+      "DraftInvoiceResponse": {
+        "description": "The flat fee and each overage as separate lines, never one total.\n\nA customer disputing a charge needs to see which dimension drove it;\na single number cannot be decomposed back into \"Pro plan\" plus\n\"4,000 agent runs over allowance\".",
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "has_overage": {
+            "title": "Has Overage",
+            "type": "boolean"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/InvoiceLineResponse"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "period_end": {
+            "format": "date-time",
+            "title": "Period End",
+            "type": "string"
+          },
+          "period_start": {
+            "format": "date-time",
+            "title": "Period Start",
+            "type": "string"
+          },
+          "subtotal_cents": {
+            "title": "Subtotal Cents",
+            "type": "integer"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "period_start",
+          "period_end",
+          "currency",
+          "lines",
+          "subtotal_cents",
+          "has_overage"
+        ],
+        "title": "DraftInvoiceResponse",
+        "type": "object"
+      },
       "DunningStatusResponse": {
         "description": "Where a past-due subscription is in its recovery window.\n\nPresent only while past due. `deadline` is the date the subscription\ncancels if nothing recovers it \u2014 a concrete date, because \"your\naccount may be suspended soon\" gives a customer nothing to act on.",
         "properties": {
@@ -1937,6 +2009,51 @@
           "user_id"
         ],
         "title": "InviteOrgMemberRequest",
+        "type": "object"
+      },
+      "InvoiceLineResponse": {
+        "properties": {
+          "amount_cents": {
+            "title": "Amount Cents",
+            "type": "integer"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "dimension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dimension"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "unit_label": {
+            "title": "Unit Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "dimension",
+          "description",
+          "quantity",
+          "unit_label",
+          "amount_cents"
+        ],
+        "title": "InvoiceLineResponse",
         "type": "object"
       },
       "InvoiceListResponse": {
@@ -3185,6 +3302,40 @@
           "is_default"
         ],
         "title": "PaymentMethodResponse",
+        "type": "object"
+      },
+      "PeriodUsageResponse": {
+        "description": "Live usage for the current billing period.\n\nCarries its period boundaries because \"usage this month\" and \"usage\nthis billing period\" are different questions for every customer whose\nsubscription did not start on the 1st \u2014 and the panel has to show\nwhich one it is answering.",
+        "properties": {
+          "dimensions": {
+            "items": {
+              "$ref": "#/components/schemas/DimensionUsageResponse"
+            },
+            "title": "Dimensions",
+            "type": "array"
+          },
+          "period_end": {
+            "format": "date-time",
+            "title": "Period End",
+            "type": "string"
+          },
+          "period_start": {
+            "format": "date-time",
+            "title": "Period Start",
+            "type": "string"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "period_start",
+          "period_end",
+          "dimensions"
+        ],
+        "title": "PeriodUsageResponse",
         "type": "object"
       },
       "Permission": {
@@ -9289,6 +9440,54 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspace_id}/billing/invoice-preview": {
+      "get": {
+        "description": "What this period would cost if it closed right now.\n\nA forecast, deliberately built from live usage \u2014 which is correct\nhere and would be a mistake for an issued invoice, where the totals\nmust be frozen first so the number cannot move between being shown\nand being paid.",
+        "operationId": "preview_invoice_route_api_v1_workspaces__workspace_id__billing_invoice_preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftInvoiceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preview Invoice Route",
+        "tags": [
+          "billing-usage"
+        ]
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/billing/invoices": {
       "get": {
         "description": "Read straight from the provider, never a local mirror.\n\nInvoice PDFs are the provider's to hold; a cached copy here would be\none more thing that can be stale and one more place financial\ndocuments live.",
@@ -9941,6 +10140,54 @@
         "summary": "Unpause Subscription Route",
         "tags": [
           "billing-actions"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/billing/usage": {
+      "get": {
+        "description": "Live usage for the current billing period.\n\nRead from the durable event rows, not a cached counter (Rule 13). A\ndimension with no events reports zero, which is the true count rather\nthan a missing value \u2014 every dimension always has an answer.",
+        "operationId": "get_usage_route_api_v1_workspaces__workspace_id__billing_usage_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeriodUsageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Usage Route",
+        "tags": [
+          "billing-usage"
         ]
       }
     },

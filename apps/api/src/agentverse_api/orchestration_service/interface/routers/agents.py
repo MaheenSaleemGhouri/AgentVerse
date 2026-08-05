@@ -5,6 +5,8 @@ workspace in the URL).
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from agentverse_api.auth_service.domain.entities import WorkspaceContext
@@ -12,6 +14,12 @@ from agentverse_api.auth_service.interface.dependencies.require_role import (
     require_member,
     require_viewer,
 )
+from agentverse_api.billing_service.application.quota_service import (
+    QuotaExceededError,
+    QuotaService,
+)
+from agentverse_api.billing_service.domain.plan import MeteredDimension
+from agentverse_api.billing_service.interface.dependencies.services import get_quota_service
 from agentverse_api.orchestration_service.application.create_agent import create_agent
 from agentverse_api.orchestration_service.application.run_agent import LockFactory, run_agent
 from agentverse_api.orchestration_service.domain.agent_entities import (
@@ -199,7 +207,37 @@ async def submit_run_route(
     run_repo: AgentRunRepository = Depends(get_agent_run_repository),
     producer: JobQueueProducer = Depends(get_job_queue_producer),
     lock_factory: LockFactory = Depends(get_lock_factory),
+    quota: QuotaService = Depends(get_quota_service),
 ) -> RunResponse:
+    # Enforced here, before the run is queued and before a single
+    # provider token is spent. Checking after the run would be too late —
+    # the cost is already paid — and checking only in the UI is not
+    # enforcement at all, since this endpoint is directly callable.
+    #
+    # Whether passing the allowance refuses or bills is the plan's
+    # decision, not this route's: a tier with an overage rate proceeds
+    # and produces an invoice line, one without is a hard stop.
+    try:
+        await quota.enforce(
+            workspace_id=context.workspace_id, dimension=MeteredDimension.AGENT_RUNS
+        )
+    except QuotaExceededError as exc:
+        decision = exc.decision
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "code": "quota_exceeded",
+                "message": str(exc),
+                "dimension": decision.dimension.value,
+                "allowance": decision.allowance,
+                "used": decision.used,
+                "resets_at": decision.resets_at.isoformat(),
+            },
+            # Without this a client cannot tell a quota refusal from an
+            # outage, and retries into the same wall.
+            headers={"Retry-After": str(decision.retry_after_seconds(datetime.now(UTC)))},
+        ) from exc
+
     try:
         run = await run_agent(
             workspace_id=context.workspace_id,

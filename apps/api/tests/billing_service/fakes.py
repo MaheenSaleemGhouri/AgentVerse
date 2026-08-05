@@ -25,11 +25,22 @@ from agentverse_api.billing_service.domain.payment_provider import (
     ProviderPaymentMethod,
     ProviderSubscriptionState,
 )
-from agentverse_api.billing_service.domain.plan import BillingInterval, Plan, PlanTier
+from agentverse_api.billing_service.domain.plan import (
+    BillingInterval,
+    MeteredDimension,
+    Plan,
+    PlanTier,
+)
 from agentverse_api.billing_service.domain.subscription import (
     Subscription,
     SubscriptionStatus,
     SubscriptionTrigger,
+)
+from agentverse_api.billing_service.domain.usage import (
+    DimensionUsage,
+    PeriodUsage,
+    UsageEvent,
+    combine,
 )
 
 _MUTABLE_ON_TRANSITION = frozenset(
@@ -237,6 +248,93 @@ class FakeSubscriptionRepository:
         ]
         matching.reverse()
         return matching[:limit]
+
+
+class FakeMeteredUsageRepository:
+    """In-memory metered usage, enforcing the same idempotency and
+    level-vs-sum rules the Postgres adapter does.
+
+    Named for the *metered* half deliberately: `FakeUsageRepository`
+    above answers standing resource counts (how many agents exist), and
+    two fakes with one name is how a test ends up asserting against the
+    wrong one.
+    """
+
+    def __init__(self) -> None:
+        self.events: list[UsageEvent] = []
+        self.rollups: dict[tuple[str, datetime, MeteredDimension], DimensionUsage] = {}
+        self.finalized: set[tuple[str, datetime]] = set()
+        self._keys: set[str] = set()
+        self._rollup_periods: dict[tuple[str, datetime], datetime] = {}
+
+    async def record(self, events: list[UsageEvent]) -> int:
+        written = 0
+        for event in events:
+            if event.idempotency_key in self._keys:
+                continue
+            self._keys.add(event.idempotency_key)
+            self.events.append(event)
+            written += 1
+        return written
+
+    async def usage_for_period(
+        self, *, workspace_id: str, period_start: datetime, period_end: datetime
+    ) -> PeriodUsage:
+        by_dimension: dict[MeteredDimension, list[UsageEvent]] = {}
+        for event in self.events:
+            if event.workspace_id != workspace_id:
+                continue
+            if not (period_start <= event.occurred_at < period_end):
+                continue
+            by_dimension.setdefault(event.dimension, []).append(event)
+        dimensions = {
+            dimension: DimensionUsage(
+                dimension=dimension,
+                quantity=combine(dimension, [e.quantity for e in rows]),
+                cost_micro_usd=sum(e.cost_micro_usd or 0 for e in rows),
+            )
+            for dimension, rows in by_dimension.items()
+        }
+        return PeriodUsage(
+            workspace_id=workspace_id,
+            period_start=period_start,
+            period_end=period_end,
+            dimensions=dimensions,
+        )
+
+    async def write_rollups(
+        self,
+        *,
+        workspace_id: str,
+        period_start: datetime,
+        period_end: datetime,
+        usage: PeriodUsage,
+        finalize: bool,
+    ) -> None:
+        for dimension, row in usage.dimensions.items():
+            self.rollups[(workspace_id, period_start, dimension)] = row
+        self._rollup_periods[(workspace_id, period_start)] = period_end
+        if finalize:
+            self.finalized.add((workspace_id, period_start))
+
+    async def finalized_rollups(
+        self, *, workspace_id: str, period_start: datetime
+    ) -> PeriodUsage | None:
+        if (workspace_id, period_start) not in self.finalized:
+            return None
+        dimensions = {
+            dimension: row
+            for (ws, start, dimension), row in self.rollups.items()
+            if ws == workspace_id and start == period_start
+        }
+        if not dimensions:
+            return None
+        return PeriodUsage(
+            workspace_id=workspace_id,
+            period_start=period_start,
+            period_end=self._rollup_periods[(workspace_id, period_start)],
+            dimensions=dimensions,
+        )
 
 
 class FakeWebhookEventRepository:

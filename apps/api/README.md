@@ -18,8 +18,8 @@ src/agentverse_api/
 │   └── interface/         # get_current_identity, get_current_workspace, require_role dependencies; routes; schemas
 ├── orchestration_service/                                # bounded context: agents, runs, teams, knowledge, integrations
 └── billing_service/                                      # bounded context (docs/adr/0012)
-    ├── domain/          # Plan/limits/capabilities + overage arithmetic; subscription state machine, proration, dunning clock; the payment-provider port
-    ├── application/      # PlanCatalogService, EntitlementService, SubscriptionService, BillingActionsService, WebhookService, ReconciliationService
+    ├── domain/          # plan limits + overage arithmetic; subscription state machine, proration, dunning; usage metering and invoice assembly; the payment-provider port
+    ├── application/      # PlanCatalog, Entitlement, Subscription, BillingActions, Webhook, Reconciliation, Usage, Quota, Invoicing services
     ├── infrastructure/    # billing models, repositories, read-time plan-config validation, stripe/ (the only module importing the Stripe SDK)
     └── interface/         # /api/v1/plans, .../billing/*, /api/v1/billing/webhooks/stripe
 ```
@@ -30,7 +30,7 @@ Dependencies point inward (`CLAUDE.md` §5). Each context is a self-contained ve
 
 ## Datastore
 
-Owns (via Alembic, `src/agentverse_api/infrastructure/migrations/`): `users`, `sessions`, `accounts`, `verifications` (Better Auth's schema, ADR-0005 — Alembic authors it, Better Auth only reads/writes through it), `workspaces`, `workspace_members`, `api_keys`, `audit_logs` (this platform's own domain), and the billing tables: `plans` (the subscription-plan catalog — seeded by migration, edited operationally rather than by deploy; `docs/adr/0012`), `billing_customers` (one payment-processor identity per workspace, kept for the workspace's whole life), `billing_subscriptions` (at most one live row per workspace, enforced by a partial unique index), `subscription_events` (append-only transition log; `idempotency_key` is unique, which is what makes a redelivered webhook a no-op rather than a second transition), and `billing_webhook_events` (the provider delivery log — its unique `(provider, provider_event_id)` index is what serializes two concurrent deliveries of the same event).
+Owns (via Alembic, `src/agentverse_api/infrastructure/migrations/`): `users`, `sessions`, `accounts`, `verifications` (Better Auth's schema, ADR-0005 — Alembic authors it, Better Auth only reads/writes through it), `workspaces`, `workspace_members`, `api_keys`, `audit_logs` (this platform's own domain), and the billing tables: `plans` (the subscription-plan catalog — seeded by migration, edited operationally rather than by deploy; `docs/adr/0012`), `billing_customers` (one payment-processor identity per workspace, kept for the workspace's whole life), `billing_subscriptions` (at most one live row per workspace, enforced by a partial unique index), `subscription_events` (append-only transition log; `idempotency_key` is unique, which is what makes a redelivered webhook a no-op rather than a second transition), `billing_webhook_events` (the provider delivery log — its unique `(provider, provider_event_id)` index is what serializes two concurrent deliveries of the same event), `billing_usage_events` (append-only metered usage, RANGE-partitioned monthly by `occurred_at` from its first migration, with a DEFAULT catch-all so an insert for an un-provisioned month is never *rejected*), and `billing_usage_rollups` (a period's finalized totals — invoicing reads these and never the event partitions, so an issued invoice cannot change because a late event arrived).
 
 ## Payment provider
 
