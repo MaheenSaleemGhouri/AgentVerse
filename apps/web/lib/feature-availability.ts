@@ -72,17 +72,6 @@ export const PENDING_INTEGRATIONS = {
     capability:
       "Aggregated run volume, success rate, latency percentiles, and per-model cost attribution over time.",
   },
-  billing: {
-    phase: 7,
-    phaseName: "Billing & Stripe Integration",
-    endpoints: [
-      "GET /api/v1/workspaces/{workspace_id}/billing/subscription",
-      "GET /api/v1/workspaces/{workspace_id}/billing/invoices",
-      "POST /api/v1/workspaces/{workspace_id}/billing/checkout-session",
-    ],
-    capability:
-      "View and change the workspace subscription, track usage against quota, and download invoices.",
-  },
   notifications: {
     phase: 11,
     phaseName: "Growth Loops & Multi-Provider Breadth",

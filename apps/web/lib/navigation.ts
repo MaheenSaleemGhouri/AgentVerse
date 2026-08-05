@@ -119,8 +119,7 @@ export const NAV_SECTIONS: readonly NavItem[] = [
     label: "Billing",
     segment: "billing",
     icon: CreditCard,
-    description: "Subscription, usage against quota, and invoices",
-    pending: true,
+    description: "Subscription, usage against quota, credit, and invoices",
   },
   {
     label: "Settings",

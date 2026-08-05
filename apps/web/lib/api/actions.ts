@@ -12,6 +12,35 @@
  */
 
 import {
+  type BillingInterval,
+  cancelSubscription as cancelSubscriptionApi,
+  changePlan as changePlanApi,
+  type CreditBalance,
+  createCheckoutSession as createCheckoutSessionApi,
+  createPortalSession as createPortalSessionApi,
+  type DraftInvoice,
+  type Entitlements,
+  getCredits as getCreditsApi,
+  getEntitlements as getEntitlementsApi,
+  getInvoicePreview as getInvoicePreviewApi,
+  getReferrals as getReferralsApi,
+  getSubscription as getSubscriptionApi,
+  getUsage as getUsageApi,
+  type Invoice,
+  listInvoices as listInvoicesApi,
+  listPaymentMethods as listPaymentMethodsApi,
+  type PaymentMethod,
+  type PeriodUsage,
+  type PlanChangeQuote,
+  type PlanTier,
+  quotePlanChange as quotePlanChangeApi,
+  redeemCoupon as redeemCouponApi,
+  type ReferralSummary,
+  resumeSubscription as resumeSubscriptionApi,
+  type Subscription,
+} from "@/lib/api/billing";
+import { ApiError } from "@/lib/api/client";
+import {
   type Agent,
   type AgentVersion,
   createAgent as createAgentApi,
@@ -807,4 +836,124 @@ export async function updateCustomRoleAction(
 
 export async function deleteCustomRoleAction(workspaceId: string, roleId: string): Promise<void> {
   return deleteCustomRoleApi(workspaceId, roleId);
+}
+
+// --- Billing (Phase 9) -------------------------------------------------
+// Client components read billing data through TanStack Query, which
+// cannot call the server-only `apiFetch` directly; these are the
+// supported bridge. The pricing page's catalog read is deliberately
+// absent — it is unauthenticated and server-rendered, so it calls
+// `listPublicPlans` from a Server Component with no action in between.
+
+export async function getSubscriptionAction(workspaceId: string): Promise<Subscription | null> {
+  try {
+    return await getSubscriptionApi(workspaceId);
+  } catch (error) {
+    // 404 is the documented answer for a workspace that has never
+    // subscribed — a Free workspace operating exactly as intended, not a
+    // failure. Mapped to `null` here so every caller does not repeat the
+    // status check.
+    if (error instanceof ApiError && error.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function getEntitlementsAction(workspaceId: string): Promise<Entitlements> {
+  return getEntitlementsApi(workspaceId);
+}
+
+export async function getUsageAction(workspaceId: string): Promise<PeriodUsage> {
+  return getUsageApi(workspaceId);
+}
+
+export async function getInvoicePreviewAction(workspaceId: string): Promise<DraftInvoice> {
+  return getInvoicePreviewApi(workspaceId);
+}
+
+export async function getCreditsAction(workspaceId: string): Promise<CreditBalance> {
+  return getCreditsApi(workspaceId);
+}
+
+export async function getReferralsAction(workspaceId: string): Promise<ReferralSummary> {
+  return getReferralsApi(workspaceId);
+}
+
+/**
+ * Invoices and payment methods live at the payment provider, so both
+ * return 503 in an environment with no provider configured — local
+ * development, CI, and preview environments legitimately run that way.
+ * Surfaced as `null` rather than thrown, so the panel can say "payments
+ * are not configured here" instead of rendering a generic error for a
+ * deliberate state.
+ */
+export async function listInvoicesAction(workspaceId: string): Promise<Invoice[] | null> {
+  try {
+    return await listInvoicesApi(workspaceId);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 503) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function listPaymentMethodsAction(
+  workspaceId: string
+): Promise<PaymentMethod[] | null> {
+  try {
+    return await listPaymentMethodsApi(workspaceId);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 503) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function createCheckoutSessionAction(
+  workspaceId: string,
+  body: { plan_slug: PlanTier; interval: BillingInterval; coupon_code?: string | null }
+): Promise<{ checkout_url: string; session_id: string }> {
+  return createCheckoutSessionApi(workspaceId, body);
+}
+
+export async function createPortalSessionAction(
+  workspaceId: string
+): Promise<{ portal_url: string }> {
+  return createPortalSessionApi(workspaceId);
+}
+
+export async function quotePlanChangeAction(
+  workspaceId: string,
+  body: { plan_slug: PlanTier; interval: BillingInterval }
+): Promise<PlanChangeQuote> {
+  return quotePlanChangeApi(workspaceId, body);
+}
+
+export async function changePlanAction(
+  workspaceId: string,
+  body: { plan_slug: PlanTier; interval: BillingInterval },
+  idempotencyKey: string
+): Promise<Subscription> {
+  return changePlanApi(workspaceId, body, idempotencyKey);
+}
+
+export async function cancelSubscriptionAction(
+  workspaceId: string,
+  body: { at_period_end: boolean; reason?: string | null }
+): Promise<Subscription> {
+  return cancelSubscriptionApi(workspaceId, body);
+}
+
+export async function resumeSubscriptionAction(workspaceId: string): Promise<Subscription> {
+  return resumeSubscriptionApi(workspaceId);
+}
+
+export async function redeemCouponAction(
+  workspaceId: string,
+  code: string
+): Promise<{ code: string; credited_cents: number; balance_cents: number }> {
+  return redeemCouponApi(workspaceId, code);
 }

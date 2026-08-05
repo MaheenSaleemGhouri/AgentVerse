@@ -78,3 +78,36 @@ export function initialsFrom(value: string): string {
   const second = parts.length > 1 ? (parts[1]?.[0] ?? "") : "";
   return (first + second).toUpperCase();
 }
+
+/**
+ * Customer-facing money is integer cents (Rule 15); only display
+ * converts. Separate from `formatMicroUsd` on purpose — that one is
+ * per-LLM-call platform cost at sub-cent precision, this one is a price
+ * or an invoice line, and showing a price to four decimal places would
+ * read as a bug.
+ */
+export function formatCents(cents: number, currency = "usd"): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(cents / 100);
+}
+
+/**
+ * A metered dimension's key as a human label: `agent_runs` ->
+ * "Agent runs". Derived rather than kept as a lookup table so a new
+ * backend dimension renders sensibly the day it ships instead of falling
+ * back to a raw key.
+ */
+export function humanizeDimension(dimension: string): string {
+  const spaced = dimension.replace(/_/g, " ");
+  const label = spaced.charAt(0).toUpperCase() + spaced.slice(1);
+  // `mb` and `mcp` read as words otherwise.
+  return label.replace(/\bmb\b/g, "MB").replace(/\bmcp\b/g, "MCP").replace(/\bapi\b/g, "API");
+}
+
+export function formatDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(date);
+}
