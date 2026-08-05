@@ -156,6 +156,18 @@ class SqlTeamRepository:
         members = await self._members_of([row.id for row in rows])
         return [_to_team(row, members.get(row.id, [])) for row in rows]
 
+    async def count_teams(self, *, workspace_id: str) -> int:
+        """Live teams, for plan-limit enforcement.
+
+        Built from `_live_teams` rather than a fresh predicate, so
+        "a team that exists" means exactly one thing across listing,
+        fetching and billing (Rule 5).
+        """
+        result = await self._session.execute(
+            select(func.count()).select_from(self._live_teams(workspace_id).subquery())
+        )
+        return int(result.scalar_one())
+
     async def get_team(self, *, workspace_id: str, team_id: str) -> Team | None:
         result = await self._session.execute(
             self._live_teams(workspace_id).where(TeamModel.id == team_id)

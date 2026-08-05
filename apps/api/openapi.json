@@ -507,6 +507,14 @@
         "title": "AuditLogResponse",
         "type": "object"
       },
+      "BillingInterval": {
+        "enum": [
+          "monthly",
+          "annual"
+        ],
+        "title": "BillingInterval",
+        "type": "string"
+      },
       "Body_upload_document_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__documents_post": {
         "properties": {
           "file": {
@@ -1104,6 +1112,112 @@
           "updated_at"
         ],
         "title": "CustomRoleResponse",
+        "type": "object"
+      },
+      "EntitlementLineResponse": {
+        "description": "One dimension's headroom.\n\n`limit`, `remaining` and `percent_used` are all `null` together when\nthe dimension is unlimited. The client must branch on `limit is null`\nand render \"Unlimited\" \u2014 a progress bar with a null maximum has\nnothing truthful to draw.",
+        "properties": {
+          "approaching_limit": {
+            "title": "Approaching Limit",
+            "type": "boolean"
+          },
+          "at_limit": {
+            "title": "At Limit",
+            "type": "boolean"
+          },
+          "dimension": {
+            "title": "Dimension",
+            "type": "string"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "percent_used": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent Used"
+          },
+          "remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining"
+          },
+          "used": {
+            "title": "Used",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dimension",
+          "limit",
+          "used",
+          "remaining",
+          "percent_used",
+          "at_limit",
+          "approaching_limit"
+        ],
+        "title": "EntitlementLineResponse",
+        "type": "object"
+      },
+      "EntitlementsResponse": {
+        "properties": {
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "metered": {
+            "items": {
+              "$ref": "#/components/schemas/EntitlementLineResponse"
+            },
+            "title": "Metered",
+            "type": "array"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/PlanResponse"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/EntitlementLineResponse"
+            },
+            "title": "Resources",
+            "type": "array"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "plan",
+          "resources",
+          "metered",
+          "capabilities"
+        ],
+        "title": "EntitlementsResponse",
         "type": "object"
       },
       "ExecuteTeamRequest": {
@@ -2698,6 +2812,30 @@
         "title": "OrganizationWorkspaceResponse",
         "type": "object"
       },
+      "OverageRateResponse": {
+        "description": "Published overage pricing for one metered dimension.\n\nBoth fields are needed to state the rate honestly: \"300 cents\" alone\nis meaningless without \"per 1,000 runs\".",
+        "properties": {
+          "billing_increment": {
+            "title": "Billing Increment",
+            "type": "integer"
+          },
+          "dimension": {
+            "title": "Dimension",
+            "type": "string"
+          },
+          "price_cents_per_increment": {
+            "title": "Price Cents Per Increment",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dimension",
+          "billing_increment",
+          "price_cents_per_increment"
+        ],
+        "title": "OverageRateResponse",
+        "type": "object"
+      },
       "PasswordPolicyResponse": {
         "properties": {
           "is_configured": {
@@ -2878,6 +3016,164 @@
         ],
         "title": "PermissionResponse",
         "type": "object"
+      },
+      "PlanListResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/PlanResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "intervals": {
+            "items": {
+              "$ref": "#/components/schemas/BillingInterval"
+            },
+            "title": "Intervals",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "PlanListResponse",
+        "type": "object"
+      },
+      "PlanResponse": {
+        "properties": {
+          "annual_price_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Price Cents"
+          },
+          "annual_saving_percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Saving Percent"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "metered_allowances": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Metered Allowances",
+            "type": "object"
+          },
+          "monthly_price_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Price Cents"
+          },
+          "overage_rates": {
+            "items": {
+              "$ref": "#/components/schemas/OverageRateResponse"
+            },
+            "title": "Overage Rates",
+            "type": "array"
+          },
+          "resource_limits": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Resource Limits",
+            "type": "object"
+          },
+          "slug": {
+            "$ref": "#/components/schemas/PlanTier"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          },
+          "trial_days": {
+            "title": "Trial Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "display_name",
+          "description",
+          "monthly_price_cents",
+          "annual_price_cents",
+          "annual_saving_percent",
+          "currency",
+          "trial_days",
+          "sort_order",
+          "resource_limits",
+          "metered_allowances",
+          "capabilities",
+          "overage_rates"
+        ],
+        "title": "PlanResponse",
+        "type": "object"
+      },
+      "PlanTier": {
+        "description": "The four tiers, fixed by CLAUDE.md \u00a71's domain vocabulary.\n\n`TEAM` is the collaboration tier \u2014 seats, shared workspaces, SSO,\naudit logs, priority support. Its customer-facing name is the\n`display_name` column on `plans`, configurable from the backend\nwithout a code change, so renaming it (to \"Business\", say) is one\nUPDATE and never a migration.",
+        "enum": [
+          "free",
+          "pro",
+          "team",
+          "enterprise"
+        ],
+        "title": "PlanTier",
+        "type": "string"
       },
       "ProviderTestRequest": {
         "properties": {
@@ -7042,6 +7338,69 @@
         ]
       }
     },
+    "/api/v1/plans": {
+      "get": {
+        "operationId": "list_plans_route_api_v1_plans_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Plans Route",
+        "tags": [
+          "billing-plans"
+        ]
+      }
+    },
+    "/api/v1/plans/{slug}": {
+      "get": {
+        "description": "A single tier by slug.\n\n`slug` is typed as `PlanTier`, so an unknown value is a 422 from\nFastAPI's own validation rather than reaching the database. A slug\nthat is valid but deactivated is a 404 \u2014 a real state, since a\nclient can hold a slug from a pricing page cached before the plan\nwas withdrawn.",
+        "operationId": "get_plan_route_api_v1_plans__slug__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PlanTier"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Plan Route",
+        "tags": [
+          "billing-plans"
+        ]
+      }
+    },
     "/api/v1/workspaces": {
       "get": {
         "operationId": "list_my_workspaces_api_v1_workspaces_get",
@@ -8174,6 +8533,53 @@
         "summary": "Export Audit Logs Route",
         "tags": [
           "audit-logs"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/billing/entitlements": {
+      "get": {
+        "operationId": "get_entitlements_route_api_v1_workspaces__workspace_id__billing_entitlements_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntitlementsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Entitlements Route",
+        "tags": [
+          "billing-entitlements"
         ]
       }
     },

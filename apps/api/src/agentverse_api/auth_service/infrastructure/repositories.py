@@ -354,6 +354,17 @@ class SqlWorkspaceRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
+    async def count_members(self, workspace_id: str) -> int:
+        """Seats in use, for plan-limit enforcement.
+
+        Counts every membership row regardless of role: a viewer still
+        occupies a seat, and billing a workspace for fewer seats than it
+        has members would under-charge exactly the customers who grow.
+        """
+        stmt = select(func.count()).where(WorkspaceMember.workspace_id == workspace_id)
+        result = await self._session.execute(stmt)
+        return int(result.scalar_one())
+
     async def list_members(self, workspace_id: str) -> list[WorkspaceMemberEntity]:
         stmt = select(WorkspaceMember).where(WorkspaceMember.workspace_id == workspace_id)
         result = await self._session.execute(stmt)

@@ -99,6 +99,21 @@ class SqlKnowledgeRepository:
         )
         return [_to_kb(row) for row in result.scalars().all()]
 
+    async def count_knowledge_bases(self, *, workspace_id: str) -> int:
+        """Live knowledge bases, for plan-limit enforcement.
+
+        Same soft-delete predicate as `list_knowledge_bases`, and it is
+        here rather than in the billing context so the two cannot drift
+        (Rule 5).
+        """
+        result = await self._session.execute(
+            select(func.count(KnowledgeBaseModel.id)).where(
+                KnowledgeBaseModel.workspace_id == workspace_id,
+                KnowledgeBaseModel.deleted_at.is_(None),
+            )
+        )
+        return int(result.scalar_one())
+
     async def get_knowledge_base(
         self, *, workspace_id: str, knowledge_base_id: str
     ) -> KnowledgeBase | None:

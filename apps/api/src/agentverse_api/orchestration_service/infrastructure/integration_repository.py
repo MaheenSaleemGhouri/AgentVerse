@@ -260,6 +260,17 @@ class SqlIntegrationRepository:
         )
         return [_to_installed(row) for row in result.scalars()]
 
+    async def count_installed(self, *, workspace_id: str) -> int:
+        """Live MCP installations, for plan-limit enforcement.
+
+        Built from `_live_installs` so billing counts exactly what the
+        integrations page lists (Rule 5).
+        """
+        result = await self._session.execute(
+            select(func.count()).select_from(self._live_installs(workspace_id).subquery())
+        )
+        return int(result.scalar_one())
+
     async def get_installed(
         self, *, workspace_id: str, installed_server_id: str
     ) -> InstalledServer | None:

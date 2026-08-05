@@ -415,6 +415,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Plans Route */
+        get: operations["list_plans_route_api_v1_plans_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plans/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Plan Route
+         * @description A single tier by slug.
+         *
+         *     `slug` is typed as `PlanTier`, so an unknown value is a 422 from
+         *     FastAPI's own validation rather than reaching the database. A slug
+         *     that is valid but deactivated is a 404 — a real state, since a
+         *     client can hold a slug from a pricing page cached before the plan
+         *     was withdrawn.
+         */
+        get: operations["get_plan_route_api_v1_plans__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces": {
         parameters: {
             query?: never;
@@ -685,6 +728,23 @@ export interface paths {
          *     attacker-influenced audit content as a document in this origin.
          */
         get: operations["export_audit_logs_route_api_v1_workspaces__workspace_id__audit_logs_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/billing/entitlements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Entitlements Route */
+        get: operations["get_entitlements_route_api_v1_workspaces__workspace_id__billing_entitlements_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1989,6 +2049,11 @@ export interface components {
             /** Workspace Id */
             workspace_id: string | null;
         };
+        /**
+         * BillingInterval
+         * @enum {string}
+         */
+        BillingInterval: "monthly" | "annual";
         /** Body_upload_document_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__documents_post */
         Body_upload_document_route_api_v1_workspaces__workspace_id__knowledge_bases__knowledge_base_id__documents_post: {
             /**
@@ -2192,6 +2257,43 @@ export interface components {
             permissions: string[];
             /** Updated At */
             updated_at: string | null;
+            /** Workspace Id */
+            workspace_id: string;
+        };
+        /**
+         * EntitlementLineResponse
+         * @description One dimension's headroom.
+         *
+         *     `limit`, `remaining` and `percent_used` are all `null` together when
+         *     the dimension is unlimited. The client must branch on `limit is null`
+         *     and render "Unlimited" — a progress bar with a null maximum has
+         *     nothing truthful to draw.
+         */
+        EntitlementLineResponse: {
+            /** Approaching Limit */
+            approaching_limit: boolean;
+            /** At Limit */
+            at_limit: boolean;
+            /** Dimension */
+            dimension: string;
+            /** Limit */
+            limit: number | null;
+            /** Percent Used */
+            percent_used: number | null;
+            /** Remaining */
+            remaining: number | null;
+            /** Used */
+            used: number;
+        };
+        /** EntitlementsResponse */
+        EntitlementsResponse: {
+            /** Capabilities */
+            capabilities: string[];
+            /** Metered */
+            metered: components["schemas"]["EntitlementLineResponse"][];
+            plan: components["schemas"]["PlanResponse"];
+            /** Resources */
+            resources: components["schemas"]["EntitlementLineResponse"][];
             /** Workspace Id */
             workspace_id: string;
         };
@@ -2814,6 +2916,21 @@ export interface components {
             /** Slug */
             slug: string;
         };
+        /**
+         * OverageRateResponse
+         * @description Published overage pricing for one metered dimension.
+         *
+         *     Both fields are needed to state the rate honestly: "300 cents" alone
+         *     is meaningless without "per 1,000 runs".
+         */
+        OverageRateResponse: {
+            /** Billing Increment */
+            billing_increment: number;
+            /** Dimension */
+            dimension: string;
+            /** Price Cents Per Increment */
+            price_cents_per_increment: number;
+        };
         /** PasswordPolicyResponse */
         PasswordPolicyResponse: {
             /** Is Configured */
@@ -2874,6 +2991,59 @@ export interface components {
             /** Timeout Seconds */
             timeout_seconds: number;
         };
+        /** PlanListResponse */
+        PlanListResponse: {
+            /** Data */
+            data: components["schemas"]["PlanResponse"][];
+            /** Intervals */
+            intervals?: components["schemas"]["BillingInterval"][];
+        };
+        /** PlanResponse */
+        PlanResponse: {
+            /** Annual Price Cents */
+            annual_price_cents: number | null;
+            /** Annual Saving Percent */
+            annual_saving_percent: number | null;
+            /** Capabilities */
+            capabilities: string[];
+            /** Currency */
+            currency: string;
+            /** Description */
+            description: string;
+            /** Display Name */
+            display_name: string;
+            /** Id */
+            id: string;
+            /** Metered Allowances */
+            metered_allowances: {
+                [key: string]: number | null;
+            };
+            /** Monthly Price Cents */
+            monthly_price_cents: number | null;
+            /** Overage Rates */
+            overage_rates: components["schemas"]["OverageRateResponse"][];
+            /** Resource Limits */
+            resource_limits: {
+                [key: string]: number | null;
+            };
+            slug: components["schemas"]["PlanTier"];
+            /** Sort Order */
+            sort_order: number;
+            /** Trial Days */
+            trial_days: number;
+        };
+        /**
+         * PlanTier
+         * @description The four tiers, fixed by CLAUDE.md §1's domain vocabulary.
+         *
+         *     `TEAM` is the collaboration tier — seats, shared workspaces, SSO,
+         *     audit logs, priority support. Its customer-facing name is the
+         *     `display_name` column on `plans`, configurable from the backend
+         *     without a code change, so renaming it (to "Business", say) is one
+         *     UPDATE and never a migration.
+         * @enum {string}
+         */
+        PlanTier: "free" | "pro" | "team" | "enterprise";
         /** ProviderTestRequest */
         ProviderTestRequest: {
             /** Model */
@@ -4759,6 +4929,57 @@ export interface operations {
             };
         };
     };
+    list_plans_route_api_v1_plans_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanListResponse"];
+                };
+            };
+        };
+    };
+    get_plan_route_api_v1_plans__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: components["schemas"]["PlanTier"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_my_workspaces_api_v1_workspaces_get: {
         parameters: {
             query?: never;
@@ -5361,6 +5582,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_entitlements_route_api_v1_workspaces__workspace_id__billing_entitlements_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntitlementsResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

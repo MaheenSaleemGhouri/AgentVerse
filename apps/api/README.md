@@ -11,18 +11,26 @@ AgentVerse's orchestration/control-plane API gateway — FastAPI, async Python, 
 ```
 src/agentverse_api/
 ├── domain/, application/, infrastructure/, interface/   # cross-cutting only (config, logging, health) — no business logic
-└── auth_service/                                         # bounded context (docs/adr/0004, docs/adr/0005)
-    ├── domain/          # Role, entities, exceptions, ports (Protocols) — zero framework imports
-    ├── application/      # use cases: WorkspaceService, ApiKeyService, AuditService, AuthEventService
-    ├── infrastructure/    # SQLAlchemy models (Alembic-owned schema), repositories, JWT/JWKS verifier
-    └── interface/         # get_current_identity, get_current_workspace, require_role dependencies; routes; schemas
+├── auth_service/                                         # bounded context (docs/adr/0004, docs/adr/0005)
+│   ├── domain/          # Role, entities, exceptions, ports (Protocols) — zero framework imports
+│   ├── application/      # use cases: WorkspaceService, ApiKeyService, AuditService, AuthEventService
+│   ├── infrastructure/    # SQLAlchemy models (Alembic-owned schema), repositories, JWT/JWKS verifier
+│   └── interface/         # get_current_identity, get_current_workspace, require_role dependencies; routes; schemas
+├── orchestration_service/                                # bounded context: agents, runs, teams, knowledge, integrations
+└── billing_service/                                      # bounded context (docs/adr/0012)
+    ├── domain/          # Plan, PlanTier, ResourceLimit, MeteredDimension, Capability, overage arithmetic
+    ├── application/      # PlanCatalogService, EntitlementService
+    ├── infrastructure/    # `plans` model, repositories, read-time plan-config validation
+    └── interface/         # /api/v1/plans, /api/v1/workspaces/{id}/billing/entitlements
 ```
 
-Dependencies point inward (`CLAUDE.md` §5). `auth_service` is a self-contained vertical slice — ready to become `apps/api/src/agentverse_api/orchestration_service` etc. in later phases, or to be extracted into its own deployable if `microservices-architect`'s "concrete pain" threshold is ever reached (`docs/adr/0004`).
+Dependencies point inward (`CLAUDE.md` §5). Each context is a self-contained vertical slice, ready to be extracted into its own deployable if `microservices-architect`'s "concrete pain" threshold is ever reached (`docs/adr/0004`).
+
+**Contexts never read each other's tables** (Rule 5). Where `billing_service` needs a count of agents, teams, knowledge bases, MCP installs, or members, it calls a `count_*` method on the *owning* context's repository rather than querying that table — so the owning context's soft-delete/live predicate stays the single definition of what counts (`docs/adr/0012`).
 
 ## Datastore
 
-Owns (via Alembic, `src/agentverse_api/infrastructure/migrations/`): `users`, `sessions`, `accounts`, `verifications` (Better Auth's schema, ADR-0005 — Alembic authors it, Better Auth only reads/writes through it), `workspaces`, `workspace_members`, `api_keys`, `audit_logs` (this platform's own domain).
+Owns (via Alembic, `src/agentverse_api/infrastructure/migrations/`): `users`, `sessions`, `accounts`, `verifications` (Better Auth's schema, ADR-0005 — Alembic authors it, Better Auth only reads/writes through it), `workspaces`, `workspace_members`, `api_keys`, `audit_logs` (this platform's own domain), and `plans` (the subscription-plan catalog — seeded by migration, edited operationally rather than by deploy; `docs/adr/0012`).
 
 ## Dependencies
 

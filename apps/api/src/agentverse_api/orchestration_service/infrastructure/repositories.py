@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentverse_api.orchestration_service.domain.agent_entities import (
@@ -217,6 +217,24 @@ class SqlAgentRepository:
         agent_row.deleted_at = datetime.now(UTC)
         agent_row.status = AgentStatus.ARCHIVED
         await self._session.flush()
+
+    async def count_for_workspace(self, workspace_id: str) -> int:
+        """Live agents in this workspace, for plan-limit enforcement.
+
+        Lives here rather than in the billing context on purpose: this
+        repository owns what "an agent that exists" means, including the
+        soft-delete predicate. If billing counted `agents` itself, a
+        later change to that predicate would leave the enforced quota
+        counting something different from what the product shows
+        (Rule 5).
+        """
+        result = await self._session.execute(
+            select(func.count(AgentModel.id)).where(
+                AgentModel.workspace_id == workspace_id,
+                AgentModel.deleted_at.is_(None),
+            )
+        )
+        return int(result.scalar_one())
 
 
 class SqlAgentRunRepository:
