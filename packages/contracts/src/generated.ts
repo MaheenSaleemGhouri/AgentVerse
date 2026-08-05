@@ -778,6 +778,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/billing/credits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Credits Route
+         * @description Balance plus the ledger behind it.
+         *
+         *     Returned together because a balance on its own is a number nobody can
+         *     explain, and "why is this $40 and not $50" is the first question
+         *     anyone asks about credit.
+         */
+        get: operations["get_credits_route_api_v1_workspaces__workspace_id__billing_credits_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/billing/credits/redeem": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redeem Coupon Route
+         * @description Redeem a coupon code for account credit.
+         *
+         *     A rejection returns the specific reason rather than a generic
+         *     "invalid code": "this has expired" and "you have already used this"
+         *     need different next steps from the customer, and collapsing them
+         *     makes both unactionable.
+         */
+        post: operations["redeem_coupon_route_api_v1_workspaces__workspace_id__billing_credits_redeem_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/billing/entitlements": {
         parameters: {
             query?: never;
@@ -886,6 +935,29 @@ export interface paths {
          *     scope it does not carry.
          */
         post: operations["create_portal_route_api_v1_workspaces__workspace_id__billing_portal_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/billing/referrals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Referrals Route
+         * @description This workspace's referral code and what it has produced.
+         *
+         *     The code is derived from the workspace id rather than stored, so it
+         *     is the same every time it is displayed and needs no table of its own.
+         */
+        get: operations["get_referrals_route_api_v1_workspaces__workspace_id__billing_referrals_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2628,6 +2700,39 @@ export interface components {
             /** Last Rotated At */
             last_rotated_at: string | null;
         };
+        /** CreditBalanceResponse */
+        CreditBalanceResponse: {
+            /** Balance Cents */
+            balance_cents: number;
+            /** Currency */
+            currency: string;
+            /** Transactions */
+            transactions: components["schemas"]["CreditTransactionResponse"][];
+            /** Workspace Id */
+            workspace_id: string;
+        };
+        /** CreditTransactionResponse */
+        CreditTransactionResponse: {
+            /** Amount Cents */
+            amount_cents: number;
+            /** Balance After Cents */
+            balance_after_cents: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /** Direction */
+            direction: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Id */
+            id: string;
+            /** Reason */
+            reason: string;
+        };
         /** CustomRoleResponse */
         CustomRoleResponse: {
             base_role: components["schemas"]["Role"];
@@ -3676,6 +3781,63 @@ export interface components {
             event_type: "auth.signup" | "auth.login" | "auth.session_revoked" | "auth.account_locked";
             /** User Id */
             user_id: string;
+        };
+        /** RedeemCouponRequest */
+        RedeemCouponRequest: {
+            /** Code */
+            code: string;
+        };
+        /** RedeemCouponResponse */
+        RedeemCouponResponse: {
+            /** Balance Cents */
+            balance_cents: number;
+            /** Code */
+            code: string;
+            /** Credited Cents */
+            credited_cents: number;
+        };
+        /** ReferralResponse */
+        ReferralResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Qualified At */
+            qualified_at: string | null;
+            /** Referred Workspace Id */
+            referred_workspace_id: string;
+            /** Referrer Reward Cents */
+            referrer_reward_cents: number;
+            /** Rewarded At */
+            rewarded_at: string | null;
+            /** Status */
+            status: string;
+        };
+        /**
+         * ReferralSummaryResponse
+         * @description The referral panel's whole payload.
+         *
+         *     `pending` is reported alongside `rewarded` deliberately: the ratio
+         *     between them is the loop efficiency `growth-engineer` judges the
+         *     programme by, and showing only successes would make a loop that never
+         *     converts look perfect.
+         */
+        ReferralSummaryResponse: {
+            /** Code */
+            code: string;
+            /** Pending */
+            pending: number;
+            /** Qualified */
+            qualified: number;
+            /** Referrals */
+            referrals: components["schemas"]["ReferralResponse"][];
+            /** Rewarded */
+            rewarded: number;
+            /** Total Earned Cents */
+            total_earned_cents: number;
         };
         /** RefundRequest */
         RefundRequest: {
@@ -6335,6 +6497,72 @@ export interface operations {
             };
         };
     };
+    get_credits_route_api_v1_workspaces__workspace_id__billing_credits_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditBalanceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    redeem_coupon_route_api_v1_workspaces__workspace_id__billing_credits_redeem_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RedeemCouponRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedeemCouponResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_entitlements_route_api_v1_workspaces__workspace_id__billing_entitlements_get: {
         parameters: {
             query?: never;
@@ -6479,6 +6707,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_referrals_route_api_v1_workspaces__workspace_id__billing_referrals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferralSummaryResponse"];
                 };
             };
             /** @description Validation Error */

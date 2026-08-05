@@ -471,3 +471,210 @@ class UsageRollupModel(Base):
     # progress.
     finalized_at: Mapped[datetime | None] = mapped_column(default=None)
     computed_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class CreditBalanceModel(Base):
+    """One row per workspace holding its spendable credit.
+
+    A projection of `billing_credit_transactions`, not an independent
+    fact. It exists because the balance is read on every invoice and
+    every credit page load, and re-summing the ledger each time would
+    scan a table that only grows. `CreditService.reconcile` re-derives it
+    and is expected to agree exactly.
+
+    Decrements take `SELECT ... FOR UPDATE` on this row —
+    `postgresql-expert`'s prescription for balance math, and the reason
+    two concurrent spends cannot both see the same balance and each
+    approve.
+    """
+
+    __tablename__ = "billing_credits"
+    __table_args__ = (
+        # A negative balance would mean the platform is owed money
+        # through a mechanism with no way to collect it. Enforced here as
+        # well as in the domain because this is the value real money is
+        # applied against.
+        CheckConstraint("balance_cents >= 0", name="ck_billing_credits_non_negative"),
+    )
+
+    workspace_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True
+    )
+    balance_cents: Mapped[int] = mapped_column(BigInteger, default=0)
+    currency: Mapped[str] = mapped_column(Text, default="usd")
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+
+class CreditTransactionModel(Base):
+    """Append-only ledger of every credit movement.
+
+    The truth the balance is derived from. Append-only in the same sense
+    as `audit_logs` (§8): the application never issues UPDATE or DELETE.
+    A balance without this is a number nobody can explain, and the first
+    question a customer asks about credit is always "why".
+    """
+
+    __tablename__ = "billing_credit_transactions"
+    __table_args__ = (
+        CheckConstraint("amount_cents > 0", name="ck_billing_credit_transactions_positive"),
+        CheckConstraint("balance_after_cents >= 0", name="ck_billing_credit_transactions_balance"),
+        # Makes a grant idempotent: a retried coupon redemption or a
+        # replayed referral payout carries the same key and the second
+        # write loses here rather than doubling someone's balance.
+        Index(
+            "uq_billing_credit_transactions_idempotency",
+            "idempotency_key",
+            unique=True,
+        ),
+        Index(
+            "ix_billing_credit_transactions_workspace_time",
+            "workspace_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    reason: Mapped[str] = mapped_column(Text)
+    # Always a positive magnitude; `reason` decides the direction. A
+    # signed amount would make "did this add or subtract" depend on
+    # reading the sign right at every call site.
+    amount_cents: Mapped[int] = mapped_column(BigInteger)
+    balance_after_cents: Mapped[int] = mapped_column(BigInteger)
+    description: Mapped[str] = mapped_column(Text, default="")
+    source_ref: Mapped[str | None] = mapped_column(Text, default=None)
+    expires_at: Mapped[datetime | None] = mapped_column(default=None)
+    idempotency_key: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class CouponModel(Base):
+    """A code that grants account credit.
+
+    Distinct from the payment provider's promotion codes, which discount
+    a subscription's price at checkout. These put money on the account,
+    which survives plan changes and cancellation. Two mechanisms, no
+    overlap — see `domain/coupon.py`.
+    """
+
+    __tablename__ = "billing_coupons"
+    __table_args__ = (
+        CheckConstraint("kind IN ('fixed_cents', 'percent_off')", name="ck_billing_coupons_kind"),
+        CheckConstraint("value > 0", name="ck_billing_coupons_value_positive"),
+        # A percentage above 100 would grant more credit than the plan
+        # costs — free money with a typo as its only cause.
+        CheckConstraint(
+            "kind <> 'percent_off' OR value <= 100", name="ck_billing_coupons_percent_range"
+        ),
+        CheckConstraint(
+            "max_redemptions IS NULL OR max_redemptions > 0",
+            name="ck_billing_coupons_max_redemptions",
+        ),
+        CheckConstraint(
+            "valid_until IS NULL OR valid_from IS NULL OR valid_until > valid_from",
+            name="ck_billing_coupons_validity_ordered",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    # Stored normalized (trimmed, uppercase) so the unique index is the
+    # case-insensitive uniqueness rule rather than something the
+    # application has to remember to apply on every lookup.
+    code: Mapped[str] = mapped_column(Text, unique=True, index=True)
+    kind: Mapped[str] = mapped_column(Text)
+    value: Mapped[int] = mapped_column(BigInteger)
+    description: Mapped[str] = mapped_column(Text, default="")
+    is_active: Mapped[bool] = mapped_column(default=True)
+    valid_from: Mapped[datetime | None] = mapped_column(default=None)
+    valid_until: Mapped[datetime | None] = mapped_column(default=None)
+    max_redemptions: Mapped[int | None] = mapped_column(default=None)
+    redemption_count: Mapped[int] = mapped_column(default=0)
+    eligible_plan_slugs: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    credit_expires_after_days: Mapped[int | None] = mapped_column(default=None)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class CouponRedemptionModel(Base):
+    """Who redeemed what, once.
+
+    The unique index on `(coupon_id, workspace_id)` is the whole point:
+    without it a workspace can redeem the same code repeatedly, and a
+    fixed-cents coupon becomes an unlimited credit tap.
+    """
+
+    __tablename__ = "billing_coupon_redemptions"
+    __table_args__ = (
+        Index(
+            "uq_billing_coupon_redemptions_once",
+            "coupon_id",
+            "workspace_id",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    coupon_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("billing_coupons.id", ondelete="CASCADE"), index=True
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    credited_cents: Mapped[int] = mapped_column(BigInteger)
+    redeemed_by_user_id: Mapped[str | None] = mapped_column(Text, default=None)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class ReferralModel(Base):
+    """Who referred whom, and how far the referral has got.
+
+    Attribution is written server-side when the referred workspace is
+    created — never reconstructed from a client cookie, which is lost on
+    a device switch and forged in a console, and either failure lands
+    directly in someone's balance.
+    """
+
+    __tablename__ = "billing_referrals"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'qualified', 'rewarded', 'voided')",
+            name="ck_billing_referrals_status",
+        ),
+        # The obvious abuse, made structurally impossible.
+        CheckConstraint(
+            "referrer_workspace_id <> referred_workspace_id",
+            name="ck_billing_referrals_not_self",
+        ),
+        # A workspace can be referred exactly once. Without this a code
+        # could be re-applied to the same workspace to farm rewards.
+        Index("uq_billing_referrals_referred_once", "referred_workspace_id", unique=True),
+        Index("ix_billing_referrals_referrer_status", "referrer_workspace_id", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    referrer_workspace_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    referred_workspace_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    code: Mapped[str] = mapped_column(Text, index=True)
+    status: Mapped[str] = mapped_column(Text, default="pending", index=True)
+    # Stored on the row rather than read from a constant at payout time,
+    # so a campaign that changes the amounts does not retroactively
+    # change what an existing referral was promised.
+    referrer_reward_cents: Mapped[int] = mapped_column(BigInteger, default=0)
+    referred_reward_cents: Mapped[int] = mapped_column(BigInteger, default=0)
+    qualified_at: Mapped[datetime | None] = mapped_column(default=None)
+    rewarded_at: Mapped[datetime | None] = mapped_column(default=None)
+    voided_reason: Mapped[str | None] = mapped_column(Text, default=None)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())

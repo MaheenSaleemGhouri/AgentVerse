@@ -1106,6 +1106,94 @@
         "title": "CredentialResponse",
         "type": "object"
       },
+      "CreditBalanceResponse": {
+        "properties": {
+          "balance_cents": {
+            "title": "Balance Cents",
+            "type": "integer"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "transactions": {
+            "items": {
+              "$ref": "#/components/schemas/CreditTransactionResponse"
+            },
+            "title": "Transactions",
+            "type": "array"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "balance_cents",
+          "currency",
+          "transactions"
+        ],
+        "title": "CreditBalanceResponse",
+        "type": "object"
+      },
+      "CreditTransactionResponse": {
+        "properties": {
+          "amount_cents": {
+            "title": "Amount Cents",
+            "type": "integer"
+          },
+          "balance_after_cents": {
+            "title": "Balance After Cents",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "direction": {
+            "title": "Direction",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reason",
+          "amount_cents",
+          "direction",
+          "balance_after_cents",
+          "description",
+          "expires_at",
+          "created_at"
+        ],
+        "title": "CreditTransactionResponse",
+        "type": "object"
+      },
       "CustomRoleResponse": {
         "properties": {
           "base_role": {
@@ -3815,6 +3903,146 @@
           "user_id"
         ],
         "title": "RecordAuthEventRequest",
+        "type": "object"
+      },
+      "RedeemCouponRequest": {
+        "properties": {
+          "code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "RedeemCouponRequest",
+        "type": "object"
+      },
+      "RedeemCouponResponse": {
+        "properties": {
+          "balance_cents": {
+            "title": "Balance Cents",
+            "type": "integer"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "credited_cents": {
+            "title": "Credited Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "credited_cents",
+          "balance_cents"
+        ],
+        "title": "RedeemCouponResponse",
+        "type": "object"
+      },
+      "ReferralResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "qualified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualified At"
+          },
+          "referred_workspace_id": {
+            "title": "Referred Workspace Id",
+            "type": "string"
+          },
+          "referrer_reward_cents": {
+            "title": "Referrer Reward Cents",
+            "type": "integer"
+          },
+          "rewarded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rewarded At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "referred_workspace_id",
+          "status",
+          "referrer_reward_cents",
+          "qualified_at",
+          "rewarded_at",
+          "created_at"
+        ],
+        "title": "ReferralResponse",
+        "type": "object"
+      },
+      "ReferralSummaryResponse": {
+        "description": "The referral panel's whole payload.\n\n`pending` is reported alongside `rewarded` deliberately: the ratio\nbetween them is the loop efficiency `growth-engineer` judges the\nprogramme by, and showing only successes would make a loop that never\nconverts look perfect.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "qualified": {
+            "title": "Qualified",
+            "type": "integer"
+          },
+          "referrals": {
+            "items": {
+              "$ref": "#/components/schemas/ReferralResponse"
+            },
+            "title": "Referrals",
+            "type": "array"
+          },
+          "rewarded": {
+            "title": "Rewarded",
+            "type": "integer"
+          },
+          "total_earned_cents": {
+            "title": "Total Earned Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "pending",
+          "qualified",
+          "rewarded",
+          "total_earned_cents",
+          "referrals"
+        ],
+        "title": "ReferralSummaryResponse",
         "type": "object"
       },
       "RefundRequest": {
@@ -9393,6 +9621,112 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspace_id}/billing/credits": {
+      "get": {
+        "description": "Balance plus the ledger behind it.\n\nReturned together because a balance on its own is a number nobody can\nexplain, and \"why is this $40 and not $50\" is the first question\nanyone asks about credit.",
+        "operationId": "get_credits_route_api_v1_workspaces__workspace_id__billing_credits_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditBalanceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Credits Route",
+        "tags": [
+          "billing-credits"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/billing/credits/redeem": {
+      "post": {
+        "description": "Redeem a coupon code for account credit.\n\nA rejection returns the specific reason rather than a generic\n\"invalid code\": \"this has expired\" and \"you have already used this\"\nneed different next steps from the customer, and collapsing them\nmakes both unactionable.",
+        "operationId": "redeem_coupon_route_api_v1_workspaces__workspace_id__billing_credits_redeem_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemCouponRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedeemCouponResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Redeem Coupon Route",
+        "tags": [
+          "billing-credits"
+        ]
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/billing/entitlements": {
       "get": {
         "operationId": "get_entitlements_route_api_v1_workspaces__workspace_id__billing_entitlements_get",
@@ -9639,6 +9973,54 @@
         "summary": "Create Portal Route",
         "tags": [
           "billing-actions"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/billing/referrals": {
+      "get": {
+        "description": "This workspace's referral code and what it has produced.\n\nThe code is derived from the workspace id rather than stored, so it\nis the same every time it is displayed and needs no table of its own.",
+        "operationId": "get_referrals_route_api_v1_workspaces__workspace_id__billing_referrals_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferralSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Referrals Route",
+        "tags": [
+          "billing-credits"
         ]
       }
     },

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agentverse_api.billing_service.application.billing_actions_service import (
     BillingActionsService,
 )
+from agentverse_api.billing_service.application.credit_service import CreditService
 from agentverse_api.billing_service.application.entitlement_service import EntitlementService
 from agentverse_api.billing_service.application.invoicing_service import InvoicingService
 from agentverse_api.billing_service.application.plan_catalog_service import PlanCatalogService
@@ -23,6 +24,11 @@ from agentverse_api.billing_service.application.webhook_service import WebhookSe
 from agentverse_api.billing_service.domain.payment_provider import (
     PaymentProviderPort,
     ProviderNotConfiguredError,
+)
+from agentverse_api.billing_service.infrastructure.credit_repositories import (
+    SqlCouponRepository,
+    SqlCreditRepository,
+    SqlReferralRepository,
 )
 from agentverse_api.billing_service.infrastructure.repositories import (
     SqlCustomerRepository,
@@ -80,6 +86,16 @@ def get_quota_service(session: AsyncSession = Depends(get_db_session)) -> QuotaS
             subscriptions=SqlSubscriptionRepository(session),
         ),
         usage=_usage_service(session),
+    )
+
+
+def get_credit_service(session: AsyncSession = Depends(get_db_session)) -> CreditService:
+    return CreditService(
+        credits=SqlCreditRepository(session),
+        coupons=SqlCouponRepository(session),
+        referrals=SqlReferralRepository(session),
+        subscriptions=_subscription_service(session),
+        catalog=PlanCatalogService(plans=SqlPlanRepository(session)),
     )
 
 
@@ -170,4 +186,6 @@ def get_webhook_service(
             catalog=PlanCatalogService(plans=SqlPlanRepository(session)),
         ),
         catalog=PlanCatalogService(plans=SqlPlanRepository(session)),
+        # A successful payment is what qualifies a referral.
+        credits=get_credit_service(session),
     )

@@ -10,9 +10,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Protocol
 
+from agentverse_api.billing_service.domain.coupon import Coupon
+from agentverse_api.billing_service.domain.credit import CreditReason, CreditTransaction
 from agentverse_api.billing_service.domain.customer import BillingCustomer, PaymentProvider
 from agentverse_api.billing_service.domain.entitlements import ResourceUsage
 from agentverse_api.billing_service.domain.plan import BillingInterval, Plan, PlanTier
+from agentverse_api.billing_service.domain.referral import Referral, ReferralStatus
 from agentverse_api.billing_service.domain.subscription import (
     Subscription,
     SubscriptionStatus,
@@ -196,6 +199,99 @@ class UsageRepository(Protocol):
         rather than billing a period still in progress.
         """
         ...
+
+
+class CreditRepository(Protocol):
+    """Credit balances and their ledger.
+
+    `move` writes the balance and the ledger row together in one call,
+    for the same reason `record_transition` does for subscriptions: they
+    are one fact, and exposing them separately would make the unlogged
+    balance change the easier of the two to write.
+    """
+
+    async def balance(self, workspace_id: str) -> int:
+        """Zero for a workspace that has never held credit — the true
+        balance, not a missing value.
+        """
+        ...
+
+    async def move(
+        self,
+        *,
+        workspace_id: str,
+        reason: CreditReason,
+        amount_cents: int,
+        description: str,
+        source_ref: str | None,
+        expires_at: datetime | None,
+        idempotency_key: str,
+    ) -> int:
+        """Apply one movement and return the new balance.
+
+        Takes `SELECT ... FOR UPDATE` on the balance row: without it two
+        concurrent spends each read the same balance and both approve,
+        which is how a workspace spends credit it does not have.
+
+        Idempotent by `idempotency_key` — a replayed grant returns the
+        current balance rather than adding a second one.
+        """
+        ...
+
+    async def history(self, *, workspace_id: str, limit: int) -> list[CreditTransaction]: ...
+
+    async def ledger_sum(self, workspace_id: str) -> int:
+        """The balance re-derived from the ledger. Used by reconciliation
+        to prove the projection has not drifted.
+        """
+        ...
+
+
+class CouponRepository(Protocol):
+    async def get_by_code(self, code: str) -> Coupon | None: ...
+
+    async def has_redeemed(self, *, coupon_id: str, workspace_id: str) -> bool: ...
+
+    async def record_redemption(
+        self,
+        *,
+        coupon_id: str,
+        workspace_id: str,
+        credited_cents: int,
+        redeemed_by_user_id: str | None,
+    ) -> None:
+        """Write the redemption and bump the coupon's counter together.
+
+        The unique `(coupon_id, workspace_id)` index is what makes a
+        second attempt fail here rather than granting credit twice.
+        """
+        ...
+
+
+class ReferralRepository(Protocol):
+    async def create(
+        self,
+        *,
+        referrer_workspace_id: str,
+        referred_workspace_id: str,
+        code: str,
+    ) -> Referral: ...
+
+    async def get_for_referred(self, referred_workspace_id: str) -> Referral | None: ...
+
+    async def list_for_referrer(
+        self, *, referrer_workspace_id: str, limit: int
+    ) -> list[Referral]: ...
+
+    async def transition(
+        self,
+        *,
+        referral_id: str,
+        status: ReferralStatus,
+        referrer_reward_cents: int | None = None,
+        referred_reward_cents: int | None = None,
+        voided_reason: str | None = None,
+    ) -> Referral: ...
 
 
 class WebhookEventRepository(Protocol):

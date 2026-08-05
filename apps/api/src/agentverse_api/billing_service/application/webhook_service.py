@@ -32,6 +32,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Protocol
 
 from agentverse_api.billing_service.application.plan_catalog_service import PlanCatalogService
 from agentverse_api.billing_service.application.subscription_service import (
@@ -51,6 +52,18 @@ from agentverse_api.billing_service.domain.subscription import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class ReferralQualifier(Protocol):
+    """The one method webhook processing needs from `CreditService`.
+
+    A Protocol rather than the concrete service so this module does not
+    depend on the whole credit surface — and so it cannot start granting
+    credit directly, which is not its business.
+    """
+
+    async def qualify_and_pay(self, referred_workspace_id: str) -> object: ...
+
 
 #: Actor recorded on transitions the provider caused. Distinguishable
 #: from `system:billing` (a scheduled job) and from a user id, so the
@@ -78,6 +91,11 @@ class WebhookService:
     events: WebhookEventRepository
     subscriptions: SubscriptionService
     catalog: PlanCatalogService
+    #: Optional so webhook processing still works in a deployment where
+    #: the referral programme is not wired. A missing referral payout is
+    #: recoverable by re-running the payout job; a webhook that fails
+    #: because of one is not.
+    credits: ReferralQualifier | None = None
     provider_name: str = PaymentProvider.STRIPE.value
 
     async def handle(self, event: ProviderEvent) -> WebhookOutcome:
@@ -220,6 +238,25 @@ class WebhookService:
                 extra={"provider_event_id": event.event_id, "event_type": event.type.value},
             )
             return False
+        # A successful payment is what qualifies a referral. Deliberately
+        # here rather than on signup: a referral that pays out on account
+        # creation is a bounty on creating accounts, and it would be
+        # collected. Requiring a real charge costs a real card to fake.
+        #
+        # Idempotent by state and by grant key, so a renewal payment does
+        # not qualify an already-rewarded referral a second time.
+        if self.credits is not None:
+            try:
+                await self.credits.qualify_and_pay(event.workspace_id)
+            except Exception:
+                # The payment itself landed and the subscription
+                # transitioned. Failing the webhook now would make the
+                # provider retry a transition that already succeeded, to
+                # fix a referral payout the payout job can re-run.
+                logger.exception(
+                    "billing_referral_payout_failed",
+                    extra={"workspace_id": event.workspace_id},
+                )
         return True
 
     async def _on_payment_failed(self, event: ProviderEvent) -> bool:
