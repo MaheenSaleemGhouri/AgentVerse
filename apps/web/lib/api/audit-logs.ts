@@ -28,26 +28,11 @@ export async function getAuditActivity(
 }
 
 /**
- * The download URL for an export — a route on *this* app, not on
- * apps/api.
- *
- * apps/api is internal-only and bearer-authenticated server-side
- * (CLAUDE.md §5: the frontend never talks to internal services
- * directly, and the browser has no token to present). The route handler
- * at this path authenticates, calls apps/api, and streams the result
- * back with its `Content-Disposition` intact, so the file still lands
- * on disk as a download rather than being buffered into a JS blob.
+ * The export download URL lives in `@/lib/download-paths` — it is a
+ * path on *this* app, and the button that renders it is a client
+ * component, which cannot import a value from this module without
+ * dragging `server-only` into the browser bundle.
  */
-export function auditExportPath(
-  workspaceId: string,
-  format: "csv" | "json",
-  filters: Pick<AuditLogFilters, "action" | "actor_user_id"> = {}
-): string {
-  const params = new URLSearchParams({ format });
-  if (filters.action) params.set("action", filters.action);
-  if (filters.actor_user_id) params.set("actor_user_id", filters.actor_user_id);
-  return `/downloads/audit-logs/${workspaceId}?${params.toString()}`;
-}
 
 export async function listAuditLogs(
   workspaceId: string,

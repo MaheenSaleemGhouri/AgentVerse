@@ -3,7 +3,7 @@
 import { Download } from "lucide-react";
 import * as React from "react";
 
-import { auditExportPath } from "@/lib/api/audit-logs";
+import { auditExportPath } from "@/lib/download-paths";
 
 import { Button } from "@/components/ui/button";
 import {
