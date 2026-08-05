@@ -107,6 +107,14 @@ jobs:
       # never exercising a real JWKS fetch; see tests/auth_service/integration/test_rbac_routes.py).
       AGENTVERSE_API_AUTH_INTERNAL_URL: http://localhost:3000
       AGENTVERSE_API_AUTH_PUBLIC_URL: http://localhost:3000
+      # The OAuth callback origin. Required with no default since the MCP
+      # OAuth2 work, but never added here — `agentverse_api.main` builds
+      # `Settings()` at import time, so `tests/conftest.py` could not even
+      # be collected without it and this job has been failing at the
+      # pytest step, not merely skipping tests. Added with the same
+      # runner-local placeholder as the two URLs above: nothing in the
+      # suite performs a redirect against it.
+      AGENTVERSE_API_API_PUBLIC_URL: http://localhost:8000
       AGENTVERSE_API_INTERNAL_API_SECRET: ci-only-secret-not-for-production
       # Never a real key: unit tests inject a fake ProviderAdapter/embedder
       # and never construct a real AsyncOpenAI client, so this only needs
