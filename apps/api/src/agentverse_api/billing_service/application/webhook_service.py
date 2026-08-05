@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from typing import Protocol
 
@@ -39,6 +40,7 @@ from agentverse_api.billing_service.application.subscription_service import (
     SubscriptionService,
 )
 from agentverse_api.billing_service.domain.customer import PaymentProvider
+from agentverse_api.billing_service.domain.dunning import deadline as dunning_deadline
 from agentverse_api.billing_service.domain.exceptions import SubscriptionNotFoundError
 from agentverse_api.billing_service.domain.payment_provider import (
     ProviderEvent,
@@ -48,6 +50,7 @@ from agentverse_api.billing_service.domain.plan import BillingInterval, PlanTier
 from agentverse_api.billing_service.domain.ports import WebhookEventRepository
 from agentverse_api.billing_service.domain.subscription import (
     InvalidTransitionError,
+    Subscription,
     SubscriptionStatus,
 )
 
@@ -63,6 +66,35 @@ class ReferralQualifier(Protocol):
     """
 
     async def qualify_and_pay(self, referred_workspace_id: str) -> object: ...
+
+
+class LifecycleNotifier(Protocol):
+    """The notification calls a payment event produces.
+
+    Again a Protocol, not the concrete `BillingNotifier`: this module
+    should be able to raise the two notifications a payment causes and
+    nothing else.
+    """
+
+    async def payment_failed(
+        self,
+        *,
+        workspace_id: str,
+        subscription_id: str,
+        amount_cents: int,
+        deadline: datetime,
+        recipient: str | None,
+        first_failure_at: datetime,
+    ) -> object: ...
+
+    async def payment_succeeded(
+        self,
+        *,
+        workspace_id: str,
+        amount_cents: int,
+        plan_name: str,
+        provider_event_id: str,
+    ) -> object: ...
 
 
 #: Actor recorded on transitions the provider caused. Distinguishable
@@ -96,6 +128,11 @@ class WebhookService:
     #: recoverable by re-running the payout job; a webhook that fails
     #: because of one is not.
     credits: ReferralQualifier | None = None
+    #: Optional for the same reason as `credits`: a notification that
+    #: could not be raised must not fail a payment webhook, and a
+    #: deployment without notifications wired should still process
+    #: payments.
+    notifier: LifecycleNotifier | None = None
     provider_name: str = PaymentProvider.STRIPE.value
 
     async def handle(self, event: ProviderEvent) -> WebhookOutcome:
@@ -262,7 +299,7 @@ class WebhookService:
     async def _on_payment_failed(self, event: ProviderEvent) -> bool:
         assert event.workspace_id is not None  # noqa: S101 - checked in _dispatch
         try:
-            await self.subscriptions.payment_failed(
+            updated = await self.subscriptions.payment_failed(
                 workspace_id=event.workspace_id,
                 idempotency_key=f"{self.provider_name}:{event.event_id}",
                 actor=PROVIDER_ACTOR,
@@ -270,7 +307,47 @@ class WebhookService:
             )
         except (SubscriptionNotFoundError, InvalidTransitionError):
             return False
+        # The first dunning touchpoint. Told immediately rather than at
+        # the next sweep, because the sooner a customer sees an expired
+        # card the more of the retry window they have to fix it.
+        await self._notify_payment_failed(event=event, subscription=updated)
         return True
+
+    async def _notify_payment_failed(
+        self, *, event: ProviderEvent, subscription: Subscription
+    ) -> None:
+        """Never raises. The payment event has already been processed
+        correctly; failing now would make the provider retry a
+        transition that already succeeded.
+        """
+        if self.notifier is None or subscription.past_due_since is None:
+            return
+        amount = event.data.get("amount_paid_cents")
+        try:
+            await self.notifier.payment_failed(
+                workspace_id=subscription.workspace_id,
+                subscription_id=subscription.id,
+                amount_cents=int(amount) if isinstance(amount, int) else 0,
+                deadline=dunning_deadline(subscription.past_due_since),
+                recipient=await self._billing_email(subscription.workspace_id),
+                first_failure_at=subscription.past_due_since,
+            )
+        except Exception:
+            logger.exception(
+                "billing_notification_failed",
+                extra={"provider_event_id": event.event_id},
+            )
+
+    async def _billing_email(self, workspace_id: str) -> str | None:
+        """Where billing mail goes, or `None`.
+
+        `None` records the in-app notification and skips the email rather
+        than guessing an address — mailing a fallback would send billing
+        correspondence to whoever happened to sign up rather than to
+        whoever handles billing.
+        """
+        customer = await self.subscriptions.customers.get_for_workspace(workspace_id)
+        return customer.billing_email if customer else None
 
     async def _on_subscription_updated(self, event: ProviderEvent) -> bool:
         """Mirror a provider-side change made outside this product.

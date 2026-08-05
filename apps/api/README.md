@@ -17,11 +17,16 @@ src/agentverse_api/
 │   ├── infrastructure/    # SQLAlchemy models (Alembic-owned schema), repositories, JWT/JWKS verifier
 │   └── interface/         # get_current_identity, get_current_workspace, require_role dependencies; routes; schemas
 ├── orchestration_service/                                # bounded context: agents, runs, teams, knowledge, integrations
-└── billing_service/                                      # bounded context (docs/adr/0012)
-    ├── domain/          # plan limits + overage arithmetic; subscription state machine, proration, dunning; usage metering and invoice assembly; the payment-provider port
-    ├── application/      # PlanCatalog, Entitlement, Subscription, BillingActions, Webhook, Reconciliation, Usage, Quota, Invoicing services
-    ├── infrastructure/    # billing models, repositories, read-time plan-config validation, stripe/ (the only module importing the Stripe SDK)
-    └── interface/         # /api/v1/plans, .../billing/*, /api/v1/billing/webhooks/stripe
+├── billing_service/                                      # bounded context (docs/adr/0012)
+│   ├── domain/          # plan limits + overage arithmetic; subscription state machine, proration, dunning; usage metering and invoice assembly; the payment-provider port
+│   ├── application/      # PlanCatalog, Entitlement, Subscription, BillingActions, Webhook, Reconciliation, Usage, Quota, Invoicing services
+│   ├── infrastructure/    # billing models, repositories, read-time plan-config validation, stripe/ (the only module importing the Stripe SDK)
+│   └── interface/         # /api/v1/plans, .../billing/*, /api/v1/billing/webhooks/stripe
+└── notification_service/                                 # bounded context: in-app notifications and transactional email
+    ├── domain/          # notification kinds, severity, channel routing, message templates (pure)
+    ├── application/      # NotificationService, BillingNotifier
+    ├── infrastructure/    # notifications + delivery models, repositories, email/ adapter
+    └── interface/         # .../notifications
 ```
 
 Dependencies point inward (`CLAUDE.md` §5). Each context is a self-contained vertical slice, ready to be extracted into its own deployable if `microservices-architect`'s "concrete pain" threshold is ever reached (`docs/adr/0004`).
@@ -30,7 +35,13 @@ Dependencies point inward (`CLAUDE.md` §5). Each context is a self-contained ve
 
 ## Datastore
 
-Owns (via Alembic, `src/agentverse_api/infrastructure/migrations/`): `users`, `sessions`, `accounts`, `verifications` (Better Auth's schema, ADR-0005 — Alembic authors it, Better Auth only reads/writes through it), `workspaces`, `workspace_members`, `api_keys`, `audit_logs` (this platform's own domain), and the billing tables: `plans` (the subscription-plan catalog — seeded by migration, edited operationally rather than by deploy; `docs/adr/0012`), `billing_customers` (one payment-processor identity per workspace, kept for the workspace's whole life), `billing_subscriptions` (at most one live row per workspace, enforced by a partial unique index), `subscription_events` (append-only transition log; `idempotency_key` is unique, which is what makes a redelivered webhook a no-op rather than a second transition), `billing_webhook_events` (the provider delivery log — its unique `(provider, provider_event_id)` index is what serializes two concurrent deliveries of the same event), `billing_usage_events` (append-only metered usage, RANGE-partitioned monthly by `occurred_at` from its first migration, with a DEFAULT catch-all so an insert for an un-provisioned month is never *rejected*), `billing_usage_rollups` (a period's finalized totals — invoicing reads these and never the event partitions, so an issued invoice cannot change because a late event arrived), and the credit/growth tables: `billing_credits` + `billing_credit_transactions` (a balance projection over an append-only ledger; decrements take `SELECT ... FOR UPDATE`), `billing_coupons` + `billing_coupon_redemptions`, and `billing_referrals`.
+Owns (via Alembic, `src/agentverse_api/infrastructure/migrations/`): `users`, `sessions`, `accounts`, `verifications` (Better Auth's schema, ADR-0005 — Alembic authors it, Better Auth only reads/writes through it), `workspaces`, `workspace_members`, `api_keys`, `audit_logs` (this platform's own domain), and the billing tables: `plans` (the subscription-plan catalog — seeded by migration, edited operationally rather than by deploy; `docs/adr/0012`), `billing_customers` (one payment-processor identity per workspace, kept for the workspace's whole life), `billing_subscriptions` (at most one live row per workspace, enforced by a partial unique index), `subscription_events` (append-only transition log; `idempotency_key` is unique, which is what makes a redelivered webhook a no-op rather than a second transition), `billing_webhook_events` (the provider delivery log — its unique `(provider, provider_event_id)` index is what serializes two concurrent deliveries of the same event), `billing_usage_events` (append-only metered usage, RANGE-partitioned monthly by `occurred_at` from its first migration, with a DEFAULT catch-all so an insert for an un-provisioned month is never *rejected*), `billing_usage_rollups` (a period's finalized totals — invoicing reads these and never the event partitions, so an issued invoice cannot change because a late event arrived), and the credit/growth tables: `billing_credits` + `billing_credit_transactions` (a balance projection over an append-only ledger; decrements take `SELECT ... FOR UPDATE`), `billing_coupons` + `billing_coupon_redemptions`, `billing_referrals`, and the notification tables: `notifications` (workspace-scoped, with a unique `dedupe_key` so a retried sweep tells the customer once) and `notification_deliveries` (the email send log — separate, because a failed send must not erase the in-app record).
+
+## Transactional email
+
+No email vendor is configured for this project, so `notification_service`'s adapter logs the message it *would* have sent. That is deliberate: a stub that silently returned success would make every delivery test pass while real customer email vanished. Swapping in Resend/SES/SMTP is a new class implementing `EmailSenderPort` and one line in the composition root.
+
+apps/api owns its own email port rather than calling apps/web's sender over HTTP — that would be a new call direction (today the internal channel is only web → api) and would put an outbound customer email behind another service's availability.
 
 ### Coupons vs. Stripe promotion codes
 

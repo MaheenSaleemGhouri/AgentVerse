@@ -72,6 +72,9 @@ from agentverse_api.infrastructure.config import get_settings
 from agentverse_api.infrastructure.logging import configure_logging
 from agentverse_api.interface.middleware import request_id_middleware
 from agentverse_api.interface.routes.health import router as health_router
+from agentverse_api.notification_service.interface.routes.notifications import (
+    router as notifications_router,
+)
 from agentverse_api.orchestration_service.interface.routers.agents import (
     router as agents_router,
 )
@@ -166,6 +169,7 @@ def create_app() -> FastAPI:
     app.include_router(billing_usage_router)
     app.include_router(billing_credits_router)
     app.include_router(billing_webhooks_router)
+    app.include_router(notifications_router)
     app.include_router(api_keys_router)
     app.include_router(audit_logs_router)
     app.include_router(internal_auth_events_router)

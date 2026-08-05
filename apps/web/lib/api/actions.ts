@@ -41,6 +41,12 @@ import {
 } from "@/lib/api/billing";
 import { ApiError } from "@/lib/api/client";
 import {
+  listNotifications as listNotificationsApi,
+  markAllNotificationsRead as markAllNotificationsReadApi,
+  markNotificationRead as markNotificationReadApi,
+  type NotificationList,
+} from "@/lib/api/notifications";
+import {
   type Agent,
   type AgentVersion,
   createAgent as createAgentApi,
@@ -956,4 +962,26 @@ export async function redeemCouponAction(
   code: string
 ): Promise<{ code: string; credited_cents: number; balance_cents: number }> {
   return redeemCouponApi(workspaceId, code);
+}
+
+// --- Notifications (Phase 9) -------------------------------------------
+
+export async function listNotificationsAction(
+  workspaceId: string,
+  options: { unreadOnly?: boolean; limit?: number } = {}
+): Promise<NotificationList> {
+  return listNotificationsApi(workspaceId, options);
+}
+
+export async function markNotificationReadAction(
+  workspaceId: string,
+  notificationId: string
+): Promise<void> {
+  return markNotificationReadApi(workspaceId, notificationId);
+}
+
+export async function markAllNotificationsReadAction(
+  workspaceId: string
+): Promise<{ marked: number }> {
+  return markAllNotificationsReadApi(workspaceId);
 }

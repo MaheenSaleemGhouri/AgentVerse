@@ -1641,6 +1641,66 @@ export interface paths {
         patch: operations["change_member_role_api_v1_workspaces__workspace_id__members__target_user_id__patch"];
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Notifications Route */
+        get: operations["list_notifications_route_api_v1_workspaces__workspace_id__notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark All Read Route */
+        post: operations["mark_all_read_route_api_v1_workspaces__workspace_id__notifications_read_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/notifications/{notification_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Read Route
+         * @description 404 covers both "no such notification" and "not in this
+         *     workspace".
+         *
+         *     Deliberately the same answer: distinguishing them would let a caller
+         *     probe another tenant's notification ids by watching which ones return
+         *     403 (Rule 11 — cross-workspace access is denied without leaking
+         *     existence).
+         */
+        post: operations["mark_read_route_api_v1_workspaces__workspace_id__notifications__notification_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/resource-permissions": {
         parameters: {
             query?: never;
@@ -3328,6 +3388,11 @@ export interface components {
             /** Workspace Id */
             workspace_id: string;
         };
+        /** MarkAllReadResponse */
+        MarkAllReadResponse: {
+            /** Marked */
+            marked: number;
+        };
         /**
          * McpServerResponse
          * @description A marketplace catalog entry.
@@ -3410,6 +3475,35 @@ export interface components {
             user_id: string;
             /** Workspace Id */
             workspace_id: string;
+        };
+        /** NotificationListResponse */
+        NotificationListResponse: {
+            /** Data */
+            data: components["schemas"]["NotificationResponse"][];
+            /** Unread Count */
+            unread_count: number;
+        };
+        /** NotificationResponse */
+        NotificationResponse: {
+            /** Action Path */
+            action_path: string | null;
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Is Read */
+            is_read: boolean;
+            /** Kind */
+            kind: string;
+            /** Severity */
+            severity: string;
+            /** Title */
+            title: string;
         };
         /**
          * OauthStartResponse
@@ -8163,6 +8257,101 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MemberResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notifications_route_api_v1_workspaces__workspace_id__notifications_get: {
+        parameters: {
+            query?: {
+                unread_only?: boolean;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_all_read_route_api_v1_workspaces__workspace_id__notifications_read_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkAllReadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_read_route_api_v1_workspaces__workspace_id__notifications__notification_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notification_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

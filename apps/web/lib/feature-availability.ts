@@ -72,16 +72,6 @@ export const PENDING_INTEGRATIONS = {
     capability:
       "Aggregated run volume, success rate, latency percentiles, and per-model cost attribution over time.",
   },
-  notifications: {
-    phase: 11,
-    phaseName: "Growth Loops & Multi-Provider Breadth",
-    endpoints: [
-      "GET /api/v1/workspaces/{workspace_id}/notifications",
-      "POST /api/v1/workspaces/{workspace_id}/notifications/{id}/read",
-    ],
-    capability:
-      "Workspace-wide alerts for failed runs, quota thresholds, and member invitations.",
-  },
 } as const satisfies Record<string, PendingIntegration>;
 
 export type PendingIntegrationKey = keyof typeof PENDING_INTEGRATIONS;

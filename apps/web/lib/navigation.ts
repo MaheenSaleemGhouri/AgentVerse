@@ -159,9 +159,8 @@ export const NAV_SECTIONS: readonly NavItem[] = [
     label: "Notifications",
     segment: "notifications",
     icon: Bell,
-    description: "Failed runs, quota thresholds, and invitations",
+    description: "Billing events, quota thresholds, and referral rewards",
     hiddenFromSidebar: true,
-    pending: true,
   },
 ];
 
