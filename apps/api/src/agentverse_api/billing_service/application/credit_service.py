@@ -22,6 +22,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
+from agentverse_shared.observability.billing_metrics import record_credit_drift
+
 from agentverse_api.billing_service.application.plan_catalog_service import PlanCatalogService
 from agentverse_api.billing_service.application.subscription_service import SubscriptionService
 from agentverse_api.billing_service.domain.coupon import (
@@ -161,6 +163,11 @@ class CreditService:
         ledger = await self.credits.ledger_sum(workspace_id)
         if balance == ledger:
             return None
+        # Counted as well as logged: drift means the balance projection
+        # disagrees with the ledger it is derived from, which nothing
+        # else in the system surfaces. Steady state is zero, so the
+        # alert can be `> 0` rather than a rate.
+        record_credit_drift()
         logger.error(
             "billing_credit_drift",
             extra={

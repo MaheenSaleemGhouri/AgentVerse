@@ -137,6 +137,90 @@ jobs:
         run: uv sync --frozen && uv run alembic upgrade head
       - run: uv run pytest -q
 
+  # Rule 19 says migrations are reversible. Until now that was verified
+  # by hand before each merge, which means it was verified as carefully
+  # as whoever remembered to do it — and a `downgrade()` nobody runs is
+  # a function that has never been executed, in the one place where "we
+  # can roll back" is the whole safety story.
+  #
+  # `upgrade head` -> `downgrade base` -> `upgrade head` exercises every
+  # migration's downgrade in order, not just the newest one. That
+  # matters because a downgrade only has to work from the state the one
+  # above it leaves behind, and testing the top migration alone would
+  # never catch an older one that stopped composing.
+  migration-reversibility:
+    name: migration reversibility
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: agentverse
+          POSTGRES_PASSWORD: agentverse_ci_only
+          POSTGRES_DB: agentverse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agentverse -d agentverse"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      AGENTVERSE_API_DATABASE_URL: postgresql+asyncpg://agentverse:agentverse_ci_only@localhost:5432/agentverse
+      AGENTVERSE_API_AUTH_INTERNAL_URL: http://localhost:3000
+      AGENTVERSE_API_AUTH_PUBLIC_URL: http://localhost:3000
+      AGENTVERSE_API_API_PUBLIC_URL: http://localhost:8000
+      AGENTVERSE_API_INTERNAL_API_SECRET: ci-only-secret-not-for-production
+      AGENTVERSE_API_OPENAI_API_KEY: sk-ci-placeholder-not-a-real-key
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: apps/api/uv.lock
+      - run: uv sync --frozen
+      - name: Apply every migration
+        run: uv run alembic upgrade head
+      - name: Roll every migration back
+        run: uv run alembic downgrade base
+      - name: Confirm the schema is actually gone
+        # A `downgrade()` that returns without dropping its table leaves
+        # the next `upgrade` to fail on an existing object — or worse,
+        # to succeed against a table it did not create. Asserting the
+        # database is empty is what makes the round trip meaningful.
+        run: |
+          REMAINING=$(uv run python -c "
+          import asyncio, os
+          from sqlalchemy.ext.asyncio import create_async_engine
+          from sqlalchemy import text
+
+          async def main():
+              engine = create_async_engine(os.environ['AGENTVERSE_API_DATABASE_URL'])
+              async with engine.connect() as conn:
+                  result = await conn.execute(text(
+                      \"SELECT count(*) FROM information_schema.tables \"
+                      \"WHERE table_schema = 'public' AND table_name <> 'alembic_version'\"
+                  ))
+                  print(result.scalar_one())
+              await engine.dispose()
+
+          asyncio.run(main())
+          ")
+          echo "Tables remaining after full downgrade: $REMAINING"
+          if [ "$REMAINING" -ne 0 ]; then
+            echo "::error::$REMAINING table(s) survived a full downgrade — a migration's downgrade() is incomplete."
+            exit 1
+          fi
+      - name: Re-apply every migration
+        # The second upgrade is the real assertion: it proves the
+        # downgrades left the database in a state the migrations can
+        # build on again, which is what a rollback actually needs.
+        run: uv run alembic upgrade head
+
   # Builds the images CI has never built. Added after both service
   # Dockerfiles were found to be unbuildable — they copied only their own
   # service directory while both pyproject.toml files resolve
@@ -234,7 +318,15 @@ jobs:
   ci-gate:
     name: CI gate
     if: always()
-    needs: [node-checks, python-checks, container-build, alert-rules, dependency-audit]
+    needs:
+      [
+        node-checks,
+        python-checks,
+        migration-reversibility,
+        container-build,
+        alert-rules,
+        dependency-audit,
+      ]
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any dependency job failed or was cancelled

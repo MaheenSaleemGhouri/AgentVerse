@@ -28,6 +28,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from agentverse_shared.observability.billing_metrics import record_quota_refusal
+
 from agentverse_api.billing_service.application.entitlement_service import EntitlementService
 from agentverse_api.billing_service.application.usage_service import UsageService
 from agentverse_api.billing_service.domain.plan import MeteredDimension, remaining
@@ -148,5 +150,11 @@ class QuotaService:
             workspace_id=workspace_id, dimension=dimension, requested=requested
         )
         if not decision.allowed:
+            # Counted, not just raised. One refusal is a correct 429; a
+            # *spike* of them across workspaces is a limit set wrong or a
+            # plan mispriced, and nothing else in the system would show
+            # that — every individual refusal looks like the feature
+            # working.
+            record_quota_refusal(dimension.value)
             raise QuotaExceededError(decision)
         return decision

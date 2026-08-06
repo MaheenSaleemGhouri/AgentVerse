@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from agentverse_shared.observability import billing_metrics
 from httpx import AsyncClient
 
 _OBSERVABILITY = Path(__file__).resolve().parents[4] / "infra" / "observability"
@@ -59,9 +60,34 @@ async def test_every_metric_named_in_a_rule_or_panel_is_actually_emitted(
     working correctly.
 
     So the rules are checked against the real exposition output.
+
+    **Two services now emit metrics, and the check spans both.** The
+    tool-execution surface comes from this process; the billing surface
+    (Phase 9) comes from apps/api, which has its own
+    `/internal/metrics`. The invariant is "no rule names a metric
+    *nothing* emits" — not "this process emits everything" — so the
+    billing families are resolved from their shared declaring module
+    rather than from this endpoint. Asserting they appear here would
+    force the worker to import metrics it does not produce, which would
+    make the exposition claim something false.
+
+    apps/api's own suite asserts that its endpoint actually serves those
+    families, so neither half is taken on trust.
     """
     body = (await client.get("/internal/metrics")).text
     exposed = set(re.findall(r"^(agentverse_[a-z_]+)", body, re.M))
+
+    # Families declared by the billing module. Read from the module's
+    # own definitions rather than hardcoded, so a metric renamed there
+    # does not silently drop out of this check.
+    billing_families = {
+        metric._name  # noqa: SLF001 - prometheus_client's only accessor for the base name
+        for metric in vars(billing_metrics).values()
+        if hasattr(metric, "_name") and str(getattr(metric, "_name", "")).startswith("agentverse_")
+    }
+    # A counter declared as `foo_total` is stored with `_name = "foo"`,
+    # and rules reference the exposed `foo_total`. Accept both spellings.
+    emitted_somewhere = exposed | billing_families | {f"{name}_total" for name in billing_families}
 
     for source in (ALERTS_FILE, DASHBOARD_FILE):
         assert source.exists(), source
@@ -72,7 +98,7 @@ async def test_every_metric_named_in_a_rule_or_panel_is_actually_emitted(
         # appear in the exposition under those exact names, so they need
         # no special handling — a counter's `foo_total` appears as
         # written too. Anything left unmatched is a genuine typo.
-        missing = {name for name in referenced if name not in exposed}
+        missing = {name for name in referenced if name not in emitted_somewhere}
         assert not missing, f"{source.name} references metrics never emitted: {sorted(missing)}"
 
 

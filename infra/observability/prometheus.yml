@@ -1,10 +1,18 @@
-# Prometheus scrape configuration for the AgentVerse worker fleet.
+# Prometheus scrape configuration for AgentVerse.
 #
-# Only the worker is scraped: every metric the tool-execution surface
-# emits originates there (tool calls, egress validation, MCP attachment,
-# credential unsealing). apps/api seals credentials and never opens
-# them, so it has nothing to report — see the module docstring in
-# `apps/worker/src/agentverse_worker/interface/routes/metrics.py`.
+# Two jobs, because the two services emit genuinely different signals
+# and neither can report the other's.
+#
+# The **worker** emits the tool-execution surface: tool calls, egress
+# validation, MCP attachment, credential unsealing. All of it happens
+# there.
+#
+# **apps/api** emits the billing surface (Phase 9): webhook processing,
+# quota refusals, payment-provider calls, credit-balance drift,
+# transactional-email delivery. Billing runs in apps/api, and every one
+# of those failures is otherwise silent — a webhook that failed
+# processing produces no customer-visible symptom until an invoice is
+# wrong.
 
 global:
   # 15s against a 5m alert window gives ~20 samples per evaluation —
@@ -41,3 +49,14 @@ scrape_configs:
       - targets: ["worker:8001"]
         labels:
           service: agentverse-worker
+
+  - job_name: agentverse-api
+    metrics_path: /internal/metrics
+    static_configs:
+      # Same per-process caveat as the worker: metrics live in each
+      # container's own registry, so every replica must be listed or
+      # discovered. Scraping one of N undercounts the fleet by roughly
+      # that factor, silently.
+      - targets: ["api:8000"]
+        labels:
+          service: agentverse-api

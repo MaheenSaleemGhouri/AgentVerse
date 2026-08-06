@@ -161,3 +161,131 @@ groups:
             injected content and reaching for tools it does not hold —
             check what those runs read.
           runbook: docs/observability/tool-execution-monitoring.md
+
+  # =================================================================
+  # Billing (Phase 9)
+  # =================================================================
+  #
+  # Every rule below covers a failure that is otherwise *silent*. That
+  # is the selection criterion, not "billing is important": a failed
+  # payment already produces a customer-visible dunning email, so it
+  # needs no alert. A webhook that failed *processing* produces nothing
+  # at all until an invoice is wrong weeks later.
+  #
+  # Runbooks: docs/runbooks/billing.md
+
+  - name: agentverse-billing
+    rules:
+      # --- P1: money is being got wrong -----------------------------
+
+      - alert: BillingWebhookProcessingFailures
+        # Any failure at all. The steady state is zero because a
+        # duplicate and an unrecognized event type are both *successes*
+        # with their own outcomes — `failed` means the handler raised,
+        # which leaves a `received` row and a subscription that did not
+        # transition.
+        expr: increase(agentverse_billing_webhooks_total{outcome="failed"}[15m]) > 0
+        for: 0m
+        labels:
+          severity: p1
+          route: platform-oncall
+        annotations:
+          summary: A payment-provider webhook failed processing
+          description: >-
+            The provider will retry, so this may self-resolve — but the
+            row in `billing_webhook_events` sits at `failed` with the
+            exception recorded, and until it processes the subscription
+            has not transitioned. Check that row first: it names the
+            event type and the error. A repeated failure on the same
+            event id is a bug, not a transient.
+          runbook: docs/runbooks/billing.md#webhook-processing-failure
+
+      - alert: BillingCreditDrift
+        # Steady state is exactly zero: the balance is only ever written
+        # in the same transaction as its ledger row, so a disagreement
+        # means something wrote a balance outside that path.
+        expr: increase(agentverse_billing_credit_drift_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: p1
+          route: platform-oncall
+        annotations:
+          summary: A credit balance disagrees with its own ledger
+          description: >-
+            Reconciliation found a workspace whose `billing_credits`
+            balance does not equal the sum of its
+            `billing_credit_transactions`. This should be impossible —
+            the two are written in one transaction. Do not "fix" the
+            balance: find what wrote it. The ledger is the truth.
+          runbook: docs/runbooks/billing.md#credit-drift
+
+      # --- P2: customers are being stopped --------------------------
+
+      - alert: QuotaRefusalSpike
+        # Compared against the same window a week earlier rather than a
+        # fixed threshold, for the same reason DenialRateSpike is: a
+        # busy tenant legitimately raises the baseline, and a fixed
+        # number would either page on that or miss a real spike.
+        #
+        # One refusal is the feature working. A spike across the fleet
+        # is a limit set wrong or a plan mispriced — and every
+        # individual refusal looks correct, which is why only the
+        # aggregate can show it.
+        expr: >-
+          sum(rate(agentverse_quota_refusals_total[1h]))
+          >
+          5 * sum(rate(agentverse_quota_refusals_total[1h] offset 7d))
+          and sum(rate(agentverse_quota_refusals_total[1h])) > 0.01
+        for: 30m
+        labels:
+          severity: p2
+          route: platform-oncall
+        annotations:
+          summary: Quota refusals 5x the weekly baseline
+          description: >-
+            Customers are being stopped at a rate the last week does not
+            explain. Most likely a plan's allowance was edited in the
+            `plans` table, or a new metered dimension started recording
+            against an allowance nobody set for it. Check which
+            dimension by splitting this metric on its label.
+          runbook: docs/runbooks/billing.md#quota-refusal-spike
+
+      - alert: PaymentProviderErrors
+        expr: >-
+          sum(rate(agentverse_payment_provider_calls_total{outcome="error"}[15m]))
+          /
+          sum(rate(agentverse_payment_provider_calls_total[15m])) > 0.2
+        for: 15m
+        labels:
+          severity: p2
+          route: platform-oncall
+        annotations:
+          summary: Over a fifth of payment-provider calls are failing
+          description: >-
+            Checkout and portal sessions are failing for customers. A
+            card decline is *not* counted here — those are successful
+            API calls — so this is the provider being unreachable, our
+            key being wrong, or a request shape they rejected.
+          runbook: docs/runbooks/billing.md#payment-provider-errors
+
+      # --- P3: customers are not being told -------------------------
+
+      - alert: NotificationDeliveryFailures
+        expr: >-
+          sum(rate(agentverse_notification_deliveries_total{outcome="failed"}[1h]))
+          /
+          sum(rate(agentverse_notification_deliveries_total[1h])) > 0.1
+        for: 1h
+        labels:
+          severity: p3
+          route: platform-oncall
+        annotations:
+          summary: More than a tenth of transactional emails are failing
+          description: >-
+            An email that never left is invisible to the customer and to
+            us — this counter is the only place it shows. The in-app
+            notification is unaffected, so nobody is losing information
+            permanently, but dunning depends on the inbox: a customer
+            who is never told their card failed will be canceled without
+            warning.
+          runbook: docs/runbooks/billing.md#notification-delivery-failures

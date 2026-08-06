@@ -30,10 +30,13 @@ possibly-stale payload.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from typing import Protocol
+
+from agentverse_shared.observability.billing_metrics import record_webhook
 
 from agentverse_api.billing_service.application.plan_catalog_service import PlanCatalogService
 from agentverse_api.billing_service.application.subscription_service import (
@@ -136,7 +139,23 @@ class WebhookService:
     provider_name: str = PaymentProvider.STRIPE.value
 
     async def handle(self, event: ProviderEvent) -> WebhookOutcome:
-        """Process one verified event, exactly once."""
+        """Process one verified event, exactly once.
+
+        Timed and counted by outcome: a webhook that fails processing
+        leaves a `received` row and produces no customer-visible symptom
+        until an invoice is wrong, so the metric is the only place that
+        failure is visible in time to act on it.
+        """
+        started = time.monotonic()
+        try:
+            outcome = await self._handle(event)
+        except Exception:
+            record_webhook(outcome="failed", duration_seconds=time.monotonic() - started)
+            raise
+        record_webhook(outcome=outcome.value, duration_seconds=time.monotonic() - started)
+        return outcome
+
+    async def _handle(self, event: ProviderEvent) -> WebhookOutcome:
         claimed = await self.events.claim(
             provider=self.provider_name,
             provider_event_id=event.event_id,

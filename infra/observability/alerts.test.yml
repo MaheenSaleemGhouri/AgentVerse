@@ -135,3 +135,122 @@ tests:
       - eval_time: 38m
         alertname: ToolFailureRateHigh
         exp_alerts: []
+
+  # =================================================================
+  # Billing (Phase 9)
+  # =================================================================
+
+  - interval: 1m
+    name: a single failed webhook pages
+    input_series:
+      # One increment. `failed` means the handler raised — a duplicate
+      # and an ignored event type are separate outcomes, so this series
+      # moving at all is the event.
+      - series: 'agentverse_billing_webhooks_total{outcome="failed"}'
+        values: "0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: BillingWebhookProcessingFailures
+        exp_alerts:
+          - exp_labels:
+              severity: p1
+              route: platform-oncall
+              # `increase()` preserves the series' labels, so the alert
+              # carries the outcome it matched on.
+              outcome: failed
+            exp_annotations:
+              summary: "A payment-provider webhook failed processing"
+              description: "The provider will retry, so this may self-resolve — but the row in `billing_webhook_events` sits at `failed` with the exception recorded, and until it processes the subscription has not transitioned. Check that row first: it names the event type and the error. A repeated failure on the same event id is a bug, not a transient."
+              runbook: "docs/runbooks/billing.md#webhook-processing-failure"
+
+  - interval: 1m
+    name: healthy webhook traffic does not page
+    input_series:
+      # The load-bearing case: a busy, correct system processes events
+      # and deduplicates redeliveries constantly. Neither is a failure,
+      # and an alert that fired on volume would be silenced within a day.
+      - series: 'agentverse_billing_webhooks_total{outcome="processed"}'
+        values: "0+5x16"
+      - series: 'agentverse_billing_webhooks_total{outcome="duplicate"}'
+        values: "0+2x16"
+      - series: 'agentverse_billing_webhooks_total{outcome="ignored"}'
+        values: "0+3x16"
+      - series: 'agentverse_billing_webhooks_total{outcome="failed"}'
+        values: "0x16"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: BillingWebhookProcessingFailures
+        exp_alerts: []
+
+  - interval: 1m
+    name: credit drift pages on a single occurrence
+    input_series:
+      - series: "agentverse_billing_credit_drift_total"
+        values: "0+0x30 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: BillingCreditDrift
+        exp_alerts:
+          - exp_labels:
+              severity: p1
+              route: platform-oncall
+            exp_annotations:
+              summary: "A credit balance disagrees with its own ledger"
+              description: "Reconciliation found a workspace whose `billing_credits` balance does not equal the sum of its `billing_credit_transactions`. This should be impossible — the two are written in one transaction. Do not \"fix\" the balance: find what wrote it. The ledger is the truth."
+              runbook: "docs/runbooks/billing.md#credit-drift"
+
+  - interval: 1m
+    name: a reconciled ledger never pages
+    input_series:
+      - series: "agentverse_billing_credit_drift_total"
+        values: "0x60"
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: BillingCreditDrift
+        exp_alerts: []
+
+  - interval: 1m
+    name: a provider outage pages but card declines do not
+    input_series:
+      # Declines are *successful* API calls, so they land in `success`
+      # and must not contribute. If they did, a marketing campaign
+      # bringing in bad cards would page the platform team.
+      - series: 'agentverse_payment_provider_calls_total{operation="checkout",outcome="error"}'
+        values: "0+6x40"
+      - series: 'agentverse_payment_provider_calls_total{operation="checkout",outcome="success"}'
+        values: "0+4x40"
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: PaymentProviderErrors
+        exp_alerts:
+          - exp_labels:
+              severity: p2
+              route: platform-oncall
+            exp_annotations:
+              summary: "Over a fifth of payment-provider calls are failing"
+              description: "Checkout and portal sessions are failing for customers. A card decline is *not* counted here — those are successful API calls — so this is the provider being unreachable, our key being wrong, or a request shape they rejected."
+              runbook: "docs/runbooks/billing.md#payment-provider-errors"
+
+  - interval: 1m
+    name: an occasional provider error does not page
+    input_series:
+      - series: 'agentverse_payment_provider_calls_total{operation="checkout",outcome="error"}'
+        values: "0+1x40"
+      - series: 'agentverse_payment_provider_calls_total{operation="checkout",outcome="success"}'
+        values: "0+20x40"
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: PaymentProviderErrors
+        exp_alerts: []
+
+  - interval: 1m
+    name: healthy email delivery does not page
+    input_series:
+      - series: 'agentverse_notification_deliveries_total{outcome="sent"}'
+        values: "0+10x130"
+      - series: 'agentverse_notification_deliveries_total{outcome="failed"}'
+        values: "0x130"
+    alert_rule_test:
+      - eval_time: 125m
+        alertname: NotificationDeliveryFailures
+        exp_alerts: []

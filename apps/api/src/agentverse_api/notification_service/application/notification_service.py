@@ -25,6 +25,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from agentverse_shared.observability.billing_metrics import record_notification_delivery
+
 from agentverse_api.notification_service.domain.notification import (
     Notification,
     NotificationKind,
@@ -133,6 +135,9 @@ class NotificationService:
                 provider_message_id=None,
                 error=f"{type(exc).__name__}: {exc}",
             )
+            # An email that never left is invisible by definition —
+            # this counter is the only place it shows up.
+            record_notification_delivery("failed")
             logger.exception(
                 "notification_email_failed", extra={"notification_id": notification_id}
             )
@@ -142,6 +147,7 @@ class NotificationService:
             provider_message_id=provider_message_id,
             error=None,
         )
+        record_notification_delivery("sent")
 
     # ---- reads -------------------------------------------------------
 
