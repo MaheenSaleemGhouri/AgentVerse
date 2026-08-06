@@ -46,9 +46,7 @@ __all__ = [
 ]
 
 #: Terminal states of a provider webhook. Mirrors `WebhookOutcome`.
-WEBHOOK_OUTCOMES: frozenset[str] = frozenset(
-    {"processed", "duplicate", "ignored", "failed"}
-)
+WEBHOOK_OUTCOMES: frozenset[str] = frozenset({"processed", "duplicate", "ignored", "failed"})
 
 #: Metered dimensions a request can be refused on. Mirrors
 #: `MeteredDimension`, and is a closed set for the same reason: it is
@@ -146,17 +144,13 @@ def record_quota_refusal(dimension: str) -> None:
     QUOTA_REFUSALS.labels(dimension=_bounded(dimension, QUOTA_DIMENSIONS)).inc()
 
 
-def record_provider_call(
-    *, operation: str, outcome: str, duration_seconds: float
-) -> None:
+def record_provider_call(*, operation: str, outcome: str, duration_seconds: float) -> None:
     bounded_operation = _bounded(operation, PROVIDER_OPERATIONS)
     PROVIDER_CALLS.labels(
         operation=bounded_operation,
         outcome=outcome if outcome in ("success", "error") else "other",
     ).inc()
-    PROVIDER_CALL_DURATION.labels(operation=bounded_operation).observe(
-        max(0.0, duration_seconds)
-    )
+    PROVIDER_CALL_DURATION.labels(operation=bounded_operation).observe(max(0.0, duration_seconds))
 
 
 def record_credit_drift() -> None:
@@ -164,9 +158,7 @@ def record_credit_drift() -> None:
 
 
 def record_notification_delivery(outcome: str) -> None:
-    NOTIFICATION_DELIVERIES.labels(
-        outcome=_bounded(outcome, NOTIFICATION_DELIVERY_OUTCOMES)
-    ).inc()
+    NOTIFICATION_DELIVERIES.labels(outcome=_bounded(outcome, NOTIFICATION_DELIVERY_OUTCOMES)).inc()
 
 
 def _initialise_label_children() -> None:

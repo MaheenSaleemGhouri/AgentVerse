@@ -268,9 +268,7 @@ async def _resolve(host: str, port: int) -> list[str]:
             f"DNS lookup for {host!r} timed out", category="unresolvable"
         ) from exc
     except socket.gaierror as exc:
-        raise EgressDeniedError(
-            f"{host!r} could not be resolved", category="unresolvable"
-        ) from exc
+        raise EgressDeniedError(f"{host!r} could not be resolved", category="unresolvable") from exc
 
     addresses: list[str] = []
     for info in infos:

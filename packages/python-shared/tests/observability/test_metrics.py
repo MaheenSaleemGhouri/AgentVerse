@@ -59,9 +59,12 @@ def test_unknown_status_collapses_to_other_rather_than_minting_a_series() -> Non
     )
 
     assert _value("agentverse_tool_calls_total", status="other") == before + 1
-    assert REGISTRY.get_sample_value(
-        "agentverse_tool_calls_total", {"status": "ws_01ABCDEF_some_unexpected_value"}
-    ) is None
+    assert (
+        REGISTRY.get_sample_value(
+            "agentverse_tool_calls_total", {"status": "ws_01ABCDEF_some_unexpected_value"}
+        )
+        is None
+    )
 
 
 def test_attacker_controlled_tool_name_cannot_reach_a_label() -> None:
