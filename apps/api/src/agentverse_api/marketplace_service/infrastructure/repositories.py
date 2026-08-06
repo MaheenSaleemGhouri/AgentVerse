@@ -71,6 +71,7 @@ def _to_listing(row: MarketplaceListingModel) -> Listing:
         rating_count=row.rating_count,
         install_count=row.install_count,
         is_featured=row.is_featured,
+        is_official=row.is_official,
         latest_version=row.latest_version,
         published_at=row.published_at,
         created_at=row.created_at,
@@ -92,6 +93,7 @@ class SqlListingRepository:
         query: str | None,
         featured_only: bool,
         free_only: bool,
+        official_only: bool | None,
         sort: str,
         limit: int,
         offset: int,
@@ -109,6 +111,12 @@ class SqlListingRepository:
             conditions.append(MarketplaceListingModel.is_featured.is_(True))
         if free_only:
             conditions.append(MarketplaceListingModel.pricing == Pricing.FREE.value)
+        if official_only is not None:
+            # Tri-state, not a bool: `True` is the template library,
+            # `False` is community listings only, and `None` is the whole
+            # catalog. A plain bool could not express "everything", which
+            # is the default the catalog page wants.
+            conditions.append(MarketplaceListingModel.is_official.is_(official_only))
         if query:
             # `ilike` over title and summary. Deliberately not full-text
             # search: that needs a tsvector column and an index to be

@@ -164,6 +164,14 @@ class Listing:
     published_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    #: First-party: a template from the built-in library rather than a
+    #: customer's submission — published by the platform workspace,
+    #: always free, and never moderated. Set only by the seed migration;
+    #: no route can turn it on, because "we wrote this" is not a claim a
+    #: publisher gets to make about themselves.
+    #:
+    #: Last and defaulted so existing construction sites are unchanged.
+    is_official: bool = False
 
     @property
     def average_rating(self) -> float | None:

@@ -17,6 +17,8 @@ import operator
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+from agentverse_shared.agent_tools import BUILTIN_TOOL_NAMES
+
 from agents import FunctionTool, Tool, function_tool
 
 _BINARY_OPERATORS: dict[type, Callable[[float, float], float]] = {
@@ -69,10 +71,23 @@ async def calculator(expression: str) -> str:
     return str(result)
 
 
+#: The implementations. Their *names* are declared once in
+#: `agentverse_shared.agent_tools`, because `apps/api` also needs the set
+#: — to reject a curated template naming a tool that will not exist when
+#: it runs — and two copies of a list like this disagreeing is invisible
+#: until an agent runs without a capability its prompt assumed. The
+#: assertion below is what keeps the two halves honest.
 _BUILTIN_TOOLS: dict[str, FunctionTool] = {
     "get_current_time": get_current_time,
     "calculator": calculator,
 }
+
+if set(_BUILTIN_TOOLS) != BUILTIN_TOOL_NAMES:  # pragma: no cover - import-time invariant
+    raise RuntimeError(
+        "Built-in tool implementations and "
+        "agentverse_shared.agent_tools.BUILTIN_TOOL_NAMES have diverged: "
+        f"{set(_BUILTIN_TOOLS) ^ BUILTIN_TOOL_NAMES}"
+    )
 
 
 def resolve_tools(tool_names: list[str]) -> list[Tool]:

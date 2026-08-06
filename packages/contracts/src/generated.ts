@@ -258,6 +258,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/marketplace/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Templates Route
+         * @description The first-party template library.
+         *
+         *     Not a separate system: a template *is* a listing, published by the
+         *     platform workspace with `is_official` set. Giving templates their own
+         *     table would have meant a second install path, a second version
+         *     history and a second set of tenancy rules to keep correct.
+         *
+         *     Declared before `/listings/{slug}` — FastAPI matches in declaration
+         *     order, and a later static path would be swallowed by the dynamic one.
+         *     Unpaginated because the library is curated and small; when it stops
+         *     being small, `/listings?official=true` already paginates.
+         */
+        get: operations["list_templates_route_api_v1_marketplace_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/security/devices": {
         parameters: {
             query?: never;
@@ -3884,6 +3914,8 @@ export interface components {
             install_count: number;
             /** Is Featured */
             is_featured: boolean;
+            /** Is Official */
+            is_official: boolean;
             /** Kind */
             kind: string;
             /** Latest Version */
@@ -5676,6 +5708,7 @@ export interface operations {
                 q?: string | null;
                 featured?: boolean;
                 free?: boolean;
+                official?: boolean | null;
                 sort?: string;
                 limit?: number;
                 offset?: number;
@@ -5788,6 +5821,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListingVersionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_templates_route_api_v1_marketplace_templates_get: {
+        parameters: {
+            query?: {
+                category?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingResponse"][];
                 };
             };
             /** @description Validation Error */

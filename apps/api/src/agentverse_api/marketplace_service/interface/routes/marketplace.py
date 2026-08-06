@@ -100,6 +100,10 @@ class ListingResponse(BaseModel):
     rating_count: int
     install_count: int
     is_featured: bool
+    #: A first-party template from the built-in library rather than a
+    #: customer's submission. Clients badge these differently, and the
+    #: template library filters on it.
+    is_official: bool
     latest_version: int
     published_at: datetime | None
 
@@ -233,6 +237,7 @@ def _to_response(listing: Listing) -> ListingResponse:
         rating_count=listing.rating_count,
         install_count=listing.install_count,
         is_featured=listing.is_featured,
+        is_official=listing.is_official,
         latest_version=listing.latest_version,
         published_at=listing.published_at,
     )
@@ -260,6 +265,10 @@ async def browse_route(
     q: str | None = Query(default=None, max_length=200),
     featured: bool = Query(default=False),
     free: bool = Query(default=False),
+    # Tri-state, so the default is the whole catalog: `official=true` is
+    # the first-party template library, `official=false` is community
+    # listings only, and omitting it is everything.
+    official: bool | None = Query(default=None),
     # A closed set, not free text: this reaches an ORDER BY, and an
     # unvalidated value there is an injection point. Unknown values fall
     # back to the default in the repository rather than reaching SQL.
@@ -277,11 +286,35 @@ async def browse_route(
         query=q,
         featured_only=featured,
         free_only=free,
+        official_only=official,
         sort=sort,
         limit=limit,
         offset=offset,
     )
     return ListingPageResponse(data=[_to_response(listing) for listing in listings], total=total)
+
+
+@router.get("/templates", response_model=list[ListingResponse])
+async def list_templates_route(
+    service: MarketplaceService = Depends(get_marketplace_service),
+    category: str | None = Query(default=None, max_length=64),
+) -> list[ListingResponse]:
+    """The first-party template library.
+
+    Not a separate system: a template *is* a listing, published by the
+    platform workspace with `is_official` set. Giving templates their own
+    table would have meant a second install path, a second version
+    history and a second set of tenancy rules to keep correct.
+
+    Declared before `/listings/{slug}` — FastAPI matches in declaration
+    order, and a later static path would be swallowed by the dynamic one.
+    Unpaginated because the library is curated and small; when it stops
+    being small, `/listings?official=true` already paginates.
+    """
+    listings, _ = await service.browse(
+        category_slug=category, official_only=True, sort="name", limit=100
+    )
+    return [_to_response(listing) for listing in listings]
 
 
 @router.get("/listings/{slug}", response_model=ListingResponse)

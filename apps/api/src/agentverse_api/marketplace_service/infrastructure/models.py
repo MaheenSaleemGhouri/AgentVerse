@@ -96,6 +96,14 @@ class MarketplaceListingModel(Base):
             "install_count",
             postgresql_where="is_featured AND status = 'published'",
         ),
+        # The template library's own query. Partial for the same reason:
+        # a dozen rows against a catalog meant to grow to thousands.
+        Index(
+            "ix_marketplace_listings_official",
+            "category_slug",
+            "title",
+            postgresql_where="is_official AND status = 'published'",
+        ),
     )
 
     id: Mapped[str] = mapped_column(
@@ -136,6 +144,11 @@ class MarketplaceListingModel(Base):
     # Set by a platform admin, never by the publisher — otherwise every
     # publisher features themselves.
     is_featured: Mapped[bool] = mapped_column(default=False)
+    # First-party: published by the platform workspace, always free, and
+    # never moderated (approving our own submission would be theatre).
+    # This is what the template library filters on — a template is an
+    # ordinary listing with this flag, not a parallel system.
+    is_official: Mapped[bool] = mapped_column(default=False)
     latest_version: Mapped[int] = mapped_column(Integer, default=0)
     # Why a submission was rejected. Shown to the publisher, so a
     # rejection is actionable rather than a dead end.

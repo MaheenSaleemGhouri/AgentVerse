@@ -2972,6 +2972,10 @@
             "title": "Is Featured",
             "type": "boolean"
           },
+          "is_official": {
+            "title": "Is Official",
+            "type": "boolean"
+          },
           "kind": {
             "title": "Kind",
             "type": "string"
@@ -3041,6 +3045,7 @@
           "rating_count",
           "install_count",
           "is_featured",
+          "is_official",
           "latest_version",
           "published_at"
         ],
@@ -7792,6 +7797,22 @@
           },
           {
             "in": "query",
+            "name": "official",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Official"
+            }
+          },
+          {
+            "in": "query",
             "name": "sort",
             "required": false,
             "schema": {
@@ -7995,6 +8016,61 @@
           }
         },
         "summary": "List Versions Route",
+        "tags": [
+          "marketplace"
+        ]
+      }
+    },
+    "/api/v1/marketplace/templates": {
+      "get": {
+        "description": "The first-party template library.\n\nNot a separate system: a template *is* a listing, published by the\nplatform workspace with `is_official` set. Giving templates their own\ntable would have meant a second install path, a second version\nhistory and a second set of tenancy rules to keep correct.\n\nDeclared before `/listings/{slug}` \u2014 FastAPI matches in declaration\norder, and a later static path would be swallowed by the dynamic one.\nUnpaginated because the library is curated and small; when it stops\nbeing small, `/listings?official=true` already paginates.",
+        "operationId": "list_templates_route_api_v1_marketplace_templates_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ListingResponse"
+                  },
+                  "title": "Response List Templates Route Api V1 Marketplace Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Templates Route",
         "tags": [
           "marketplace"
         ]

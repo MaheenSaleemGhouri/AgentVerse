@@ -56,6 +56,7 @@ class ListingRepository(Protocol):
         query: str | None,
         featured_only: bool,
         free_only: bool,
+        official_only: bool | None,
         sort: str,
         limit: int,
         offset: int,

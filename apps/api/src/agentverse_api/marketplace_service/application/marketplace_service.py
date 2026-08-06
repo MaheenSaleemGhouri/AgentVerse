@@ -133,17 +133,25 @@ class MarketplaceService:
         query: str | None = None,
         featured_only: bool = False,
         free_only: bool = False,
+        official_only: bool | None = None,
         sort: str = "popular",
         limit: int = 24,
         offset: int = 0,
     ) -> tuple[list[Listing], int]:
-        """The public catalog. No workspace filter, deliberately."""
+        """The public catalog. No workspace filter, deliberately.
+
+        `official_only` is tri-state: `True` is the first-party template
+        library, `False` is community listings only, `None` is the whole
+        catalog. A bool could not express "everything", which is what a
+        catalog page wants by default.
+        """
         return await self.listings.browse(
             category_slug=category_slug,
             kind=kind,
             query=query,
             featured_only=featured_only,
             free_only=free_only,
+            official_only=official_only,
             sort=sort,
             limit=min(max(limit, 1), 100),
             offset=max(offset, 0),
