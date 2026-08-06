@@ -63,6 +63,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/marketplace/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Categories Route
+         * @description Unauthenticated: the category rail is part of the public catalog.
+         */
+        get: operations["list_categories_route_api_v1_marketplace_categories_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/marketplace/listings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Browse Route
+         * @description The public catalog. Published listings only, across every
+         *     workspace — the one read in this platform that is deliberately not
+         *     tenant-scoped.
+         */
+        get: operations["browse_route_api_v1_marketplace_listings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/marketplace/listings/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Listing Route
+         * @description Unauthenticated, so it returns published listings only.
+         *
+         *     A publisher viewing their own draft reads it through
+         *     `/workspaces/{id}/marketplace/listings` instead, where they have a
+         *     workspace context to be checked against.
+         */
+        get: operations["get_listing_route_api_v1_marketplace_listings__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/marketplace/listings/{slug}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Reviews Route */
+        get: operations["list_reviews_route_api_v1_marketplace_listings__slug__reviews_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/marketplace/listings/{slug}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Versions Route */
+        get: operations["list_versions_route_api_v1_marketplace_listings__slug__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/security/devices": {
         parameters: {
             query?: never;
@@ -1605,6 +1705,137 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List My Listings Route
+         * @description This workspace's listings in *every* status, including the drafts
+         *     and rejections the public catalog must never return.
+         */
+        get: operations["list_my_listings_route_api_v1_workspaces__workspace_id__marketplace_listings_get"];
+        put?: never;
+        /**
+         * Create Listing Route
+         * @description Create a draft. `require_admin`, because publishing puts the
+         *     workspace's name on a public page.
+         */
+        post: operations["create_listing_route_api_v1_workspaces__workspace_id__marketplace_listings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Listing Route */
+        patch: operations["update_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__patch"];
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Submit Review Route
+         * @description One review per workspace, so `PUT` rather than `POST` — a second
+         *     submission replaces the first rather than adding one.
+         */
+        put: operations["submit_review_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__review_put"];
+        post?: never;
+        /** Withdraw Review Route */
+        delete: operations["withdraw_review_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__review_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit Listing Route
+         * @description Submit for moderation. Reports *every* readiness problem at once,
+         *     so a publisher does not make three round trips to submit.
+         */
+        post: operations["submit_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__submit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/unlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unlist Listing Route
+         * @description Withdraw from the catalog. Not deletion — installs already made
+         *     from this listing are copies in other workspaces, and the row
+         *     survives so their provenance stays explicable.
+         */
+        post: operations["unlist_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__unlist_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Version Route
+         * @description Snapshot a configuration as a new version.
+         *
+         *     The config is *copied*. The publisher can delete their source agent
+         *     afterwards and every install made from this version keeps working.
+         */
+        post: operations["publish_version_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/members": {
         parameters: {
             query?: never;
@@ -2562,6 +2793,15 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** CategoryResponse */
+        CategoryResponse: {
+            /** Description */
+            description: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+        };
         /** ChangeMemberRoleRequest */
         ChangeMemberRoleRequest: {
             role: components["schemas"]["Role"];
@@ -2681,6 +2921,34 @@ export interface components {
             description?: string | null;
             /** Name */
             name: string;
+        };
+        /** CreateListingRequest */
+        CreateListingRequest: {
+            /** Category Slug */
+            category_slug: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** @default agent */
+            kind: components["schemas"]["ListingKind"];
+            /**
+             * Price Cents
+             * @default 0
+             */
+            price_cents: number;
+            /** @default free */
+            pricing: components["schemas"]["Pricing"];
+            /** Slug */
+            slug?: string | null;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+            /** Title */
+            title: string;
         };
         /** CreateOrganizationRequest */
         CreateOrganizationRequest: {
@@ -3388,6 +3656,72 @@ export interface components {
             /** Workspace Id */
             workspace_id: string;
         };
+        /**
+         * ListingKind
+         * @description What is being published.
+         *
+         *     `WORKFLOW` exists in the schema from the start and is deliberately
+         *     not yet reachable: the DAG workflow feature has not shipped, so
+         *     there is nothing to publish. Modelling it now costs one CHECK value
+         *     and means the marketplace does not need reshaping when it lands —
+         *     but a publish route that accepted it today would offer a button for
+         *     something a customer cannot create.
+         * @enum {string}
+         */
+        ListingKind: "agent" | "workflow";
+        /** ListingPageResponse */
+        ListingPageResponse: {
+            /** Data */
+            data: components["schemas"]["ListingResponse"][];
+            /** Total */
+            total: number;
+        };
+        /** ListingResponse */
+        ListingResponse: {
+            /** Average Rating */
+            average_rating: number | null;
+            /** Category Slug */
+            category_slug: string;
+            /** Description */
+            description: string;
+            /** Id */
+            id: string;
+            /** Install Count */
+            install_count: number;
+            /** Is Featured */
+            is_featured: boolean;
+            /** Kind */
+            kind: string;
+            /** Latest Version */
+            latest_version: number;
+            /** Price Cents */
+            price_cents: number;
+            /** Pricing */
+            pricing: string;
+            /** Published At */
+            published_at: string | null;
+            /** Publisher Name */
+            publisher_name: string;
+            /** Rating Count */
+            rating_count: number;
+            /** Slug */
+            slug: string;
+            /** Status */
+            status: string;
+            /** Summary */
+            summary: string;
+            /** Title */
+            title: string;
+        };
+        /** ListingVersionResponse */
+        ListingVersionResponse: {
+            /** Changelog */
+            changelog: string;
+            /** Created At */
+            created_at: string;
+            /** Version Number */
+            version_number: number;
+        };
         /** MarkAllReadResponse */
         MarkAllReadResponse: {
             /** Marked */
@@ -3821,6 +4155,11 @@ export interface components {
             portal_url: string;
         };
         /**
+         * Pricing
+         * @enum {string}
+         */
+        Pricing: "free" | "premium";
+        /**
          * ProrationResponse
          * @description Both halves separately, never one net figure.
          *
@@ -3845,6 +4184,20 @@ export interface components {
             model?: string | null;
             /** Prompt */
             prompt: string;
+        };
+        /** PublishVersionRequest */
+        PublishVersionRequest: {
+            /**
+             * Changelog
+             * @default
+             */
+            changelog: string;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /** Source Agent Version Id */
+            source_agent_version_id?: string | null;
         };
         /**
          * PutCredentialRequest
@@ -4053,6 +4406,22 @@ export interface components {
             resource_type: string;
             /** Workspace Id */
             workspace_id: string;
+        };
+        /** ReviewResponse */
+        ReviewResponse: {
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Rating */
+            rating: number;
+            /** Reviewer Name */
+            reviewer_name: string;
         };
         /**
          * Role
@@ -4358,6 +4727,16 @@ export interface components {
          * @enum {string}
          */
         SsoProtocol: "oidc" | "saml";
+        /** SubmitReviewRequest */
+        SubmitReviewRequest: {
+            /**
+             * Body
+             * @default
+             */
+            body: string;
+            /** Rating */
+            rating: number;
+        };
         /** SubscriptionEventResponse */
         SubscriptionEventResponse: {
             /** Actor */
@@ -4673,6 +5052,20 @@ export interface components {
             /** Status */
             status?: ("active" | "disabled") | null;
         };
+        /** UpdateListingRequest */
+        UpdateListingRequest: {
+            /** Category Slug */
+            category_slug?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Price Cents */
+            price_cents?: number | null;
+            pricing?: components["schemas"]["Pricing"] | null;
+            /** Summary */
+            summary?: string | null;
+            /** Title */
+            title?: string | null;
+        };
         /** UpdateOrganizationSettingsRequest */
         UpdateOrganizationSettingsRequest: {
             /** Brand Color */
@@ -4904,6 +5297,159 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AcceptInviteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_categories_route_api_v1_marketplace_categories_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryResponse"][];
+                };
+            };
+        };
+    };
+    browse_route_api_v1_marketplace_listings_get: {
+        parameters: {
+            query?: {
+                category?: string | null;
+                kind?: components["schemas"]["ListingKind"] | null;
+                q?: string | null;
+                featured?: boolean;
+                free?: boolean;
+                sort?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingPageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_listing_route_api_v1_marketplace_listings__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reviews_route_api_v1_marketplace_listings__slug__reviews_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_versions_route_api_v1_marketplace_listings__slug__versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingVersionResponse"][];
                 };
             };
             /** @description Validation Error */
@@ -8124,6 +8670,274 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_my_listings_route_api_v1_workspaces__workspace_id__marketplace_listings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_listing_route_api_v1_workspaces__workspace_id__marketplace_listings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateListingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateListingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_review_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__review_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_review_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__review_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__submit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlist_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__unlist_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_version_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingVersionResponse"];
                 };
             };
             /** @description Validation Error */

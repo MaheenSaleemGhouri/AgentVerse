@@ -24,6 +24,16 @@ class WorkspaceService:
     async def list_workspaces_for_user(self, user_id: str) -> list[WorkspaceSummary]:
         return await self.workspaces.list_for_user(user_id)
 
+    async def get_workspace(self, workspace_id: str) -> Workspace | None:
+        """The workspace itself, with no role attached.
+
+        Exists so another bounded context can resolve a workspace's
+        display name through this service rather than reading the
+        `workspaces` table itself (Rule 5). Carries no authorization of
+        its own — the caller has already resolved a `WorkspaceContext`.
+        """
+        return await self.workspaces.get_workspace(workspace_id)
+
     async def create_workspace(self, *, name: str, owner_user_id: str) -> Workspace:
         slug = await self._resolve_available_slug(name)
         workspace = await self.workspaces.create_workspace(

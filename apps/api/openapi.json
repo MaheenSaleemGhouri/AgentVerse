@@ -552,6 +552,29 @@
         "title": "CancelRequest",
         "type": "object"
       },
+      "CategoryResponse": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "description"
+        ],
+        "title": "CategoryResponse",
+        "type": "object"
+      },
       "ChangeMemberRoleRequest": {
         "properties": {
           "role": {
@@ -915,6 +938,67 @@
           "name"
         ],
         "title": "CreateKnowledgeBaseRequest",
+        "type": "object"
+      },
+      "CreateListingRequest": {
+        "properties": {
+          "category_slug": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Category Slug",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 20000,
+            "title": "Description",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ListingKind",
+            "default": "agent"
+          },
+          "price_cents": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Price Cents",
+            "type": "integer"
+          },
+          "pricing": {
+            "$ref": "#/components/schemas/Pricing",
+            "default": "free"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "pattern": "^[a-z0-9-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "summary": {
+            "default": "",
+            "maxLength": 280,
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "category_slug"
+        ],
+        "title": "CreateListingRequest",
         "type": "object"
       },
       "CreateOrganizationRequest": {
@@ -2696,6 +2780,167 @@
         "title": "KnowledgeBaseResponse",
         "type": "object"
       },
+      "ListingKind": {
+        "description": "What is being published.\n\n`WORKFLOW` exists in the schema from the start and is deliberately\nnot yet reachable: the DAG workflow feature has not shipped, so\nthere is nothing to publish. Modelling it now costs one CHECK value\nand means the marketplace does not need reshaping when it lands \u2014\nbut a publish route that accepted it today would offer a button for\nsomething a customer cannot create.",
+        "enum": [
+          "agent",
+          "workflow"
+        ],
+        "title": "ListingKind",
+        "type": "string"
+      },
+      "ListingPageResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ListingResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data",
+          "total"
+        ],
+        "title": "ListingPageResponse",
+        "type": "object"
+      },
+      "ListingResponse": {
+        "properties": {
+          "average_rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Rating"
+          },
+          "category_slug": {
+            "title": "Category Slug",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "install_count": {
+            "title": "Install Count",
+            "type": "integer"
+          },
+          "is_featured": {
+            "title": "Is Featured",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "latest_version": {
+            "title": "Latest Version",
+            "type": "integer"
+          },
+          "price_cents": {
+            "title": "Price Cents",
+            "type": "integer"
+          },
+          "pricing": {
+            "title": "Pricing",
+            "type": "string"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "publisher_name": {
+            "title": "Publisher Name",
+            "type": "string"
+          },
+          "rating_count": {
+            "title": "Rating Count",
+            "type": "integer"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "kind",
+          "publisher_name",
+          "title",
+          "summary",
+          "description",
+          "category_slug",
+          "status",
+          "pricing",
+          "price_cents",
+          "average_rating",
+          "rating_count",
+          "install_count",
+          "is_featured",
+          "latest_version",
+          "published_at"
+        ],
+        "title": "ListingResponse",
+        "type": "object"
+      },
+      "ListingVersionResponse": {
+        "properties": {
+          "changelog": {
+            "title": "Changelog",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "version_number": {
+            "title": "Version Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_number",
+          "changelog",
+          "created_at"
+        ],
+        "title": "ListingVersionResponse",
+        "type": "object"
+      },
       "MarkAllReadResponse": {
         "properties": {
           "marked": {
@@ -3866,6 +4111,14 @@
         "title": "PortalResponse",
         "type": "object"
       },
+      "Pricing": {
+        "enum": [
+          "free",
+          "premium"
+        ],
+        "title": "Pricing",
+        "type": "string"
+      },
       "ProrationResponse": {
         "description": "Both halves separately, never one net figure.\n\n`saas-strategist`'s standard: an invoice itemizes the credit and the\ncharge, because a single number cannot be decomposed back into\n\"credit for unused Pro time\" and \"prorated Team charge\", which is\nwhat a customer actually needs to check the maths.",
         "properties": {
@@ -3920,6 +4173,38 @@
           "prompt"
         ],
         "title": "ProviderTestRequest",
+        "type": "object"
+      },
+      "PublishVersionRequest": {
+        "properties": {
+          "changelog": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Changelog",
+            "type": "string"
+          },
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "source_agent_version_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Agent Version Id"
+          }
+        },
+        "required": [
+          "config"
+        ],
+        "title": "PublishVersionRequest",
         "type": "object"
       },
       "PutCredentialRequest": {
@@ -4392,6 +4677,40 @@
           "created_at"
         ],
         "title": "ResourcePermissionResponse",
+        "type": "object"
+      },
+      "ReviewResponse": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "rating": {
+            "title": "Rating",
+            "type": "integer"
+          },
+          "reviewer_name": {
+            "title": "Reviewer Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reviewer_name",
+          "rating",
+          "body",
+          "created_at"
+        ],
+        "title": "ReviewResponse",
         "type": "object"
       },
       "Role": {
@@ -5215,6 +5534,27 @@
         ],
         "title": "SsoProtocol",
         "type": "string"
+      },
+      "SubmitReviewRequest": {
+        "properties": {
+          "body": {
+            "default": "",
+            "maxLength": 4000,
+            "title": "Body",
+            "type": "string"
+          },
+          "rating": {
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Rating",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rating"
+        ],
+        "title": "SubmitReviewRequest",
+        "type": "object"
       },
       "SubscriptionEventResponse": {
         "properties": {
@@ -6194,6 +6534,83 @@
         "title": "UpdateInstalledServerRequest",
         "type": "object"
       },
+      "UpdateListingRequest": {
+        "properties": {
+          "category_slug": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Slug"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "price_cents": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Cents"
+          },
+          "pricing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Pricing"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "maxLength": 280,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 3,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "UpdateListingRequest",
+        "type": "object"
+      },
       "UpdateOrganizationSettingsRequest": {
         "properties": {
           "brand_color": {
@@ -6899,6 +7316,317 @@
         "summary": "Accept Invite",
         "tags": [
           "invitations"
+        ]
+      }
+    },
+    "/api/v1/marketplace/categories": {
+      "get": {
+        "description": "Unauthenticated: the category rail is part of the public catalog.",
+        "operationId": "list_categories_route_api_v1_marketplace_categories_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CategoryResponse"
+                  },
+                  "title": "Response List Categories Route Api V1 Marketplace Categories Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Categories Route",
+        "tags": [
+          "marketplace"
+        ]
+      }
+    },
+    "/api/v1/marketplace/listings": {
+      "get": {
+        "description": "The public catalog. Published listings only, across every\nworkspace \u2014 the one read in this platform that is deliberately not\ntenant-scoped.",
+        "operationId": "browse_route_api_v1_marketplace_listings_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ListingKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "featured",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Featured",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "free",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Free",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "popular",
+              "pattern": "^(popular|newest|rating|name)$",
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 24,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingPageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Browse Route",
+        "tags": [
+          "marketplace"
+        ]
+      }
+    },
+    "/api/v1/marketplace/listings/{slug}": {
+      "get": {
+        "description": "Unauthenticated, so it returns published listings only.\n\nA publisher viewing their own draft reads it through\n`/workspaces/{id}/marketplace/listings` instead, where they have a\nworkspace context to be checked against.",
+        "operationId": "get_listing_route_api_v1_marketplace_listings__slug__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Listing Route",
+        "tags": [
+          "marketplace"
+        ]
+      }
+    },
+    "/api/v1/marketplace/listings/{slug}/reviews": {
+      "get": {
+        "operationId": "list_reviews_route_api_v1_marketplace_listings__slug__reviews_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReviewResponse"
+                  },
+                  "title": "Response List Reviews Route Api V1 Marketplace Listings  Slug  Reviews Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Reviews Route",
+        "tags": [
+          "marketplace"
+        ]
+      }
+    },
+    "/api/v1/marketplace/listings/{slug}/versions": {
+      "get": {
+        "operationId": "list_versions_route_api_v1_marketplace_listings__slug__versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ListingVersionResponse"
+                  },
+                  "title": "Response List Versions Route Api V1 Marketplace Listings  Slug  Versions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Versions Route",
+        "tags": [
+          "marketplace"
         ]
       }
     },
@@ -12447,6 +13175,475 @@
         "summary": "Search Route",
         "tags": [
           "knowledge-bases"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings": {
+      "get": {
+        "description": "This workspace's listings in *every* status, including the drafts\nand rejections the public catalog must never return.",
+        "operationId": "list_my_listings_route_api_v1_workspaces__workspace_id__marketplace_listings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ListingResponse"
+                  },
+                  "title": "Response List My Listings Route Api V1 Workspaces  Workspace Id  Marketplace Listings Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List My Listings Route",
+        "tags": [
+          "marketplace-publishing"
+        ]
+      },
+      "post": {
+        "description": "Create a draft. `require_admin`, because publishing puts the\nworkspace's name on a public page.",
+        "operationId": "create_listing_route_api_v1_workspaces__workspace_id__marketplace_listings_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateListingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Listing Route",
+        "tags": [
+          "marketplace-publishing"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}": {
+      "patch": {
+        "operationId": "update_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateListingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Listing Route",
+        "tags": [
+          "marketplace-publishing"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/review": {
+      "delete": {
+        "operationId": "withdraw_review_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__review_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Withdraw Review Route",
+        "tags": [
+          "marketplace-publishing"
+        ]
+      },
+      "put": {
+        "description": "One review per workspace, so `PUT` rather than `POST` \u2014 a second\nsubmission replaces the first rather than adding one.",
+        "operationId": "submit_review_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__review_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Submit Review Route",
+        "tags": [
+          "marketplace-publishing"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/submit": {
+      "post": {
+        "description": "Submit for moderation. Reports *every* readiness problem at once,\nso a publisher does not make three round trips to submit.",
+        "operationId": "submit_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__submit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Submit Listing Route",
+        "tags": [
+          "marketplace-publishing"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/unlist": {
+      "post": {
+        "description": "Withdraw from the catalog. Not deletion \u2014 installs already made\nfrom this listing are copies in other workspaces, and the row\nsurvives so their provenance stays explicable.",
+        "operationId": "unlist_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__unlist_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Unlist Listing Route",
+        "tags": [
+          "marketplace-publishing"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/versions": {
+      "post": {
+        "description": "Snapshot a configuration as a new version.\n\nThe config is *copied*. The publisher can delete their source agent\nafterwards and every install made from this version keeps working.",
+        "operationId": "publish_version_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__versions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingVersionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Publish Version Route",
+        "tags": [
+          "marketplace-publishing"
         ]
       }
     },
