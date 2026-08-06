@@ -82,6 +82,7 @@ from agentverse_api.auth_service.infrastructure.models import (
     OrganizationMember,
     OrganizationSettings,
     PasswordPolicy,
+    PlatformAdmin,
     ResourcePermission,
     ScimToken,
     SecurityEvent,
@@ -1897,3 +1898,22 @@ class SqlCustomRoleRepository:
                 # would take out every request the member makes.
                 continue
         return frozenset(resolved)
+
+
+class SqlPlatformAdminRepository:
+    """Reads the platform-staff roster.
+
+    Read-only by design. Membership is granted out of band and never
+    through an endpoint, so there is no `add`/`remove` here to become a
+    privilege-escalation target the moment one admin account is
+    compromised.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def is_platform_admin(self, user_id: str) -> bool:
+        result = await self._session.execute(
+            select(PlatformAdmin.user_id).where(PlatformAdmin.user_id == user_id)
+        )
+        return result.scalar_one_or_none() is not None

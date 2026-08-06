@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from agentverse_api.marketplace_service.domain.install import ImportedConfig, MarketplaceInstall
 from agentverse_api.marketplace_service.domain.listing import (
     Listing,
     ListingKind,
@@ -74,6 +75,17 @@ class ListingRepository(Protocol):
     async def list_for_publisher(self, *, publisher_workspace_id: str, limit: int) -> list[Listing]:
         """Every listing this workspace owns, in any status — including
         the drafts and rejections `browse` must never return.
+        """
+        ...
+
+    async def list_by_status(self, *, status: ListingStatus, limit: int) -> list[Listing]:
+        """Across every workspace, for the moderation queue.
+
+        The only other unscoped read in this context, and unlike `browse`
+        it is not public: it is reachable solely behind
+        `require_platform_admin`, because it deliberately returns
+        listings nobody outside the publishing workspace may otherwise
+        see.
         """
         ...
 
@@ -193,3 +205,75 @@ class CategoryRepository(Protocol):
     async def list_active(self) -> list[Category]: ...
 
     async def exists(self, slug: str) -> bool: ...
+
+
+class InstallRepository(Protocol):
+    """Provenance records — which listing became which agent, where.
+
+    Every method is workspace-scoped. This *is* a tenant-owned table, so
+    the catalog's public-read exception does not extend to it: a
+    workspace's install history is nobody else's business.
+    """
+
+    async def get(
+        self, *, workspace_id: str, listing_id: str, version_number: int
+    ) -> MarketplaceInstall | None: ...
+
+    async def list_for_workspace(
+        self, *, workspace_id: str, limit: int
+    ) -> list[MarketplaceInstall]: ...
+
+    async def record(
+        self,
+        *,
+        workspace_id: str,
+        listing_id: str,
+        version_number: int,
+        agent_id: str,
+        installed_by_user_id: str,
+    ) -> MarketplaceInstall:
+        """Write, or re-point an existing record at a fresh agent.
+
+        Upserted on `(workspace_id, listing_id, version_number)` so a
+        double-clicked install cannot produce two agents, while installing
+        a *newer* version still records separately — that is the
+        difference between a retry and an upgrade.
+        """
+        ...
+
+    async def count_for_listing(self, listing_id: str) -> int:
+        """For reconciling the catalog's denormalized install count."""
+        ...
+
+
+class AgentImporter(Protocol):
+    """Creates the installed agent, on the other side of a context
+    boundary.
+
+    The marketplace does not write `agents`/`agent_versions` — those are
+    the orchestration context's tables, and reaching into them directly
+    is exactly what Rule 5 forbids. This port is the whole of what the
+    marketplace needs from that context, and the composition root binds
+    it to orchestration's own use case.
+    """
+
+    async def create_from_listing(
+        self,
+        *,
+        workspace_id: str,
+        name: str,
+        description: str,
+        created_by_user_id: str,
+        config: ImportedConfig,
+    ) -> str:
+        """Returns the new agent's id."""
+        ...
+
+    async def exists(self, *, workspace_id: str, agent_id: str) -> bool:
+        """Whether a previously installed agent is still there.
+
+        Asked before returning an existing install as a no-op: a record
+        pointing at an agent the installer has since deleted should
+        install again, not hand back a dead id.
+        """
+        ...

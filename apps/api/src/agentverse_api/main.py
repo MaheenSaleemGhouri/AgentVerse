@@ -74,6 +74,9 @@ from agentverse_api.interface.middleware import request_id_middleware
 from agentverse_api.interface.routes.health import router as health_router
 from agentverse_api.interface.routes.metrics import router as metrics_router
 from agentverse_api.marketplace_service.interface.routes.marketplace import (
+    admin_router as marketplace_admin_router,
+)
+from agentverse_api.marketplace_service.interface.routes.marketplace import (
     publisher_router as marketplace_publisher_router,
 )
 from agentverse_api.marketplace_service.interface.routes.marketplace import (
@@ -179,6 +182,7 @@ def create_app() -> FastAPI:
     app.include_router(notifications_router)
     app.include_router(marketplace_router)
     app.include_router(marketplace_publisher_router)
+    app.include_router(marketplace_admin_router)
     app.include_router(metrics_router)
     app.include_router(api_keys_router)
     app.include_router(audit_logs_router)

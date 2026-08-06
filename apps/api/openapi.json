@@ -1639,6 +1639,19 @@
         "title": "ExecutionEventResponse",
         "type": "object"
       },
+      "FeatureRequest": {
+        "properties": {
+          "is_featured": {
+            "title": "Is Featured",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "is_featured"
+        ],
+        "title": "FeatureRequest",
+        "type": "object"
+      },
       "GrantPermissionRequest": {
         "description": "Granting a server's tools to an agent, a team, or the workspace.\n\nAt most one subject. Both set is rejected here as well as by the\ntable's CHECK constraint \u2014 the DB is the guarantee, this is the\nreadable error.",
         "properties": {
@@ -1892,6 +1905,122 @@
           "mcp_server_id"
         ],
         "title": "InstallFromCatalogRequest",
+        "type": "object"
+      },
+      "InstallRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "version_number": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Number"
+          }
+        },
+        "title": "InstallRequest",
+        "type": "object"
+      },
+      "InstallResponse": {
+        "properties": {
+          "agent_id": {
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "created": {
+            "title": "Created",
+            "type": "boolean"
+          },
+          "installed_at": {
+            "format": "date-time",
+            "title": "Installed At",
+            "type": "string"
+          },
+          "listing_slug": {
+            "title": "Listing Slug",
+            "type": "string"
+          },
+          "version_number": {
+            "title": "Version Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "listing_slug",
+          "version_number",
+          "agent_id",
+          "installed_at",
+          "created"
+        ],
+        "title": "InstallResponse",
+        "type": "object"
+      },
+      "InstalledListingResponse": {
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "installed_at": {
+            "format": "date-time",
+            "title": "Installed At",
+            "type": "string"
+          },
+          "installed_version": {
+            "title": "Installed Version",
+            "type": "integer"
+          },
+          "latest_version": {
+            "title": "Latest Version",
+            "type": "integer"
+          },
+          "listing_slug": {
+            "title": "Listing Slug",
+            "type": "string"
+          },
+          "listing_title": {
+            "title": "Listing Title",
+            "type": "string"
+          },
+          "upgrade_available": {
+            "title": "Upgrade Available",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "listing_slug",
+          "listing_title",
+          "installed_version",
+          "latest_version",
+          "upgrade_available",
+          "agent_id",
+          "installed_at"
+        ],
+        "title": "InstalledListingResponse",
         "type": "object"
       },
       "InstalledServerResponse": {
@@ -3189,6 +3318,18 @@
           "created_at"
         ],
         "title": "MemberResponse",
+        "type": "object"
+      },
+      "ModerationDecisionRequest": {
+        "properties": {
+          "note": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "title": "ModerationDecisionRequest",
         "type": "object"
       },
       "NotificationListResponse": {
@@ -7151,6 +7292,235 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/admin/marketplace/listings/{listing_id}/approve": {
+      "post": {
+        "description": "Publish a submitted listing to the public catalog.\n\nAudit-logged on *success*, not only on denial. For an ordinary route\n\"someone with permission used it\" is noise; for the action that puts\na listing in front of every customer it is the record an incident\nreview reads.",
+        "operationId": "approve_listing_route_api_v1_admin_marketplace_listings__listing_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "listing_id",
+            "required": true,
+            "schema": {
+              "title": "Listing Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModerationDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Approve Listing Route",
+        "tags": [
+          "marketplace-moderation"
+        ]
+      }
+    },
+    "/api/v1/admin/marketplace/listings/{listing_id}/feature": {
+      "post": {
+        "description": "Curated placement \u2014 a platform decision, never a publisher's, or\nevery publisher features themselves.",
+        "operationId": "feature_listing_route_api_v1_admin_marketplace_listings__listing_id__feature_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "listing_id",
+            "required": true,
+            "schema": {
+              "title": "Listing Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeatureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Feature Listing Route",
+        "tags": [
+          "marketplace-moderation"
+        ]
+      }
+    },
+    "/api/v1/admin/marketplace/listings/{listing_id}/reject": {
+      "post": {
+        "description": "Send a listing back with a reason.\n\nThe note is required here where it is optional on approval \u2014 a\npublisher told \"rejected\" with no reason cannot fix anything, and a\nrejection that produces a second submission of the same listing has\nwasted everyone's time.",
+        "operationId": "reject_listing_route_api_v1_admin_marketplace_listings__listing_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "listing_id",
+            "required": true,
+            "schema": {
+              "title": "Listing Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModerationDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reject Listing Route",
+        "tags": [
+          "marketplace-moderation"
+        ]
+      }
+    },
+    "/api/v1/admin/marketplace/queue": {
+      "get": {
+        "description": "Everything awaiting a decision, oldest first.\n\nOldest first because a queue sorted newest-first starves its tail:\nthe listing nobody looked at yesterday is the one most in need of\nlooking at today.",
+        "operationId": "moderation_queue_route_api_v1_admin_marketplace_queue_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ListingResponse"
+                  },
+                  "title": "Response Moderation Queue Route Api V1 Admin Marketplace Queue Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Moderation Queue Route",
+        "tags": [
+          "marketplace-moderation"
+        ]
+      }
+    },
     "/api/v1/billing/webhooks/stripe": {
       "post": {
         "operationId": "stripe_webhook_route_api_v1_billing_webhooks_stripe_post",
@@ -13178,6 +13548,58 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspace_id}/marketplace/installs": {
+      "get": {
+        "description": "What this workspace has installed, and whether anything has moved on.\n\nTenant-scoped in the ordinary way \u2014 the catalog's public-read\nexception stops at the catalog.",
+        "operationId": "list_installs_route_api_v1_workspaces__workspace_id__marketplace_installs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/InstalledListingResponse"
+                  },
+                  "title": "Response List Installs Route Api V1 Workspaces  Workspace Id  Marketplace Installs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Installs Route",
+        "tags": [
+          "marketplace-publishing"
+        ]
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/marketplace/listings": {
       "get": {
         "description": "This workspace's listings in *every* status, including the drafts\nand rejections the public catalog must never return.",
@@ -13347,6 +13769,73 @@
           }
         ],
         "summary": "Update Listing Route",
+        "tags": [
+          "marketplace-publishing"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/install": {
+      "post": {
+        "description": "Copy a published version into this workspace as a new agent.\n\n`require_admin`, not `require_member`: installing writes an agent\ninto the workspace, and a viewer or member browsing the catalog\nshould not be able to add one.\n\nThe copy is a copy. Nothing links the installed agent back to the\nlisting at run time, so the publisher can unlist, rewrite or delete\ntheir source and this agent keeps working.",
+        "operationId": "install_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__install_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Install Listing Route",
         "tags": [
           "marketplace-publishing"
         ]

@@ -10,6 +10,7 @@ from sqlalchemy import UnaryExpression, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agentverse_api.marketplace_service.domain.install import MarketplaceInstall
 from agentverse_api.marketplace_service.domain.listing import (
     Listing,
     ListingKind,
@@ -20,6 +21,7 @@ from agentverse_api.marketplace_service.domain.ports import Category, ListingVer
 from agentverse_api.marketplace_service.domain.review import RatingAggregate, Review
 from agentverse_api.marketplace_service.infrastructure.models import (
     MarketplaceCategoryModel,
+    MarketplaceInstallModel,
     MarketplaceListingModel,
     MarketplaceListingVersionModel,
     MarketplaceReviewModel,
@@ -152,6 +154,20 @@ class SqlListingRepository:
             select(MarketplaceListingModel)
             .where(MarketplaceListingModel.publisher_workspace_id == publisher_workspace_id)
             .order_by(MarketplaceListingModel.updated_at.desc())
+            .limit(limit)
+        )
+        return [_to_listing(row) for row in result.scalars().all()]
+
+    async def list_by_status(self, *, status: ListingStatus, limit: int) -> list[Listing]:
+        # Unscoped by workspace, like `browse` — but unlike `browse` this
+        # is not public. It returns listings only their publisher may
+        # otherwise see, and is reachable solely behind
+        # `require_platform_admin`.
+        result = await self._session.execute(
+            select(MarketplaceListingModel)
+            .where(MarketplaceListingModel.status == status.value)
+            # Oldest first: a queue sorted newest-first starves its tail.
+            .order_by(MarketplaceListingModel.updated_at.asc())
             .limit(limit)
         )
         return [_to_listing(row) for row in result.scalars().all()]
@@ -478,3 +494,101 @@ class SqlCategoryRepository:
             )
         )
         return result.scalar_one_or_none() is not None
+
+
+def _to_install(row: MarketplaceInstallModel) -> MarketplaceInstall:
+    return MarketplaceInstall(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        listing_id=row.listing_id,
+        version_number=row.version_number,
+        agent_id=row.agent_id,
+        installed_by_user_id=row.installed_by_user_id,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+class SqlInstallRepository:
+    """Implements `domain.ports.InstallRepository`.
+
+    Every query is `workspace_id`-scoped. The catalog's public-read
+    exception stops at the catalog — a workspace's install history is
+    tenant-owned and follows the ordinary rule.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get(
+        self, *, workspace_id: str, listing_id: str, version_number: int
+    ) -> MarketplaceInstall | None:
+        result = await self._session.execute(
+            select(MarketplaceInstallModel).where(
+                MarketplaceInstallModel.workspace_id == workspace_id,
+                MarketplaceInstallModel.listing_id == listing_id,
+                MarketplaceInstallModel.version_number == version_number,
+            )
+        )
+        row = result.scalar_one_or_none()
+        return None if row is None else _to_install(row)
+
+    async def list_for_workspace(
+        self, *, workspace_id: str, limit: int
+    ) -> list[MarketplaceInstall]:
+        result = await self._session.execute(
+            select(MarketplaceInstallModel)
+            .where(MarketplaceInstallModel.workspace_id == workspace_id)
+            .order_by(MarketplaceInstallModel.created_at.desc())
+            .limit(limit)
+        )
+        return [_to_install(row) for row in result.scalars().all()]
+
+    async def record(
+        self,
+        *,
+        workspace_id: str,
+        listing_id: str,
+        version_number: int,
+        agent_id: str,
+        installed_by_user_id: str,
+    ) -> MarketplaceInstall:
+        # Upserted on the unique index rather than checked-then-inserted:
+        # two concurrent installs would both pass a check, and the loser
+        # would fail the request after having already created an agent.
+        stmt = (
+            pg_insert(MarketplaceInstallModel)
+            .values(
+                id=str(uuid.uuid4()),
+                workspace_id=workspace_id,
+                listing_id=listing_id,
+                version_number=version_number,
+                agent_id=agent_id,
+                installed_by_user_id=installed_by_user_id,
+            )
+            .on_conflict_do_update(
+                index_elements=[
+                    MarketplaceInstallModel.workspace_id,
+                    MarketplaceInstallModel.listing_id,
+                    MarketplaceInstallModel.version_number,
+                ],
+                # Re-points at the fresh agent. Reached when the previous
+                # copy was deleted and the listing installed again.
+                set_={
+                    "agent_id": agent_id,
+                    "installed_by_user_id": installed_by_user_id,
+                    "updated_at": func.now(),
+                },
+            )
+            .returning(MarketplaceInstallModel)
+        )
+        result = await self._session.execute(stmt)
+        return _to_install(result.scalar_one())
+
+    async def count_for_listing(self, listing_id: str) -> int:
+        result = await self._session.execute(
+            select(func.count())
+            .select_from(MarketplaceInstallModel)
+            .where(MarketplaceInstallModel.listing_id == listing_id)
+        )
+        return int(result.scalar_one())

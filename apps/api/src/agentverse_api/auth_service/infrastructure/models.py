@@ -605,3 +605,38 @@ class CustomRolePermission(Base):
     role_id: Mapped[str] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"), index=True)
     permission: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime]
+
+
+class PlatformAdmin(Base):
+    """A user who acts for AgentVerse itself rather than for a workspace.
+
+    A genuinely new kind of authority, and deliberately the narrowest one
+    that works. Every other permission in this platform answers "what may
+    this identity do *inside this workspace*" — but moderating the
+    marketplace is a judgement about a listing that belongs to someone
+    else's workspace, so no workspace role can express it. Routing it
+    through `require_role` instead would have let a publisher approve
+    themselves.
+
+    There is no grant route, on purpose. Membership is granted out of
+    band (a migration or an operator's INSERT) and every use is
+    audit-logged, so the set of people who can approve a public listing
+    changes only through a reviewed, recorded action — not through an
+    endpoint that becomes a privilege-escalation target the moment one
+    admin account is compromised.
+
+    Global by design, so no `workspace_id`: it is one of the explicit
+    exemptions from Rule 11, alongside `users` and platform feature
+    flags.
+    """
+
+    __tablename__ = "platform_admins"
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    #: Why this person has it. Read during an incident review, when
+    #: "who could have approved this listing, and why did they have that
+    #: power" is the question being asked.
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime]

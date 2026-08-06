@@ -23,16 +23,29 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 
+from agentverse_api.auth_service.application.audit_service import AuditService
 from agentverse_api.auth_service.application.workspace_service import WorkspaceService
 from agentverse_api.auth_service.domain.entities import WorkspaceContext
+from agentverse_api.auth_service.interface.dependencies.require_platform_admin import (
+    require_platform_admin,
+)
 from agentverse_api.auth_service.interface.dependencies.require_role import (
     require_admin,
     require_member,
 )
-from agentverse_api.auth_service.interface.dependencies.services import get_workspace_service
+from agentverse_api.auth_service.interface.dependencies.services import (
+    get_audit_service,
+    get_workspace_service,
+)
+from agentverse_api.marketplace_service.application.install_service import (
+    InstallService,
+    ListingNotInstallableError,
+    ModerationService,
+    NoSuchVersionError,
+)
 from agentverse_api.marketplace_service.application.marketplace_service import (
     ListingForbiddenError,
     ListingNotFoundError,
@@ -41,6 +54,7 @@ from agentverse_api.marketplace_service.application.marketplace_service import (
     UnknownCategoryError,
     WorkflowListingsNotYetSupportedError,
 )
+from agentverse_api.marketplace_service.domain.install import UninstallableConfigError
 from agentverse_api.marketplace_service.domain.listing import (
     InvalidListingTransitionError,
     Listing,
@@ -53,7 +67,9 @@ from agentverse_api.marketplace_service.domain.review import (
     SelfReviewError,
 )
 from agentverse_api.marketplace_service.interface.dependencies.services import (
+    get_install_service,
     get_marketplace_service,
+    get_moderation_service,
 )
 
 router = APIRouter(prefix="/api/v1/marketplace", tags=["marketplace"])
@@ -140,6 +156,51 @@ class PublishVersionRequest(BaseModel):
 class SubmitReviewRequest(BaseModel):
     rating: int = Field(ge=1, le=5)
     body: str = Field(default="", max_length=4_000)
+
+
+class InstallRequest(BaseModel):
+    #: `null` installs the current version — what one-click install
+    #: means. Naming one explicitly lets a workspace pin, or re-install
+    #: exactly what they reviewed.
+    version_number: int | None = Field(default=None, ge=1)
+    #: Defaults to the listing's title. Overridable because a workspace
+    #: installing two variants needs to tell them apart.
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+
+
+class InstallResponse(BaseModel):
+    listing_slug: str
+    version_number: int
+    #: The agent this became, in the installing workspace. It is a copy:
+    #: the publisher can unlist, rewrite or delete their source and this
+    #: agent keeps working.
+    agent_id: str
+    installed_at: datetime
+    #: False when an identical install already existed and was returned
+    #: unchanged, so a retried request is visibly a retry.
+    created: bool
+
+
+class InstalledListingResponse(BaseModel):
+    listing_slug: str
+    listing_title: str
+    installed_version: int
+    latest_version: int
+    #: Whether the listing has published a newer version since. Computed
+    #: rather than stored, because it changes when the *publisher* acts.
+    upgrade_available: bool
+    agent_id: str | None
+    installed_at: datetime
+
+
+class ModerationDecisionRequest(BaseModel):
+    #: Required on a rejection and free-form on an approval. A publisher
+    #: told "rejected" with no reason cannot fix anything.
+    note: str = Field(default="", max_length=2_000)
+
+
+class FeatureRequest(BaseModel):
+    is_featured: bool
 
 
 async def _publisher_name(workspaces: WorkspaceService, workspace_id: str) -> str:
@@ -540,3 +601,220 @@ async def withdraw_review_route(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="This workspace has not reviewed that listing.",
         )
+
+
+# ---- installing (workspace-scoped) ------------------------------------
+
+
+@publisher_router.post(
+    "/{workspace_id}/marketplace/listings/{slug}/install",
+    response_model=InstallResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def install_listing_route(
+    slug: str,
+    body: InstallRequest,
+    response: Response,
+    context: WorkspaceContext = Depends(require_admin),
+    service: InstallService = Depends(get_install_service),
+) -> InstallResponse:
+    """Copy a published version into this workspace as a new agent.
+
+    `require_admin`, not `require_member`: installing writes an agent
+    into the workspace, and a viewer or member browsing the catalog
+    should not be able to add one.
+
+    The copy is a copy. Nothing links the installed agent back to the
+    listing at run time, so the publisher can unlist, rewrite or delete
+    their source and this agent keeps working.
+    """
+    try:
+        result = await service.install(
+            slug=slug,
+            workspace_id=context.workspace_id,
+            installed_by_user_id=context.user_id,
+            version_number=body.version_number,
+            name=body.name,
+        )
+    except NoSuchVersionError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ListingNotInstallableError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except UninstallableConfigError as exc:
+        # The publisher's snapshot is broken, not the installer's
+        # request — so it names what is wrong rather than saying "invalid".
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "listing_not_installable", "problems": exc.problems},
+        ) from exc
+
+    if not result.created:
+        # A retry, answered with the same agent. 200 rather than 201, so
+        # the caller can see it did not create a second one.
+        response.status_code = status.HTTP_200_OK
+    return InstallResponse(
+        listing_slug=slug,
+        version_number=result.install.version_number,
+        agent_id=result.agent_id,
+        installed_at=result.install.created_at,
+        created=result.created,
+    )
+
+
+@publisher_router.get(
+    "/{workspace_id}/marketplace/installs", response_model=list[InstalledListingResponse]
+)
+async def list_installs_route(
+    context: WorkspaceContext = Depends(require_member),
+    service: InstallService = Depends(get_install_service),
+) -> list[InstalledListingResponse]:
+    """What this workspace has installed, and whether anything has moved on.
+
+    Tenant-scoped in the ordinary way — the catalog's public-read
+    exception stops at the catalog.
+    """
+    rows: list[InstalledListingResponse] = []
+    for install in await service.list_installs(workspace_id=context.workspace_id):
+        resolved = await service.upgrade_available(install=install)
+        if resolved is None:
+            # The listing has since been withdrawn. The installed agent
+            # is unaffected, but there is nothing to offer, so it is not
+            # shown as upgradable rather than shown as broken.
+            continue
+        listing, upgradable = resolved
+        rows.append(
+            InstalledListingResponse(
+                listing_slug=listing.slug,
+                listing_title=listing.title,
+                installed_version=install.version_number,
+                latest_version=listing.latest_version,
+                upgrade_available=upgradable,
+                agent_id=install.agent_id,
+                installed_at=install.created_at,
+            )
+        )
+    return rows
+
+
+# ---- moderation (platform staff) --------------------------------------
+
+admin_router = APIRouter(prefix="/api/v1/admin/marketplace", tags=["marketplace-moderation"])
+
+
+@admin_router.get("/queue", response_model=list[ListingResponse])
+async def moderation_queue_route(
+    _admin: str = Depends(require_platform_admin),
+    service: ModerationService = Depends(get_moderation_service),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> list[ListingResponse]:
+    """Everything awaiting a decision, oldest first.
+
+    Oldest first because a queue sorted newest-first starves its tail:
+    the listing nobody looked at yesterday is the one most in need of
+    looking at today.
+    """
+    return [_to_response(listing) for listing in await service.queue(limit=limit)]
+
+
+@admin_router.post("/listings/{listing_id}/approve", response_model=ListingResponse)
+async def approve_listing_route(
+    listing_id: str,
+    body: ModerationDecisionRequest,
+    admin_user_id: str = Depends(require_platform_admin),
+    service: MarketplaceService = Depends(get_marketplace_service),
+    audit: AuditService = Depends(get_audit_service),
+) -> ListingResponse:
+    """Publish a submitted listing to the public catalog.
+
+    Audit-logged on *success*, not only on denial. For an ordinary route
+    "someone with permission used it" is noise; for the action that puts
+    a listing in front of every customer it is the record an incident
+    review reads.
+    """
+    try:
+        listing = await service.approve(listing_id=listing_id)
+    except ListingNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No such listing"
+        ) from exc
+    except InvalidListingTransitionError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    await audit.record(
+        action="marketplace.listing_approved",
+        outcome="success",
+        workspace_id=listing.publisher_workspace_id,
+        actor_user_id=admin_user_id,
+        target=listing.id,
+        metadata={"slug": listing.slug, "note": body.note},
+    )
+    return _to_response(listing)
+
+
+@admin_router.post("/listings/{listing_id}/reject", response_model=ListingResponse)
+async def reject_listing_route(
+    listing_id: str,
+    body: ModerationDecisionRequest,
+    admin_user_id: str = Depends(require_platform_admin),
+    service: MarketplaceService = Depends(get_marketplace_service),
+    audit: AuditService = Depends(get_audit_service),
+) -> ListingResponse:
+    """Send a listing back with a reason.
+
+    The note is required here where it is optional on approval — a
+    publisher told "rejected" with no reason cannot fix anything, and a
+    rejection that produces a second submission of the same listing has
+    wasted everyone's time.
+    """
+    if not body.note.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="A rejection must say why, so the publisher can fix it.",
+        )
+    try:
+        listing = await service.reject(listing_id=listing_id, note=body.note)
+    except ListingNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No such listing"
+        ) from exc
+    except InvalidListingTransitionError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    await audit.record(
+        action="marketplace.listing_rejected",
+        outcome="success",
+        workspace_id=listing.publisher_workspace_id,
+        actor_user_id=admin_user_id,
+        target=listing.id,
+        metadata={"slug": listing.slug, "note": body.note},
+    )
+    return _to_response(listing)
+
+
+@admin_router.post("/listings/{listing_id}/feature", response_model=ListingResponse)
+async def feature_listing_route(
+    listing_id: str,
+    body: FeatureRequest,
+    admin_user_id: str = Depends(require_platform_admin),
+    service: MarketplaceService = Depends(get_marketplace_service),
+    audit: AuditService = Depends(get_audit_service),
+) -> ListingResponse:
+    """Curated placement — a platform decision, never a publisher's, or
+    every publisher features themselves.
+    """
+    try:
+        listing = await service.set_featured(listing_id=listing_id, is_featured=body.is_featured)
+    except ListingNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No such listing"
+        ) from exc
+
+    await audit.record(
+        action="marketplace.listing_featured",
+        outcome="success",
+        workspace_id=listing.publisher_workspace_id,
+        actor_user_id=admin_user_id,
+        target=listing.id,
+        metadata={"slug": listing.slug, "is_featured": str(body.is_featured)},
+    )
+    return _to_response(listing)

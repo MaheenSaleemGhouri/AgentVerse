@@ -9,6 +9,7 @@ event loop.
 from __future__ import annotations
 
 import os
+import uuid
 from collections.abc import AsyncIterator
 
 import pytest
@@ -42,3 +43,12 @@ async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
     session_factory = async_sessionmaker(db_engine, expire_on_commit=False)
     async with session_factory() as session:
         yield session
+
+
+@pytest.fixture
+def unique_name() -> str:
+    """A per-test suffix, so the route-level tests — which commit, as any
+    real request does — can run against a shared dev Postgres without
+    colliding on workspace slugs or user emails.
+    """
+    return f"test-{uuid.uuid4().hex[:12]}"

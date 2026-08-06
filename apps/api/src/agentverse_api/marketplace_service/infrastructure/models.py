@@ -186,6 +186,61 @@ class MarketplaceListingVersionModel(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
+class MarketplaceInstallModel(Base):
+    """Provenance: which listing, at which version, became which agent.
+
+    Unlike the catalog, this **is** a tenant-owned table and follows the
+    ordinary rule — `workspace_id` leading, every query scoped by it. A
+    workspace's install history is nobody else's business.
+
+    Nothing reads back through this at run time. The installed agent is a
+    copy of the snapshot and stands alone; this exists so a workspace can
+    ask "where did this come from, and is there a newer version?", and so
+    the catalog's denormalized install count can be reconciled against
+    real rows.
+    """
+
+    __tablename__ = "marketplace_installs"
+    __table_args__ = (
+        # One record per (workspace, listing, version). A double-clicked
+        # install therefore cannot produce two agents, while installing a
+        # *newer* version still records separately — the difference
+        # between a retry and an upgrade. A workspace that genuinely
+        # wants two copies duplicates the installed agent, which is an
+        # action in their own workspace rather than a second import.
+        Index(
+            "uq_marketplace_installs_version",
+            "workspace_id",
+            "listing_id",
+            "version_number",
+            unique=True,
+        ),
+        Index("ix_marketplace_installs_workspace", "workspace_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    listing_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        # RESTRICT: the listing row is what makes an install explicable,
+        # and a listing is withdrawn by unlisting rather than deleted.
+        ForeignKey("marketplace_listings.id", ondelete="RESTRICT"),
+        index=True,
+    )
+    version_number: Mapped[int] = mapped_column(Integer)
+    # No foreign key, and nullable: agents are deletable, and the
+    # provenance record outlives them. A dangling id here means the
+    # installer removed their copy, not that the install never happened.
+    agent_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), default=None)
+    installed_by_user_id: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+
 class MarketplaceReviewModel(Base):
     """One workspace's review of one listing."""
 

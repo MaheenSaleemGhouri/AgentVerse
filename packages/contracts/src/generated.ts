@@ -4,6 +4,101 @@
  */
 
 export interface paths {
+    "/api/v1/admin/marketplace/listings/{listing_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Listing Route
+         * @description Publish a submitted listing to the public catalog.
+         *
+         *     Audit-logged on *success*, not only on denial. For an ordinary route
+         *     "someone with permission used it" is noise; for the action that puts
+         *     a listing in front of every customer it is the record an incident
+         *     review reads.
+         */
+        post: operations["approve_listing_route_api_v1_admin_marketplace_listings__listing_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/marketplace/listings/{listing_id}/feature": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Feature Listing Route
+         * @description Curated placement — a platform decision, never a publisher's, or
+         *     every publisher features themselves.
+         */
+        post: operations["feature_listing_route_api_v1_admin_marketplace_listings__listing_id__feature_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/marketplace/listings/{listing_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Listing Route
+         * @description Send a listing back with a reason.
+         *
+         *     The note is required here where it is optional on approval — a
+         *     publisher told "rejected" with no reason cannot fix anything, and a
+         *     rejection that produces a second submission of the same listing has
+         *     wasted everyone's time.
+         */
+        post: operations["reject_listing_route_api_v1_admin_marketplace_listings__listing_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/marketplace/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Moderation Queue Route
+         * @description Everything awaiting a decision, oldest first.
+         *
+         *     Oldest first because a queue sorted newest-first starves its tail:
+         *     the listing nobody looked at yesterday is the one most in need of
+         *     looking at today.
+         */
+        get: operations["moderation_queue_route_api_v1_admin_marketplace_queue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing/webhooks/stripe": {
         parameters: {
             query?: never;
@@ -1705,6 +1800,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/marketplace/installs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Installs Route
+         * @description What this workspace has installed, and whether anything has moved on.
+         *
+         *     Tenant-scoped in the ordinary way — the catalog's public-read
+         *     exception stops at the catalog.
+         */
+        get: operations["list_installs_route_api_v1_workspaces__workspace_id__marketplace_installs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/marketplace/listings": {
         parameters: {
             query?: never;
@@ -1746,6 +1864,34 @@ export interface paths {
         head?: never;
         /** Update Listing Route */
         patch: operations["update_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__patch"];
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Install Listing Route
+         * @description Copy a published version into this workspace as a new agent.
+         *
+         *     `require_admin`, not `require_member`: installing writes an agent
+         *     into the workspace, and a viewer or member browsing the catalog
+         *     should not be able to add one.
+         *
+         *     The copy is a copy. Nothing links the installed agent back to the
+         *     listing at run time, so the publisher can unlist, rewrite or delete
+         *     their source and this agent keeps working.
+         */
+        post: operations["install_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__install_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/review": {
@@ -3211,6 +3357,11 @@ export interface components {
             /** Type */
             type: string;
         };
+        /** FeatureRequest */
+        FeatureRequest: {
+            /** Is Featured */
+            is_featured: boolean;
+        };
         /**
          * GrantPermissionRequest
          * @description Granting a server's tools to an agent, a team, or the workspace.
@@ -3331,6 +3482,49 @@ export interface components {
             display_name?: string | null;
             /** Mcp Server Id */
             mcp_server_id: string;
+        };
+        /** InstallRequest */
+        InstallRequest: {
+            /** Name */
+            name?: string | null;
+            /** Version Number */
+            version_number?: number | null;
+        };
+        /** InstallResponse */
+        InstallResponse: {
+            /** Agent Id */
+            agent_id: string;
+            /** Created */
+            created: boolean;
+            /**
+             * Installed At
+             * Format: date-time
+             */
+            installed_at: string;
+            /** Listing Slug */
+            listing_slug: string;
+            /** Version Number */
+            version_number: number;
+        };
+        /** InstalledListingResponse */
+        InstalledListingResponse: {
+            /** Agent Id */
+            agent_id: string | null;
+            /**
+             * Installed At
+             * Format: date-time
+             */
+            installed_at: string;
+            /** Installed Version */
+            installed_version: number;
+            /** Latest Version */
+            latest_version: number;
+            /** Listing Slug */
+            listing_slug: string;
+            /** Listing Title */
+            listing_title: string;
+            /** Upgrade Available */
+            upgrade_available: boolean;
         };
         /** InstalledServerResponse */
         InstalledServerResponse: {
@@ -3809,6 +4003,14 @@ export interface components {
             user_id: string;
             /** Workspace Id */
             workspace_id: string;
+        };
+        /** ModerationDecisionRequest */
+        ModerationDecisionRequest: {
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /** NotificationListResponse */
         NotificationListResponse: {
@@ -5213,6 +5415,142 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    approve_listing_route_api_v1_admin_marketplace_listings__listing_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listing_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModerationDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    feature_listing_route_api_v1_admin_marketplace_listings__listing_id__feature_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listing_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeatureRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_listing_route_api_v1_admin_marketplace_listings__listing_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listing_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModerationDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    moderation_queue_route_api_v1_admin_marketplace_queue_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     stripe_webhook_route_api_v1_billing_webhooks_stripe_post: {
         parameters: {
             query?: never;
@@ -8683,6 +9021,37 @@ export interface operations {
             };
         };
     };
+    list_installs_route_api_v1_workspaces__workspace_id__marketplace_installs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstalledListingResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_my_listings_route_api_v1_workspaces__workspace_id__marketplace_listings_get: {
         parameters: {
             query?: never;
@@ -8772,6 +9141,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    install_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__install_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstallRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallResponse"];
                 };
             };
             /** @description Validation Error */
