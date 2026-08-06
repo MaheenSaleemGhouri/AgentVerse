@@ -2507,6 +2507,123 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/webhooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Endpoints Route */
+        get: operations["list_endpoints_route_api_v1_workspaces__workspace_id__webhooks_get"];
+        put?: never;
+        /**
+         * Create Endpoint Route
+         * @description Register an endpoint. The signing secret is returned once, here.
+         *
+         *     The URL is checked against the egress guard before it is stored, not
+         *     only before it is called — so a customer who typed a private address
+         *     hears about it while they are looking at the form.
+         */
+        post: operations["create_endpoint_route_api_v1_workspaces__workspace_id__webhooks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/webhooks/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Deliveries Route
+         * @description Recent attempts, so a customer can debug their own endpoint
+         *     without asking support what we sent.
+         *
+         *     The payload is deliberately absent: this is for "did it arrive and
+         *     what did my server say", and echoing every body would turn a list
+         *     endpoint into a bulk export of the workspace's own run data.
+         */
+        get: operations["list_deliveries_route_api_v1_workspaces__workspace_id__webhooks_deliveries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/webhooks/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Event Types Route
+         * @description Everything that can be subscribed to.
+         *
+         *     Served from the enum rather than documented separately, so the list
+         *     a client sees and the list the validator accepts cannot disagree.
+         */
+        get: operations["list_event_types_route_api_v1_workspaces__workspace_id__webhooks_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/webhooks/{endpoint_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Endpoint Route */
+        delete: operations["delete_endpoint_route_api_v1_workspaces__workspace_id__webhooks__endpoint_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Endpoint Route */
+        patch: operations["update_endpoint_route_api_v1_workspaces__workspace_id__webhooks__endpoint_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/webhooks/{endpoint_id}/rotate-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Secret Route
+         * @description A new signing secret, shown once.
+         *
+         *     The old one stops working immediately — there is no overlap window.
+         *     That is the right behaviour for a leaked secret, which is the reason
+         *     rotation exists, and the wrong one for a planned rotation on a busy
+         *     integration. An overlap needs a second stored secret and an expiry;
+         *     it is real scope, not a flag, and nobody has asked for it yet.
+         */
+        post: operations["rotate_secret_route_api_v1_workspaces__workspace_id__webhooks__endpoint_id__rotate_secret_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -3091,6 +3208,21 @@ export interface components {
             /** Permissions */
             permissions?: string[];
         };
+        /** CreateEndpointRequest */
+        CreateEndpointRequest: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Events */
+            events: string[];
+            /**
+             * Url
+             * Format: uri
+             */
+            url: string;
+        };
         /** CreateKnowledgeBaseRequest */
         CreateKnowledgeBaseRequest: {
             /** Description */
@@ -3171,6 +3303,52 @@ export interface components {
         CreateWorkspaceRequest: {
             /** Name */
             name: string;
+        };
+        /** CreatedEndpointResponse */
+        CreatedEndpointResponse: {
+            /** Consecutive Failures */
+            consecutive_failures: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /** Disabled At */
+            disabled_at: string | null;
+            /** Disabled Reason */
+            disabled_reason: string | null;
+            /** Events */
+            events: string[];
+            /** Id */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Recommended Tolerance Seconds
+             * @default 300
+             */
+            recommended_tolerance_seconds: number;
+            /** Secret */
+            secret: string;
+            /**
+             * Signature Format
+             * @default t=<unix-seconds>,v1=<hex-hmac-sha256>
+             */
+            signature_format: string;
+            /**
+             * Signature Header
+             * @default AgentVerse-Signature
+             */
+            signature_header: string;
+            /**
+             * Signed Payload
+             * @default <timestamp>.<raw-request-body>
+             */
+            signed_payload: string;
+            /** Url */
+            url: string;
         };
         /**
          * CredentialResponse
@@ -3260,6 +3438,35 @@ export interface components {
             /** Workspace Id */
             workspace_id: string;
         };
+        /** DeliveryResponse */
+        DeliveryResponse: {
+            /** Attempts */
+            attempts: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Delivered At */
+            delivered_at: string | null;
+            /** Endpoint Id */
+            endpoint_id: string;
+            /** Event Type */
+            event_type: string;
+            /** Id */
+            id: string;
+            /** Last Error */
+            last_error: string | null;
+            /** Last Response Status */
+            last_response_status: number | null;
+            /**
+             * Next Attempt At
+             * Format: date-time
+             */
+            next_attempt_at: string;
+            /** Status */
+            status: string;
+        };
         /** DimensionUsageResponse */
         DimensionUsageResponse: {
             /** Dimension */
@@ -3322,6 +3529,30 @@ export interface components {
              * Format: date-time
              */
             since: string;
+        };
+        /** EndpointResponse */
+        EndpointResponse: {
+            /** Consecutive Failures */
+            consecutive_failures: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /** Disabled At */
+            disabled_at: string | null;
+            /** Disabled Reason */
+            disabled_reason: string | null;
+            /** Events */
+            events: string[];
+            /** Id */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Url */
+            url: string;
         };
         /**
          * EntitlementLineResponse
@@ -4852,6 +5083,11 @@ export interface components {
             /** Used Tokens */
             used_tokens: number;
         };
+        /** SecretResponse */
+        SecretResponse: {
+            /** Secret */
+            secret: string;
+        };
         /** SecurityEventResponse */
         SecurityEventResponse: {
             /**
@@ -5274,6 +5510,17 @@ export interface components {
             name?: string | null;
             /** Permissions */
             permissions?: string[] | null;
+        };
+        /** UpdateEndpointRequest */
+        UpdateEndpointRequest: {
+            /** Description */
+            description?: string | null;
+            /** Events */
+            events?: string[] | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Url */
+            url?: string | null;
         };
         /** UpdateInstalledServerRequest */
         UpdateInstalledServerRequest: {
@@ -10628,6 +10875,235 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_endpoints_route_api_v1_workspaces__workspace_id__webhooks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndpointResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_endpoint_route_api_v1_workspaces__workspace_id__webhooks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEndpointRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedEndpointResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_deliveries_route_api_v1_workspaces__workspace_id__webhooks_deliveries_get: {
+        parameters: {
+            query?: {
+                endpoint_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_event_types_route_api_v1_workspaces__workspace_id__webhooks_events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_endpoint_route_api_v1_workspaces__workspace_id__webhooks__endpoint_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                endpoint_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_endpoint_route_api_v1_workspaces__workspace_id__webhooks__endpoint_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                endpoint_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateEndpointRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndpointResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_secret_route_api_v1_workspaces__workspace_id__webhooks__endpoint_id__rotate_secret_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                endpoint_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretResponse"];
                 };
             };
             /** @description Validation Error */

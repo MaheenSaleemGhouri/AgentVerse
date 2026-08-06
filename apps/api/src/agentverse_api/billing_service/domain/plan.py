@@ -190,6 +190,17 @@ class Plan:
     metered_allowances: dict[MeteredDimension, int | None]
     capabilities: frozenset[Capability]
     overage_rates: dict[MeteredDimension, OverageRate]
+    #: Public-API requests admitted per minute. `None` is unlimited, the
+    #: same convention every other quota here uses, so "not configured"
+    #: never silently means zero.
+    #:
+    #: Lives on the plan rather than in the limiter because it is a
+    #: packaging decision — `saas-pricing-expert` owns the numbers — and
+    #: a second copy in code would be the one that gets edited.
+    #:
+    #: Defaulted, and last, so every existing construction site is
+    #: unchanged.
+    api_rate_limit_per_minute: int | None = None
 
     @property
     def is_custom_priced(self) -> bool:

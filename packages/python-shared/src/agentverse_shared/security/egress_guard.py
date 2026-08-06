@@ -33,7 +33,7 @@ import asyncio
 import ipaddress
 import socket
 from dataclasses import dataclass
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 #: Only these reach a third party. `file:`, `gopher:`, `ftp:`, and
 #: friends are classic SSRF primitives; an allowlist means a scheme
@@ -165,6 +165,28 @@ class ValidatedDestination:
     @property
     def primary_address(self) -> str:
         return self.addresses[0]
+
+    @property
+    def pinned_url(self) -> str:
+        """The original URL with the hostname replaced by a validated IP.
+
+        This is how a caller actually uses the guard, and it lives here
+        so no caller has to reconstruct it — getting this wrong (dialling
+        the hostname again) reopens the DNS-rebinding hole the whole
+        class exists to close. Send `Host: <destination.host>` alongside
+        it, or TLS verification and virtual hosting both break.
+
+        IPv6 literals are bracketed; the port is included only when it
+        was explicit or non-default, so a plain `https://example.com/x`
+        does not become `https://93.184.216.34:443/x` for no reason.
+        """
+        parts = urlsplit(self.url)
+        address = self.primary_address
+        if ":" in address:
+            address = f"[{address}]"
+        default_port = 443 if self.scheme == "https" else 80
+        netloc = address if self.port == default_port else f"{address}:{self.port}"
+        return urlunsplit((parts.scheme, netloc, parts.path or "/", parts.query, parts.fragment))
 
 
 def _normalize(address: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address:

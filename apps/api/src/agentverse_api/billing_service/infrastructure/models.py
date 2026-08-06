@@ -107,6 +107,11 @@ class PlanModel(Base):
     metered_allowances: Mapped[dict[str, int | None]] = mapped_column(JSONB, default=dict)
     capabilities: Mapped[list[str]] = mapped_column(JSONB, default=list)
     overage_rates: Mapped[dict[str, dict[str, int]]] = mapped_column(JSONB, default=dict)
+    # Public-API requests per minute. NULL is unlimited, the same
+    # convention every other quota on this row uses. A packaging
+    # decision, so it lives with the rest of the pricing config rather
+    # than as a constant in the limiter (Rule 3).
+    api_rate_limit_per_minute: Mapped[int | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 

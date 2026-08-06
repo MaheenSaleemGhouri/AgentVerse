@@ -173,6 +173,7 @@ def to_domain(
     metered_allowances: object,
     capabilities: object,
     overage_rates: object,
+    api_rate_limit_per_minute: int | None = None,
 ) -> Plan:
     """Build the domain `Plan` from a stored row, or raise."""
     try:
@@ -204,4 +205,5 @@ def to_domain(
         metered_allowances=_parse_allowances(slug.value, metered_allowances),
         capabilities=_parse_capabilities(slug.value, capabilities),
         overage_rates=_parse_overage_rates(slug.value, overage_rates),
+        api_rate_limit_per_minute=api_rate_limit_per_minute,
     )

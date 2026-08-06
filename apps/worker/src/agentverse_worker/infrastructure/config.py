@@ -103,6 +103,16 @@ class Settings(BaseSettings):
     #: (`postgresql-expert`); the remainder is picked up next cycle.
     retention_sweep_batch_size: int = 1000
 
+    #: How often the webhook queue is drained. Seconds, not hours: unlike
+    #: retention this is latency a customer feels — a webhook that
+    #: arrives an hour after the run it describes is not a webhook.
+    webhook_drain_interval_seconds: float = 5.0
+    #: Deliveries attempted per cycle, per replica. Each one is a network
+    #: round trip to a third party with a ten-second ceiling, so the
+    #: batch bounds how long a cycle can take when every endpoint is
+    #: timing out.
+    webhook_drain_batch_size: int = 25
+
 
 @lru_cache
 def get_settings() -> Settings:

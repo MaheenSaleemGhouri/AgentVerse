@@ -30,6 +30,7 @@ from agentverse_worker.mcp.health_sweep import build_health_sweeper
 from agentverse_worker.mcp.metrics_aggregation import build_tool_metrics_aggregator
 from agentverse_worker.queue.factory import build_queue  # noqa: F401 - re-exported for tests
 from agentverse_worker.retention.sweep import build_retention_sweeper
+from agentverse_worker.webhooks.drainer import build_webhook_drainer
 
 __all__ = ["app", "build_queue", "create_app", "lifespan"]
 
@@ -54,6 +55,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     retention = build_retention_sweeper(redis_client, get_settings())
     retention_task = asyncio.create_task(retention.run_forever())
 
+    # No distributed lock, unlike the sweepers above: delivery is a
+    # queue, and several replicas draining it in parallel is the point.
+    # `FOR UPDATE SKIP LOCKED` is what makes that safe.
+    webhooks = build_webhook_drainer(get_settings())
+    webhook_task = asyncio.create_task(webhooks.run_forever())
+
     try:
         yield
     finally:
@@ -73,6 +80,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         retention_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await retention_task
+        webhooks.stop()
+        webhook_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await webhook_task
         await redis_client.aclose()
 
 

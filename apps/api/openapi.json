@@ -913,6 +913,38 @@
         "title": "CreateCustomRoleRequest",
         "type": "object"
       },
+      "CreateEndpointRequest": {
+        "properties": {
+          "description": {
+            "default": "",
+            "maxLength": 280,
+            "title": "Description",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 7,
+            "minItems": 1,
+            "title": "Events",
+            "type": "array"
+          },
+          "url": {
+            "format": "uri",
+            "maxLength": 2083,
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "events"
+        ],
+        "title": "CreateEndpointRequest",
+        "type": "object"
+      },
       "CreateKnowledgeBaseRequest": {
         "properties": {
           "description": {
@@ -1113,6 +1145,103 @@
           "name"
         ],
         "title": "CreateWorkspaceRequest",
+        "type": "object"
+      },
+      "CreatedEndpointResponse": {
+        "properties": {
+          "consecutive_failures": {
+            "title": "Consecutive Failures",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "disabled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled At"
+          },
+          "disabled_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled Reason"
+          },
+          "events": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "recommended_tolerance_seconds": {
+            "default": 300,
+            "title": "Recommended Tolerance Seconds",
+            "type": "integer"
+          },
+          "secret": {
+            "title": "Secret",
+            "type": "string"
+          },
+          "signature_format": {
+            "default": "t=<unix-seconds>,v1=<hex-hmac-sha256>",
+            "title": "Signature Format",
+            "type": "string"
+          },
+          "signature_header": {
+            "default": "AgentVerse-Signature",
+            "title": "Signature Header",
+            "type": "string"
+          },
+          "signed_payload": {
+            "default": "<timestamp>.<raw-request-body>",
+            "title": "Signed Payload",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "description",
+          "events",
+          "is_active",
+          "consecutive_failures",
+          "disabled_at",
+          "disabled_reason",
+          "created_at",
+          "secret"
+        ],
+        "title": "CreatedEndpointResponse",
         "type": "object"
       },
       "CredentialResponse": {
@@ -1356,6 +1485,88 @@
         "title": "CustomRoleResponse",
         "type": "object"
       },
+      "DeliveryResponse": {
+        "properties": {
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "delivered_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered At"
+          },
+          "endpoint_id": {
+            "title": "Endpoint Id",
+            "type": "string"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "last_response_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Response Status"
+          },
+          "next_attempt_at": {
+            "format": "date-time",
+            "title": "Next Attempt At",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "endpoint_id",
+          "event_type",
+          "status",
+          "attempts",
+          "last_response_status",
+          "last_error",
+          "next_attempt_at",
+          "delivered_at",
+          "created_at"
+        ],
+        "title": "DeliveryResponse",
+        "type": "object"
+      },
       "DimensionUsageResponse": {
         "properties": {
           "dimension": {
@@ -1457,6 +1668,78 @@
           "next_action"
         ],
         "title": "DunningStatusResponse",
+        "type": "object"
+      },
+      "EndpointResponse": {
+        "properties": {
+          "consecutive_failures": {
+            "title": "Consecutive Failures",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "disabled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled At"
+          },
+          "disabled_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled Reason"
+          },
+          "events": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "description",
+          "events",
+          "is_active",
+          "consecutive_failures",
+          "disabled_at",
+          "disabled_reason",
+          "created_at"
+        ],
+        "title": "EndpointResponse",
         "type": "object"
       },
       "EntitlementLineResponse": {
@@ -5428,6 +5711,19 @@
         "title": "SearchResponse",
         "type": "object"
       },
+      "SecretResponse": {
+        "properties": {
+          "secret": {
+            "title": "Secret",
+            "type": "string"
+          }
+        },
+        "required": [
+          "secret"
+        ],
+        "title": "SecretResponse",
+        "type": "object"
+      },
       "SecurityEventResponse": {
         "properties": {
           "created_at": {
@@ -6632,6 +6928,64 @@
           }
         },
         "title": "UpdateCustomRoleRequest",
+        "type": "object"
+      },
+      "UpdateEndpointRequest": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 280,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "events": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 7,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Events"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "format": "uri",
+                "maxLength": 2083,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "title": "UpdateEndpointRequest",
         "type": "object"
       },
       "UpdateInstalledServerRequest": {
@@ -16404,6 +16758,415 @@
         "summary": "Stream Team Session",
         "tags": [
           "teams"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/webhooks": {
+      "get": {
+        "operationId": "list_endpoints_route_api_v1_workspaces__workspace_id__webhooks_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EndpointResponse"
+                  },
+                  "title": "Response List Endpoints Route Api V1 Workspaces  Workspace Id  Webhooks Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Endpoints Route",
+        "tags": [
+          "webhooks"
+        ]
+      },
+      "post": {
+        "description": "Register an endpoint. The signing secret is returned once, here.\n\nThe URL is checked against the egress guard before it is stored, not\nonly before it is called \u2014 so a customer who typed a private address\nhears about it while they are looking at the form.",
+        "operationId": "create_endpoint_route_api_v1_workspaces__workspace_id__webhooks_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEndpointRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedEndpointResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Endpoint Route",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/webhooks/deliveries": {
+      "get": {
+        "description": "Recent attempts, so a customer can debug their own endpoint\nwithout asking support what we sent.\n\nThe payload is deliberately absent: this is for \"did it arrive and\nwhat did my server say\", and echoing every body would turn a list\nendpoint into a bulk export of the workspace's own run data.",
+        "operationId": "list_deliveries_route_api_v1_workspaces__workspace_id__webhooks_deliveries_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endpoint_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Endpoint Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeliveryResponse"
+                  },
+                  "title": "Response List Deliveries Route Api V1 Workspaces  Workspace Id  Webhooks Deliveries Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Deliveries Route",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/webhooks/events": {
+      "get": {
+        "description": "Everything that can be subscribed to.\n\nServed from the enum rather than documented separately, so the list\na client sees and the list the validator accepts cannot disagree.",
+        "operationId": "list_event_types_route_api_v1_workspaces__workspace_id__webhooks_events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response List Event Types Route Api V1 Workspaces  Workspace Id  Webhooks Events Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Event Types Route",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/webhooks/{endpoint_id}": {
+      "delete": {
+        "operationId": "delete_endpoint_route_api_v1_workspaces__workspace_id__webhooks__endpoint_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "endpoint_id",
+            "required": true,
+            "schema": {
+              "title": "Endpoint Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Endpoint Route",
+        "tags": [
+          "webhooks"
+        ]
+      },
+      "patch": {
+        "operationId": "update_endpoint_route_api_v1_workspaces__workspace_id__webhooks__endpoint_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "endpoint_id",
+            "required": true,
+            "schema": {
+              "title": "Endpoint Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEndpointRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndpointResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Endpoint Route",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/webhooks/{endpoint_id}/rotate-secret": {
+      "post": {
+        "description": "A new signing secret, shown once.\n\nThe old one stops working immediately \u2014 there is no overlap window.\nThat is the right behaviour for a leaked secret, which is the reason\nrotation exists, and the wrong one for a planned rotation on a busy\nintegration. An overlap needs a second stored secret and an expiry;\nit is real scope, not a flag, and nobody has asked for it yet.",
+        "operationId": "rotate_secret_route_api_v1_workspaces__workspace_id__webhooks__endpoint_id__rotate_secret_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "endpoint_id",
+            "required": true,
+            "schema": {
+              "title": "Endpoint Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rotate Secret Route",
+        "tags": [
+          "webhooks"
         ]
       }
     },

@@ -20,6 +20,7 @@ import pytest
 from agentverse_shared.security import egress_guard
 from agentverse_shared.security.egress_guard import (
     EgressDeniedError,
+    ValidatedDestination,
     is_denied_address,
     validate_destination,
     validate_redirect_chain,
@@ -214,3 +215,79 @@ class TestDenialReasons:
             await validate_destination("https://evil.test/")
         assert "10.1.2.3" in caught.value.reason
         assert "10.0.0.0/8" in caught.value.reason
+
+
+class TestPinnedUrl:
+    """The property that decides whether the guard actually works.
+
+    Validating a hostname and then handing that same hostname to an HTTP
+    client is a validate-then-fetch guard, which DNS rebinding walks
+    straight through. `pinned_url` is what a caller dials instead, so
+    getting it wrong reopens the hole the whole module exists to close.
+    """
+
+    def _destination(self, url: str, address: str, port: int, scheme: str = "https"):
+        return ValidatedDestination(
+            url=url,
+            scheme=scheme,
+            host="example.com",
+            port=port,
+            addresses=(address,),
+        )
+
+    def test_the_hostname_is_replaced_by_the_validated_address(self) -> None:
+        destination = self._destination("https://example.com/hooks", "93.184.216.34", 443)
+        assert destination.pinned_url == "https://93.184.216.34/hooks"
+
+    def test_the_path_and_query_survive(self) -> None:
+        destination = self._destination(
+            "https://example.com/hooks/av?token=abc", "93.184.216.34", 443
+        )
+        assert destination.pinned_url == "https://93.184.216.34/hooks/av?token=abc"
+
+    def test_a_missing_path_becomes_root(self) -> None:
+        destination = self._destination("https://example.com", "93.184.216.34", 443)
+        assert destination.pinned_url == "https://93.184.216.34/"
+
+    def test_a_default_port_is_not_spelled_out(self) -> None:
+        # `https://93.184.216.34:443/x` is correct but noisy in logs and
+        # in any signature that happens to cover the URL.
+        assert (
+            self._destination("https://example.com/x", "93.184.216.34", 443).pinned_url
+            == "https://93.184.216.34/x"
+        )
+        assert (
+            self._destination("http://example.com/x", "93.184.216.34", 80, scheme="http").pinned_url
+            == "http://93.184.216.34/x"
+        )
+
+    def test_a_non_default_port_is_preserved(self) -> None:
+        # Dropping it would send the request to the wrong service.
+        assert (
+            self._destination("https://example.com:8443/x", "93.184.216.34", 8443).pinned_url
+            == "https://93.184.216.34:8443/x"
+        )
+
+    def test_an_ipv6_address_is_bracketed(self) -> None:
+        # Without brackets the address's own colons are parsed as a port
+        # separator and the request goes nowhere useful.
+        destination = ValidatedDestination(
+            url="https://example.com/x",
+            scheme="https",
+            host="example.com",
+            port=443,
+            addresses=("2606:2800:220:1:248:1893:25c8:1946",),
+        )
+        assert destination.pinned_url == "https://[2606:2800:220:1:248:1893:25c8:1946]/x"
+
+    def test_the_first_validated_address_is_used(self) -> None:
+        # Every address was validated, so any is safe; using the first
+        # keeps the choice deterministic across retries.
+        destination = ValidatedDestination(
+            url="https://example.com/x",
+            scheme="https",
+            host="example.com",
+            port=443,
+            addresses=("93.184.216.34", "93.184.216.35"),
+        )
+        assert destination.pinned_url == "https://93.184.216.34/x"

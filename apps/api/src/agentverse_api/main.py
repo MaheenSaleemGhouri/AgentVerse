@@ -112,6 +112,9 @@ from agentverse_api.orchestration_service.interface.routers.team_session_stream 
 from agentverse_api.orchestration_service.interface.routers.teams import (
     router as teams_router,
 )
+from agentverse_api.webhook_service.interface.routes.webhooks import (
+    router as webhooks_router,
+)
 
 
 def create_app() -> FastAPI:
@@ -183,6 +186,7 @@ def create_app() -> FastAPI:
     app.include_router(marketplace_router)
     app.include_router(marketplace_publisher_router)
     app.include_router(marketplace_admin_router)
+    app.include_router(webhooks_router)
     app.include_router(metrics_router)
     app.include_router(api_keys_router)
     app.include_router(audit_logs_router)

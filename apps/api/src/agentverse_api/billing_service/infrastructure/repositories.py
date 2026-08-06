@@ -67,6 +67,7 @@ def _to_plan(row: PlanModel) -> Plan:
         metered_allowances=row.metered_allowances,
         capabilities=row.capabilities,
         overage_rates=row.overage_rates,
+        api_rate_limit_per_minute=row.api_rate_limit_per_minute,
     )
 
 

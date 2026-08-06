@@ -22,6 +22,9 @@ from agentverse_api.notification_service.infrastructure import (  # noqa: F401
 from agentverse_api.orchestration_service.infrastructure import (  # noqa: F401
     models as orchestration_models,
 )
+from agentverse_api.webhook_service.infrastructure import (  # noqa: F401
+    models as webhook_models,
+)
 
 config = context.config
 if config.config_file_name is not None:
