@@ -1,0 +1,60 @@
+[project]
+name = "agentverse"
+version = "0.1.0a0"
+description = "Official Python SDK for the AgentVerse API — build, run and observe agents."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+# Deliberately 3.10, not 3.12 like the services. An SDK's floor is set by
+# what its *users* run, not by what this repository runs, and a customer
+# on 3.10 should not be told to upgrade Python to call an HTTP API.
+classifiers = [
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
+dependencies = [
+    # One dependency, on purpose. Every library an SDK pulls in is a
+    # version conflict it can cause in someone else's application, and
+    # httpx already provides sync, async, streaming and connection
+    # pooling. `typing-extensions` is not needed at this floor.
+    "httpx>=0.27,<1",
+]
+
+[project.urls]
+Homepage = "https://github.com/MaheenSaleemGhouri/AgentVerse"
+Source = "https://github.com/MaheenSaleemGhouri/AgentVerse/tree/main/packages/sdk-python"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<9",
+    "pytest-asyncio>=0.24,<1",
+    "mypy>=1.14,<2",
+    "ruff>=0.8,<0.9",
+    "respx>=0.22,<1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentverse"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
