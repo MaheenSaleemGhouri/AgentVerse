@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { listMyWorkspaces } from "@/lib/api/workspaces";
 import { auth } from "@/lib/auth";
+import { buildDocsSearchIndex } from "@/lib/docs/search-index";
 
 import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
@@ -39,6 +40,11 @@ export default async function WorkspaceShellLayout({
     redirect("/dashboard");
   }
 
+  // Read from disk on the server so the ⌘K palette can match guides
+  // without a request. Public content, identical for every user — there
+  // is nothing here to scope to the workspace.
+  const docsIndex = await buildDocsSearchIndex();
+
   return (
     <div className="flex min-h-screen flex-col">
       <Topbar
@@ -46,6 +52,7 @@ export default async function WorkspaceShellLayout({
         activeWorkspaceId={workspaceId}
         userEmail={session.user.email}
         userName={session.user.name}
+        docsIndex={docsIndex}
       />
       <div className="flex flex-1">
         <Sidebar workspaceId={workspaceId} />

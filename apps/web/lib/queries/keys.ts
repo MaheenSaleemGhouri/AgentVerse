@@ -125,4 +125,10 @@ export const queryKeys = {
     documents: (workspaceId: string, knowledgeBaseId: string) =>
       ["workspaces", workspaceId, "knowledge-bases", knowledgeBaseId, "documents"] as const,
   },
+
+  // The query string is part of the key, so each distinct search caches
+  // separately and backspacing to a previous one is instant rather than
+  // a refetch.
+  search: (workspaceId: string, query: string) =>
+    ["workspaces", workspaceId, "search", query] as const,
 } as const;

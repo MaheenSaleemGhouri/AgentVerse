@@ -46,6 +46,8 @@ import {
   markNotificationRead as markNotificationReadApi,
   type NotificationList,
 } from "@/lib/api/notifications";
+import { searchWorkspace as searchWorkspaceApi } from "@/lib/api/search";
+import type { SearchKind, SearchResults } from "@/lib/search/kinds";
 import {
   type Agent,
   type AgentVersion,
@@ -984,4 +986,21 @@ export async function markAllNotificationsReadAction(
   workspaceId: string
 ): Promise<{ marked: number }> {
   return markAllNotificationsReadApi(workspaceId);
+}
+
+/**
+ * Read-only, unlike everything else in this file — and it has to be.
+ *
+ * The command palette is a Client Component, so it cannot call the
+ * server-only `apiFetch` (which needs `next/headers` for the session)
+ * directly. Every other read in the app is issued from a Server
+ * Component that already has the request context; a palette that opens
+ * on ⌘K and queries as the user types has no such moment.
+ */
+export async function searchWorkspaceAction(
+  workspaceId: string,
+  query: string,
+  kinds?: readonly SearchKind[]
+): Promise<SearchResults> {
+  return searchWorkspaceApi(workspaceId, query, kinds);
 }

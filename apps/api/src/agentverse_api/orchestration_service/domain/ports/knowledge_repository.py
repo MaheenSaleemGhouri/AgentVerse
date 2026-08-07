@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from agentverse_shared.search import SearchMatch
+
 from agentverse_api.orchestration_service.domain.knowledge_entities import (
     KbDocument,
     KnowledgeBase,
@@ -30,6 +32,10 @@ class KnowledgeRepository(Protocol):
     ) -> KnowledgeBase: ...
 
     async def list_knowledge_bases(self, *, workspace_id: str) -> list[KnowledgeBase]: ...
+
+    async def search_knowledge_bases(
+        self, *, workspace_id: str, tsquery: str, limit: int
+    ) -> list[SearchMatch]: ...
 
     async def get_knowledge_base(
         self, *, workspace_id: str, knowledge_base_id: str

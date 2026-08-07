@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from agentverse_shared.search import SearchMatch
+
 from agentverse_api.marketplace_service.domain.install import ImportedConfig, MarketplaceInstall
 from agentverse_api.marketplace_service.domain.listing import (
     Listing,
@@ -68,6 +70,8 @@ class ListingRepository(Protocol):
         disagree if a listing is published between them.
         """
         ...
+
+    async def search_published(self, *, tsquery: str, limit: int) -> list[SearchMatch]: ...
 
     async def get_by_slug(self, slug: str) -> Listing | None: ...
 

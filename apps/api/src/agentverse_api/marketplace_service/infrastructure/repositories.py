@@ -6,10 +6,17 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import UnaryExpression, delete, func, or_, select, update
+from agentverse_shared.search import SearchMatch, to_prefix_tsquery
+from sqlalchemy import UnaryExpression, delete, false, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agentverse_api.infrastructure.full_text import (
+    matches,
+    search_query,
+    searchable,
+    to_matches,
+)
 from agentverse_api.marketplace_service.domain.install import MarketplaceInstall
 from agentverse_api.marketplace_service.domain.listing import (
     Listing,
@@ -118,18 +125,24 @@ class SqlListingRepository:
             # is the default the catalog page wants.
             conditions.append(MarketplaceListingModel.is_official.is_(official_only))
         if query:
-            # `ilike` over title and summary. Deliberately not full-text
-            # search: that needs a tsvector column and an index to be
-            # worth anything, and building one before the catalog has
-            # content would be tuning against no data. M6's search work
-            # owns the upgrade; this is honest until then.
-            pattern = f"%{query.strip()}%"
-            conditions.append(
-                or_(
-                    MarketplaceListingModel.title.ilike(pattern),
-                    MarketplaceListingModel.summary.ilike(pattern),
+            # Full-text over title and summary, served by the GIN
+            # expression index — the upgrade from the `ilike` scan this
+            # shipped with. Terms are prefix-matched, so "automat" finds
+            # "Process automator" the way a catalog search is expected to.
+            tsquery = to_prefix_tsquery(query)
+            if tsquery is None:
+                # Non-empty but nothing survives normalization ("!!!").
+                # The user asked to filter, so filter to nothing rather
+                # than silently ignoring their query and showing the
+                # whole catalog.
+                conditions.append(false())
+            else:
+                conditions.append(
+                    matches(
+                        searchable(MarketplaceListingModel.title, MarketplaceListingModel.summary),
+                        tsquery,
+                    )
                 )
-            )
 
         total = await self._session.execute(
             select(func.count()).select_from(MarketplaceListingModel).where(*conditions)
@@ -142,6 +155,30 @@ class SqlListingRepository:
             .offset(offset)
         )
         return [_to_listing(row) for row in rows.scalars().all()], int(total.scalar_one())
+
+    async def search_published(self, *, tsquery: str, limit: int) -> list[SearchMatch]:
+        """Full-text search over the *public* catalog.
+
+        The one searcher with no `workspace_id` predicate, and the reason
+        is the same one `browse` documents: a published listing belongs
+        to the catalog, not to a tenant. The `status` filter is what does
+        the security work here — without it this would expose every
+        workspace's drafts to every other workspace's search box.
+
+        `id` is the slug, not the row id: search results are rendered as
+        links, and the catalog is addressed by slug.
+        """
+        result = await self._session.execute(
+            search_query(
+                id_column=MarketplaceListingModel.slug,
+                title_column=MarketplaceListingModel.title,
+                subtitle_column=MarketplaceListingModel.summary,
+                tsquery=tsquery,
+                where=[MarketplaceListingModel.status == ListingStatus.PUBLISHED.value],
+                limit=limit,
+            )
+        )
+        return to_matches(result.all())
 
     async def get_by_slug(self, slug: str) -> Listing | None:
         result = await self._session.execute(

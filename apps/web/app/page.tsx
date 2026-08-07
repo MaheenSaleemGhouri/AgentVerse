@@ -26,6 +26,18 @@ export default function HomePage(): React.JSX.Element {
           Log in
         </Link>
       </div>
+      {/* Quiet text links rather than more buttons: both are public
+          surfaces someone reads *before* deciding to sign up, so they
+          have to be reachable without an account — but neither is the
+          action this page is asking for. */}
+      <div className="flex gap-4 text-sm text-neutral-500 dark:text-neutral-400">
+        <Link href="/docs" className="hover:text-foreground hover:underline">
+          Documentation
+        </Link>
+        <Link href="/pricing" className="hover:text-foreground hover:underline">
+          Pricing
+        </Link>
+      </div>
     </main>
   );
 }

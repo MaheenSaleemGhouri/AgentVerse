@@ -5588,6 +5588,60 @@
         "title": "ScoreFactorResponse",
         "type": "object"
       },
+      "SearchGroupOut": {
+        "properties": {
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "hits": {
+            "items": {
+              "$ref": "#/components/schemas/SearchHitOut"
+            },
+            "title": "Hits",
+            "type": "array"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SearchKind"
+          }
+        },
+        "required": [
+          "kind",
+          "hits",
+          "has_more"
+        ],
+        "title": "SearchGroupOut",
+        "type": "object"
+      },
+      "SearchHitOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtitle"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "SearchHitOut",
+        "type": "object"
+      },
       "SearchHitResponse": {
         "properties": {
           "chunk_id": {
@@ -5644,6 +5698,17 @@
         ],
         "title": "SearchHitResponse",
         "type": "object"
+      },
+      "SearchKind": {
+        "description": "The entity kinds search covers.\n\nDeliberately not \"everything with a name\". Runs are absent because\nthere is still no read path over `agent_runs` (the Phase 4 gap\n`feature-availability.ts` tracks as `runHistory`) \u2014 adding a kind\nwhose results could not be opened would be a worse experience than\nnot offering it.",
+        "enum": [
+          "agent",
+          "knowledge_base",
+          "team",
+          "listing"
+        ],
+        "title": "SearchKind",
+        "type": "string"
       },
       "SearchRequest": {
         "properties": {
@@ -5709,6 +5774,27 @@
           "dropped_chunk_count"
         ],
         "title": "SearchResponse",
+        "type": "object"
+      },
+      "SearchResultsOut": {
+        "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/SearchGroupOut"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query",
+          "groups"
+        ],
+        "title": "SearchResultsOut",
         "type": "object"
       },
       "SecretResponse": {
@@ -15428,6 +15514,102 @@
         "summary": "Update Custom Role",
         "tags": [
           "roles"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/search": {
+      "get": {
+        "description": "Search agents, knowledge bases, teams and the public catalog.\n\n`viewer` is the right floor: everything reachable here is already\nreadable by a viewer through its own list endpoint. Search is a\nfaster route to those rows, never a wider one \u2014 a hit it returns is\nalways a page the caller could already open.\n\nA 512-character cap is generous on purpose. Anything longer is a\npaste, and the shared normalizer truncates to its own limit and\nsearches the first terms rather than rejecting the request.",
+        "operationId": "search_workspace_api_v1_workspaces__workspace_id__search_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "What the user typed. Terms are prefix-matched, so partial words find whole ones. A query too short to be useful returns empty groups rather than an error.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "What the user typed. Terms are prefix-matched, so partial words find whole ones. A query too short to be useful returns empty groups rather than an error.",
+              "maxLength": 512,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Restrict to these kinds. Omit to search all of them.",
+            "in": "query",
+            "name": "kinds",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/SearchKind"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict to these kinds. Omit to search all of them.",
+              "title": "Kinds"
+            }
+          },
+          {
+            "description": "Maximum hits per kind, not in total.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "description": "Maximum hits per kind, not in total.",
+              "maximum": 25,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResultsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Search Workspace",
+        "tags": [
+          "search"
         ]
       }
     },

@@ -222,6 +222,10 @@
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* Documentation code blocks only — see the note in `app/layout.tsx`.
+     Repointing `--font-mono` at JetBrains Mono would restyle every run
+     id, trace timestamp and log line in the product. */
+  --font-mono-docs: var(--font-jetbrains-mono);
 }
 
 @layer base {
@@ -230,5 +234,106 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/*
+ * Documentation prose.
+ *
+ * Guides are rendered from markdown to an HTML string, so their
+ * elements cannot carry utility classes — they are styled here, scoped
+ * under `.docs-prose` so nothing leaks into the product's own surfaces.
+ * Every value is a token; there are no raw hex colours or off-scale
+ * spacings below.
+ */
+@layer components {
+  .docs-prose {
+    @apply text-[15px] leading-7 text-foreground;
+  }
+
+  .docs-prose > * + * {
+    @apply mt-4;
+  }
+
+  .docs-prose h2 {
+    @apply mt-12 scroll-mt-24 border-t border-border pt-8 text-xl font-semibold tracking-tight;
+  }
+
+  .docs-prose h3 {
+    @apply mt-8 scroll-mt-24 text-base font-semibold tracking-tight;
+  }
+
+  .docs-prose a {
+    @apply font-medium text-primary underline underline-offset-4 hover:no-underline;
+  }
+
+  .docs-prose ul {
+    @apply list-disc space-y-2 pl-6;
+  }
+
+  .docs-prose ol {
+    @apply list-decimal space-y-2 pl-6;
+  }
+
+  .docs-prose strong {
+    @apply font-semibold text-foreground;
+  }
+
+  .docs-prose blockquote {
+    @apply rounded-lg border border-warning/40 bg-warning-soft px-4 py-3 text-sm;
+  }
+
+  .docs-prose blockquote > * + * {
+    @apply mt-2;
+  }
+
+  /* Inline code. Distinguished by weight and a surface rather than a
+     border, so a sentence with three `identifiers` in it does not turn
+     into a row of boxes. */
+  .docs-prose :not(pre) > code {
+    @apply rounded bg-muted px-1.5 py-0.5 font-[family-name:var(--font-mono-docs)] text-[0.875em];
+  }
+
+  .docs-prose pre {
+    @apply overflow-x-auto rounded-lg border border-border bg-muted/50 p-4 text-[13px] leading-6;
+  }
+
+  .docs-prose pre code {
+    @apply font-[family-name:var(--font-mono-docs)];
+  }
+
+  /*
+   * Shiki emits both themes at once as CSS variables on the same
+   * markup, so switching theme is a CSS switch rather than a
+   * re-highlight — code is correct on first paint in either theme
+   * instead of flashing the wrong one.
+   */
+  .docs-prose pre code span {
+    color: var(--shiki-light);
+  }
+
+  .dark .docs-prose pre code span {
+    color: var(--shiki-dark);
+  }
+
+  /* Tables scroll inside their own container rather than widening the
+     page — a wide table must never make the body scroll sideways. */
+  /* `block` + `overflow-x-auto` so a wide table scrolls within itself.
+     Without it the table sets the page's minimum width and the whole
+     body scrolls sideways on a phone. */
+  .docs-prose table {
+    @apply block w-full max-w-full overflow-x-auto border-collapse text-sm;
+  }
+
+  .docs-prose thead {
+    @apply border-b border-border;
+  }
+
+  .docs-prose th {
+    @apply px-3 py-2 text-left font-semibold;
+  }
+
+  .docs-prose td {
+    @apply border-b border-border px-3 py-2 align-top;
   }
 }

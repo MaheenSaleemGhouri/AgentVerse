@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
+from agentverse_shared.search import SearchMatch
+
 from agentverse_api.orchestration_service.domain.team_entities import (
     CommunicationLogEntry,
     HandoffRecord,
@@ -41,6 +43,10 @@ class TeamRepository(Protocol):
     ) -> Team: ...
 
     async def list_teams(self, *, workspace_id: str) -> list[Team]: ...
+
+    async def search_teams(
+        self, *, workspace_id: str, tsquery: str, limit: int
+    ) -> list[SearchMatch]: ...
 
     async def get_team(self, *, workspace_id: str, team_id: str) -> Team | None: ...
 

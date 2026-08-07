@@ -4,6 +4,7 @@ import { Bell, Search } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
+import type { DocsSearchEntry } from "@/lib/docs/match";
 import type { Workspace } from "@/lib/api/workspaces";
 
 import { Breadcrumbs } from "@/components/shell/breadcrumbs";
@@ -28,11 +29,16 @@ export function Topbar({
   activeWorkspaceId,
   userEmail,
   userName,
+  docsIndex,
 }: {
   workspaces: Workspace[];
   activeWorkspaceId: string;
   userEmail: string;
   userName?: string | null | undefined;
+  /** Built server-side in the layout and passed straight through to the
+   * palette — the docs corpus is public and identical for everyone, so
+   * it ships with the shell rather than being fetched per search. */
+  docsIndex: readonly DocsSearchEntry[];
 }): React.JSX.Element {
   return (
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-md">
@@ -55,6 +61,10 @@ export function Topbar({
       </div>
 
       <div className="ml-auto flex items-center gap-1">
+        <Button variant="ghost" size="sm" className="hidden text-muted-foreground md:inline-flex" asChild>
+          <Link href="/docs">Docs</Link>
+        </Button>
+
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -95,7 +105,7 @@ export function Topbar({
         <UserMenu email={userEmail} name={userName} workspaceId={activeWorkspaceId} />
       </div>
 
-      <CommandPalette workspaceId={activeWorkspaceId} />
+      <CommandPalette workspaceId={activeWorkspaceId} docsIndex={docsIndex} />
     </header>
   );
 }

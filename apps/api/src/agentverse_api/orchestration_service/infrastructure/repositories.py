@@ -5,9 +5,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from agentverse_shared.search import SearchMatch
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agentverse_api.infrastructure.full_text import search_query, to_matches
 from agentverse_api.orchestration_service.domain.agent_entities import (
     Agent,
     AgentConfig,
@@ -162,6 +164,31 @@ class SqlAgentRepository:
             .order_by(AgentModel.created_at.desc())
         )
         return [_to_agent(row) for row in result.scalars()]
+
+    async def search_agents(
+        self, *, workspace_id: str, tsquery: str, limit: int
+    ) -> list[SearchMatch]:
+        """Full-text search over this workspace's live agents.
+
+        Lives here, on the repository that owns `agents`, rather than in
+        the search module: no context reads another's tables (Rule 5).
+        Search reaches this through a port, exactly as the marketplace
+        reaches agent creation through `AgentImporter`.
+        """
+        result = await self._session.execute(
+            search_query(
+                id_column=AgentModel.id,
+                title_column=AgentModel.name,
+                subtitle_column=AgentModel.description,
+                tsquery=tsquery,
+                where=[
+                    AgentModel.workspace_id == workspace_id,
+                    AgentModel.deleted_at.is_(None),
+                ],
+                limit=limit,
+            )
+        )
+        return to_matches(result.all())
 
     async def get_version(self, *, agent_id: str, version_id: str) -> AgentVersion | None:
         result = await self._session.execute(

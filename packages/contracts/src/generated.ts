@@ -2200,6 +2200,35 @@ export interface paths {
         patch: operations["update_custom_role_api_v1_workspaces__workspace_id__roles__role_id__patch"];
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Workspace
+         * @description Search agents, knowledge bases, teams and the public catalog.
+         *
+         *     `viewer` is the right floor: everything reachable here is already
+         *     readable by a viewer through its own list endpoint. Search is a
+         *     faster route to those rows, never a wider one — a hit it returns is
+         *     always a page the caller could already open.
+         *
+         *     A 512-character cap is generous on purpose. Anything longer is a
+         *     paste, and the shared normalizer truncates to its own limit and
+         *     searches the first terms rather than rejecting the request.
+         */
+        get: operations["search_workspace_api_v1_workspaces__workspace_id__search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/security/events": {
         parameters: {
             query?: never;
@@ -5041,6 +5070,23 @@ export interface components {
             /** Remediation */
             remediation: string | null;
         };
+        /** SearchGroupOut */
+        SearchGroupOut: {
+            /** Has More */
+            has_more: boolean;
+            /** Hits */
+            hits: components["schemas"]["SearchHitOut"][];
+            kind: components["schemas"]["SearchKind"];
+        };
+        /** SearchHitOut */
+        SearchHitOut: {
+            /** Id */
+            id: string;
+            /** Subtitle */
+            subtitle?: string | null;
+            /** Title */
+            title: string;
+        };
         /** SearchHitResponse */
         SearchHitResponse: {
             /** Chunk Id */
@@ -5058,6 +5104,18 @@ export interface components {
             /** Vector Rank */
             vector_rank: number | null;
         };
+        /**
+         * SearchKind
+         * @description The entity kinds search covers.
+         *
+         *     Deliberately not "everything with a name". Runs are absent because
+         *     there is still no read path over `agent_runs` (the Phase 4 gap
+         *     `feature-availability.ts` tracks as `runHistory`) — adding a kind
+         *     whose results could not be opened would be a worse experience than
+         *     not offering it.
+         * @enum {string}
+         */
+        SearchKind: "agent" | "knowledge_base" | "team" | "listing";
         /** SearchRequest */
         SearchRequest: {
             /** Query */
@@ -5082,6 +5140,13 @@ export interface components {
             hits: components["schemas"]["SearchHitResponse"][];
             /** Used Tokens */
             used_tokens: number;
+        };
+        /** SearchResultsOut */
+        SearchResultsOut: {
+            /** Groups */
+            groups: components["schemas"]["SearchGroupOut"][];
+            /** Query */
+            query: string;
         };
         /** SecretResponse */
         SecretResponse: {
@@ -10172,6 +10237,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomRoleResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_workspace_api_v1_workspaces__workspace_id__search_get: {
+        parameters: {
+            query?: {
+                /** @description What the user typed. Terms are prefix-matched, so partial words find whole ones. A query too short to be useful returns empty groups rather than an error. */
+                q?: string;
+                /** @description Restrict to these kinds. Omit to search all of them. */
+                kinds?: components["schemas"]["SearchKind"][] | null;
+                /** @description Maximum hits per kind, not in total. */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResultsOut"];
                 };
             };
             /** @description Validation Error */

@@ -6,9 +6,11 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from agentverse_shared.search import SearchMatch
 from sqlalchemy import Select, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agentverse_api.infrastructure.full_text import search_query, to_matches
 from agentverse_api.infrastructure.sql_result import affected
 from agentverse_api.orchestration_service.domain.team_entities import (
     CommunicationKind,
@@ -155,6 +157,31 @@ class SqlTeamRepository:
         rows = list(result.scalars())
         members = await self._members_of([row.id for row in rows])
         return [_to_team(row, members.get(row.id, [])) for row in rows]
+
+    async def search_teams(
+        self, *, workspace_id: str, tsquery: str, limit: int
+    ) -> list[SearchMatch]:
+        """Full-text search over this workspace's live teams.
+
+        The `where` repeats `_live_teams`'s predicate rather than reusing
+        it because `search_query` builds a column select, not a select of
+        `TeamModel` — but it is the same two conditions, and the
+        soft-delete filter is the part that must not be forgotten.
+        """
+        result = await self._session.execute(
+            search_query(
+                id_column=TeamModel.id,
+                title_column=TeamModel.name,
+                subtitle_column=TeamModel.description,
+                tsquery=tsquery,
+                where=[
+                    TeamModel.workspace_id == workspace_id,
+                    TeamModel.deleted_at.is_(None),
+                ],
+                limit=limit,
+            )
+        )
+        return to_matches(result.all())
 
     async def count_teams(self, *, workspace_id: str) -> int:
         """Live teams, for plan-limit enforcement.

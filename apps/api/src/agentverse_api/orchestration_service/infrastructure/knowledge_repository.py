@@ -11,9 +11,11 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from agentverse_shared.search import SearchMatch
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agentverse_api.infrastructure.full_text import search_query, to_matches
 from agentverse_api.infrastructure.sql_result import affected
 from agentverse_api.orchestration_service.domain.knowledge_entities import (
     DocumentStatus,
@@ -98,6 +100,25 @@ class SqlKnowledgeRepository:
             .order_by(KnowledgeBaseModel.created_at.desc())
         )
         return [_to_kb(row) for row in result.scalars().all()]
+
+    async def search_knowledge_bases(
+        self, *, workspace_id: str, tsquery: str, limit: int
+    ) -> list[SearchMatch]:
+        """Full-text search over this workspace's live knowledge bases."""
+        result = await self._session.execute(
+            search_query(
+                id_column=KnowledgeBaseModel.id,
+                title_column=KnowledgeBaseModel.name,
+                subtitle_column=KnowledgeBaseModel.description,
+                tsquery=tsquery,
+                where=[
+                    KnowledgeBaseModel.workspace_id == workspace_id,
+                    KnowledgeBaseModel.deleted_at.is_(None),
+                ],
+                limit=limit,
+            )
+        )
+        return to_matches(result.all())
 
     async def count_knowledge_bases(self, *, workspace_id: str) -> int:
         """Live knowledge bases, for plan-limit enforcement.

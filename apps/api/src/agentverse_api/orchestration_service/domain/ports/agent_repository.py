@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from agentverse_shared.search import SearchMatch
+
 from agentverse_api.orchestration_service.domain.agent_entities import (
     Agent,
     AgentConfig,
@@ -33,6 +35,10 @@ class AgentRepository(Protocol):
     async def get_agent(self, *, workspace_id: str, agent_id: str) -> Agent | None: ...
 
     async def list_agents(self, *, workspace_id: str) -> list[Agent]: ...
+
+    async def search_agents(
+        self, *, workspace_id: str, tsquery: str, limit: int
+    ) -> list[SearchMatch]: ...
 
     async def get_version(self, *, agent_id: str, version_id: str) -> AgentVersion | None: ...
 
