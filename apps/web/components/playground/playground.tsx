@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, CornerDownLeft, MessageSquare, Rocket, User } from "lucide-react";
+import { Bot, CornerDownLeft, MessageSquare, Rocket, RotateCcw, User } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ import type { Agent } from "@/lib/api/agents";
 import { useAgentRunStream } from "@/lib/hooks/useAgentRunStream";
 
 import { RuntimeMonitor } from "@/components/playground/runtime-monitor";
+import { CopyButton } from "@/components/patterns/copy-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -90,15 +91,19 @@ export function Playground({
   const isStreaming = status === "connecting" || status === "streaming";
   const canSend = Boolean(agentId) && prompt.trim().length > 0 && !isSubmitting && !isStreaming;
 
-  async function submit(): Promise<void> {
-    if (!canSend) return;
+  // `override` lets Retry resend a past turn's exact prompt without
+  // round-tripping it through the composer — same submission path,
+  // same idempotency-key discipline, just not sourced from `prompt`.
+  async function submit(override?: string): Promise<void> {
+    const sent = (override ?? prompt).trim();
+    if (!agentId || sent.length === 0 || isSubmitting || isStreaming) return;
+
     const turnId = crypto.randomUUID();
-    const sent = prompt.trim();
     setTurns((current) => [
       ...current,
       { id: turnId, prompt: sent, runId: null, answer: null, failed: false },
     ]);
-    setPrompt("");
+    if (override === undefined) setPrompt("");
     setIsSubmitting(true);
     try {
       // The idempotency key is per submission, so a double-click or a
@@ -187,17 +192,28 @@ export function Playground({
             </div>
           ) : (
             <div className="flex flex-1 flex-col gap-5">
-              {turns.map((turn) => (
-                <div key={turn.id} className="space-y-4">
-                  <Message role="user" text={turn.prompt} />
-                  <Message
-                    role="agent"
-                    text={turn.answer}
-                    isPending={turn.runId !== null && turn.answer === null && !turn.failed}
-                    failed={turn.failed}
-                  />
-                </div>
-              ))}
+              {turns.map((turn) => {
+                const isActive = turn.id === activeTurn?.id;
+                // Retry and further sends are blocked mid-run for every
+                // turn, not only the active one — there is nothing to
+                // interrupt (no cancel endpoint exists), so a second
+                // submission while one is in flight would just queue
+                // behind it with no visible order.
+                const busy = isSubmitting || (isActive && isStreaming);
+                return (
+                  <div key={turn.id} className="space-y-4">
+                    <Message role="user" text={turn.prompt} />
+                    <Message
+                      role="agent"
+                      text={turn.answer}
+                      isPending={turn.runId !== null && turn.answer === null && !turn.failed}
+                      failed={turn.failed}
+                      onRetry={() => void submit(turn.prompt)}
+                      retryDisabled={busy}
+                    />
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -247,15 +263,27 @@ function Message({
   text,
   isPending,
   failed,
+  onRetry,
+  retryDisabled,
 }: {
   role: "user" | "agent";
   text: string | null;
   isPending?: boolean;
   failed?: boolean;
+  /** Resends the *user* turn this agent message answers. Present only
+   * on agent messages — retrying a user message would mean something
+   * different (editing it) and is not offered here. */
+  onRetry?: () => void;
+  retryDisabled?: boolean;
 }): React.JSX.Element {
   const Icon = role === "user" ? User : Bot;
+  // Actions apply once there is a real answer to act on — not while
+  // pending, not on a failed turn (nothing to copy), and never on the
+  // user's own message.
+  const showActions = role === "agent" && !isPending && !failed && text !== null;
+
   return (
-    <div className="flex gap-3">
+    <div className="group flex gap-3">
       <span
         aria-hidden="true"
         className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground"
@@ -267,7 +295,15 @@ function Message({
           {role === "user" ? "You" : "Agent"}
         </p>
         {failed ? (
-          <p className="text-sm text-destructive">The run failed — see the runtime monitor.</p>
+          <div className="space-y-2">
+            <p className="text-sm text-destructive">The run failed — see the runtime monitor.</p>
+            {onRetry && (
+              <Button variant="outline" size="sm" onClick={onRetry} disabled={retryDisabled}>
+                <RotateCcw />
+                Retry
+              </Button>
+            )}
+          </div>
         ) : isPending ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <span className="size-1.5 animate-pulse rounded-full bg-primary" aria-hidden="true" />
@@ -275,6 +311,26 @@ function Message({
           </p>
         ) : (
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{text ?? "—"}</p>
+        )}
+
+        {showActions && (
+          // Visible on focus too, not only hover — a keyboard user
+          // reaching this message with Tab must be able to see the
+          // controls exist before deciding to activate one.
+          <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <CopyButton value={text} label="Copy response" size="icon-xs" />
+            {onRetry && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={onRetry}
+                disabled={retryDisabled}
+                aria-label="Retry this message"
+              >
+                <RotateCcw />
+              </Button>
+            )}
+          </div>
         )}
       </div>
     </div>
