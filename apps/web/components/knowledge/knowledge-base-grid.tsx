@@ -103,7 +103,7 @@ export function KnowledgeBaseGrid({
           {visible.map((kb) => (
             <Card
               key={kb.id}
-              className="group relative gap-0 p-5 transition-colors hover:border-primary/40"
+              className="group relative gap-0 p-5 transition-[transform,border-color] duration-150 hover:-translate-y-px hover:border-primary/50 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
               <div className="flex items-start gap-3">
                 <span
