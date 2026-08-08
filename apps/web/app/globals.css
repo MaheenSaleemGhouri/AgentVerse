@@ -25,31 +25,89 @@
 :root {
   --radius: 0.75rem;
 
-  /* Light theme (default) */
-  --background: #ffffff;
-  --foreground: #15131f;
+  /* ------------------------------------------------------------------
+   * Light theme (default) — the approved warm-neutral palette from
+   * docs/design/design-system.md §2, locked against
+   * docs/design/agentverse-master-design-reference.png.
+   *
+   * The five approved values are used *in the roles the reference shows
+   * them in*, which is not always the role their name suggests:
+   *
+   *   #463F3A  primary    text, primary fills, focus ring   (9.30:1 on bg)
+   *   #8A817C  secondary  NON-TEXT only — outlines, icons   (3.43:1 on bg)
+   *   #BCB8B1  border     dividers and card edges           (1.78:1 on bg)
+   *   #F4F3EE  background page ground
+   *   #E0AFA0  accent     solid fill, never a text colour   (1.75:1 on bg)
+   *
+   * `#8A817C` as body text measures 3.43:1 and `#E0AFA0` measures
+   * 1.75:1 — both fail WCAG 1.4.3. They are not "wrong": they are
+   * surface and outline colours, and the reference draws them that way.
+   * So the roles are split the way the status tokens below already
+   * split theirs, and the text-carrying variants are derived from the
+   * same warm hues. Every pair is measured by
+   * app/design-tokens-contrast.test.ts, which fails on drift.
+   * ------------------------------------------------------------------ */
+  --background: #f4f3ee;
+  --foreground: #463f3a;
+  /* Cards sit *lighter* than the ground, which is how the reference
+     separates them — elevation by surface lightness plus a border,
+     with shadow as the third and lightest signal. */
   --card: #ffffff;
-  --card-foreground: #15131f;
+  --card-foreground: #463f3a;
   --popover: #ffffff;
-  --popover-foreground: #15131f;
-  /* 3% darker than the #7c5cff brand purple. White label text on the
-   * default Button measured 4.35:1 against a 4.5:1 requirement — the
-   * smallest change that clears it, and visually indistinguishable.
-   * --brand-500 keeps the original hue, so the brand ramp is unchanged. */
-  --primary: #7859f7;
-  --primary-foreground: #ffffff;
-  --secondary: #f7f8fb;
-  --secondary-foreground: #15131f;
-  --muted: #f7f8fb;
-  --muted-foreground: #6b677e;
-  --accent: #f1edff;
-  --accent-foreground: #7c5cff;
-  /* Deepened from #f04438: white text on it measured 3.76:1. */
-  --destructive: #d83d32;
+  --popover-foreground: #463f3a;
+  --primary: #463f3a;
+  /* Warm off-white, not pure white: a pure-white label on the warm
+     near-black reads slightly blue next to the page ground. */
+  --primary-foreground: #f4f3ee;
+  --secondary: #e8e5dd;
+  --secondary-foreground: #463f3a;
+  --muted: #e8e5dd;
+  /* The approved #8A817C darkened until it clears 4.5:1 as body text.
+     Same hue, legible weight — see the role note above. */
+  --muted-foreground: #6b635c;
+  /* The terracotta as a *surface*: a soft tint for active nav, selected
+     rows, and hover states, with a deep terracotta for text on it. */
+  --accent: #f2e3dd;
+  --accent-foreground: #7c4a37;
+  /* The approved accent at full strength, for the one or two places the
+     reference uses it as a fill (the secondary CTA in panel 04). Its
+     label is --primary, measured at 5.32:1 — white on it is 1.94:1 and
+     must never be used. */
+  --accent-solid: #e0afa0;
+  --accent-solid-foreground: #463f3a;
+  /* Warm brick rather than a stock red, so an error still belongs to
+     this palette. */
+  --destructive: #a33c30;
   --destructive-foreground: #ffffff;
-  --border: #e5e7eb;
-  --input: #e5e7eb;
-  --ring: #7859f7;
+  /* Dividers and card edges — decoration, so 1.4.11's 3:1 does not
+     apply (nothing is identified by them alone). */
+  --border: #bcb8b1;
+  /* Form-control outlines *are* a required boundary under 1.4.11, so
+     they take the approved #8A817C, which clears 3:1 exactly in this
+     role (3.43:1 on the ground, 3.81:1 on a card). */
+  --input: #8a817c;
+  --ring: #463f3a;
+
+  /* Sidebar — its own surface, on purpose.
+   *
+   * The reference draws the sidebar dark in *light* mode (panel 05).
+   * That is not an oversight to normalise away: the dark rail is what
+   * makes the shell read as one product across both themes, and it
+   * anchors the warm content area beside it. So the sidebar gets its
+   * own token set rather than borrowing --card, which would make it
+   * flip with the theme and lose that.
+   *
+   * Its divider is deliberately not held to 3:1: like --border, it
+   * separates regions that are already identified by their content, and
+   * nothing is recognised by the line alone. */
+  --sidebar: #332e2a;
+  --sidebar-foreground: #f0ede6;
+  --sidebar-muted-foreground: #b3aaa2;
+  --sidebar-accent: #463f3a;
+  --sidebar-accent-foreground: #f0ede6;
+  --sidebar-border: #4a433d;
+  --sidebar-rail: #e0afa0;
 
   /* Status extensions — not part of shadcn's default set.
    *
@@ -63,100 +121,146 @@
    * ...and the same triple for warning, info, and destructive.
    *
    * The -strong tokens exist because measuring found status text at
-   * 2.14:1–3.29:1 in this theme — see docs/accessibility/phase-6-audit.md.
-   * Darkening --success itself would have fixed the text and dulled every
-   * dot and border along with it, so the roles were split instead.
-   * Verified by app/design-tokens-contrast.test.ts, which fails if any
-   * of these drifts below its threshold. */
-  --success: #17b26a;
+   * 2.14:1–3.29:1 in an earlier theme — see
+   * docs/accessibility/phase-6-audit.md. Darkening --success itself
+   * would have fixed the text and dulled every dot and border along
+   * with it, so the roles were split instead. Verified by
+   * app/design-tokens-contrast.test.ts, which fails if any of these
+   * drifts below its threshold.
+   *
+   * The hues are desaturated toward the warm ground rather than a stock
+   * traffic-light set: an unmodified #17b26a green next to #F4F3EE
+   * reads as a different product. Harmonised, still unmistakably
+   * success / warning / danger / info. */
+  --success: #4f7a52;
   --success-foreground: #ffffff;
-  --success-soft: #e7f9f0;
-  --success-strong: #11804c;
-  --warning: #f79009;
+  --success-soft: #e5ede3;
+  --success-strong: #3c5f3f;
+  --warning: #b07d2c;
   --warning-foreground: #ffffff;
-  --warning-soft: #fef3e2;
-  --warning-strong: #a35f06;
-  --info: #4c8dff;
+  --warning-soft: #f6ecda;
+  --warning-strong: #7d5719;
+  --info: #4a6b8a;
   --info-foreground: #ffffff;
-  --info-soft: #eaf1ff;
-  --info-strong: #3a6bc2;
-  --destructive-soft: #fdecea;
-  --destructive-strong: #c7382e;
-  --accent-2: #9b7bff;
-  --magenta: #d946a8;
+  --info-soft: #e5eaf0;
+  --info-strong: #3b5670;
+  --destructive-soft: #f7e3df;
+  --destructive-strong: #94362b;
 
-  /* Chart palette (shadcn's own `--chart-1..5` convention) */
-  --chart-1: #4c8dff;
-  --chart-2: #7c5cff;
-  --chart-3: #f2a6c9;
-  --chart-4: #17b26a;
-  --chart-5: #f79009;
+  /* Chart palette (shadcn's own `--chart-1..5` convention).
+     Drawn from the warm neutrals plus the accent, so a chart reads as
+     part of the page rather than as an embedded widget. */
+  --chart-1: #463f3a;
+  --chart-2: #e0afa0;
+  --chart-3: #8a817c;
+  --chart-4: #4f7a52;
+  --chart-5: #b07d2c;
 
   /* Brand primitive ramp — the one primitive genuinely specific to
      AgentVerse (Phase 0's own rationale, carried forward): every other
      primitive (neutrals, spacing, radius steps, type scale) is
      Tailwind v4's built-in default, reused rather than redefined
-     (CLAUDE.md §16). */
-  --brand-50: #f1edff;
-  --brand-100: #e4dbff;
-  --brand-200: #cbb8ff;
-  --brand-300: #ad8fff;
-  --brand-400: #9469ff;
-  --brand-500: #7c5cff;
-  --brand-600: #6a3ffc;
-  --brand-700: #5a2fe0;
-  --brand-800: #4a26b8;
-  --brand-900: #3d2296;
-  --brand-950: #241454;
+     (CLAUDE.md §16).
+     Four of the approved values land directly on this ramp — 100 is the
+     background, 400 the border, 500 the secondary, 800 the primary — so
+     the ramp is the palette extended, not a parallel system. */
+  --brand-50: #faf9f6;
+  --brand-100: #f4f3ee;
+  --brand-200: #e8e5dd;
+  --brand-300: #d5d1c7;
+  --brand-400: #bcb8b1;
+  --brand-500: #8a817c;
+  --brand-600: #6b635c;
+  --brand-700: #554e48;
+  --brand-800: #463f3a;
+  --brand-900: #332e2a;
+  --brand-950: #1a1715;
 }
 
+/* ------------------------------------------------------------------
+ * Dark theme — designed, not inverted.
+ *
+ * Inverting the warm palette produces cold grey: the warmth lives in
+ * the *low* end of each channel, and flipping luminance loses it. So
+ * the dark surfaces carry their own warm bias (#1a1715 is the brand
+ * ramp's 950 step, not a neutral black), and the identity survives.
+ *
+ * Elevation is built from border plus surface lightness, not shadow —
+ * a shadow barely reads on a dark ground, which is why dark cards here
+ * are *lighter* than the page, mirroring how light-mode cards are
+ * lighter than theirs.
+ *
+ * The one role that flips is --primary. The approved #463F3A is a
+ * near-black; a near-black fill on a dark ground is invisible. Dark
+ * mode therefore takes the warm light end of the same ramp, so a
+ * primary button stays the highest-contrast element on the page in
+ * both themes. The accent does not flip — #E0AFA0 works on both
+ * grounds, and keeping it fixed is what makes the two themes read as
+ * one product.
+ * ------------------------------------------------------------------ */
 .dark {
-  --background: #0b0b12;
-  --foreground: #f1effb;
-  --card: #171722;
-  --card-foreground: #f1effb;
-  --popover: #171722;
-  --popover-foreground: #f1effb;
-  /* 3% darker than the #7c5cff brand purple. White label text on the
-   * default Button measured 4.35:1 against a 4.5:1 requirement — the
-   * smallest change that clears it, and visually indistinguishable.
-   * --brand-500 keeps the original hue, so the brand ramp is unchanged. */
-  --primary: #7859f7;
-  --primary-foreground: #ffffff;
-  --secondary: #11111a;
-  --secondary-foreground: #f1effb;
-  --muted: #11111a;
-  --muted-foreground: #9c97b8;
-  --accent: #221c3b;
-  --accent-foreground: #9b7bff;
-  /* Deepened from #f04438: white text on it measured 3.76:1. */
-  --destructive: #d83d32;
+  --background: #1a1715;
+  --foreground: #f0ede6;
+  --card: #231f1c;
+  --card-foreground: #f0ede6;
+  --popover: #231f1c;
+  --popover-foreground: #f0ede6;
+  --primary: #ebe7df;
+  --primary-foreground: #2b2622;
+  --secondary: #2a2522;
+  --secondary-foreground: #f0ede6;
+  --muted: #2a2522;
+  --muted-foreground: #a89f97;
+  --accent: #3a2c26;
+  --accent-foreground: #e6b7a7;
+  /* Unchanged across themes — see the note above. */
+  --accent-solid: #e0afa0;
+  --accent-solid-foreground: #463f3a;
+  /* Lightened from light mode's #a33c30: on a dark ground the direction
+     that increases contrast is up, not down. */
+  --destructive: #bd4e40;
   --destructive-foreground: #ffffff;
-  --border: rgba(255, 255, 255, 0.08);
-  --input: rgba(255, 255, 255, 0.08);
-  --ring: #7859f7;
+  /* Solid hex rather than a white alpha: an alpha border sits at a
+     different effective colour on every surface it crosses, which makes
+     the 3:1 requirement on --input unmeasurable. */
+  --border: #3a3430;
+  --input: #736a61;
+  --ring: #e0afa0;
 
-  /* Dark's soft tints are far darker than light's, so the vivid hue
-   * already clears 4.5:1 on three of the four (success 5.01, warning
-   * 6.44, info 4.87) and -strong is simply the base. Only danger fell
-   * short at 4.37:1, and it is lightened rather than darkened here —
-   * the direction that increases contrast against a dark background. */
-  --success: #17b26a;
+  /* One step *below* the page rather than above it, so the rail still
+     reads as the frame around the content — the same relationship the
+     light theme gets from a dark sidebar on a warm ground. */
+  --sidebar: #131110;
+  --sidebar-foreground: #f0ede6;
+  --sidebar-muted-foreground: #a89f97;
+  --sidebar-accent: #2a2522;
+  --sidebar-accent-foreground: #f0ede6;
+  --sidebar-border: #2a2522;
+  --sidebar-rail: #e0afa0;
+
+  /* Dark's soft tints are far darker than light's, so -strong moves the
+     opposite way here: it is *lighter* than the base hue, not darker. */
+  --success: #6fa072;
   --success-foreground: #ffffff;
-  --success-soft: #113321;
-  --success-strong: #17b26a;
-  --warning: #f79009;
+  --success-soft: #1e2a1f;
+  --success-strong: #8cbb8f;
+  --warning: #d3a256;
   --warning-foreground: #ffffff;
-  --warning-soft: #332310;
-  --warning-strong: #f79009;
-  --info: #4c8dff;
+  --warning-soft: #2e2617;
+  --warning-strong: #dfb26b;
+  --info: #7fa3c4;
   --info-foreground: #ffffff;
-  --info-soft: #16233f;
-  --info-strong: #4c8dff;
-  --destructive-soft: #341714;
-  --destructive-strong: #f4655b;
-  --accent-2: #9b7bff;
-  --magenta: #d946a8;
+  --info-soft: #1c242c;
+  --info-strong: #9dbbd6;
+  --destructive-soft: #301c19;
+  --destructive-strong: #e58a7d;
+
+  /* Charts lift off the dark ground rather than sinking into it. */
+  --chart-1: #ebe7df;
+  --chart-2: #e0afa0;
+  --chart-3: #a89f97;
+  --chart-4: #6fa072;
+  --chart-5: #d3a256;
 }
 
 @theme inline {
@@ -179,6 +283,8 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-solid: var(--accent-solid);
+  --color-accent-solid-foreground: var(--accent-solid-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
@@ -199,8 +305,14 @@
   --color-info-strong: var(--info-strong);
   --color-destructive-soft: var(--destructive-soft);
   --color-destructive-strong: var(--destructive-strong);
-  --color-accent-2: var(--accent-2);
-  --color-magenta: var(--magenta);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-rail: var(--sidebar-rail);
 
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -220,12 +332,17 @@
   --color-brand-900: var(--brand-900);
   --color-brand-950: var(--brand-950);
 
+  /* Typography, locked by docs/design/design-system.md §3.
+     Three roles, three faces:
+       --font-display  Satoshi     headings and product statements
+       --font-sans     Geist       everything else in the UI
+       --font-mono     JetBrains   code, keys, logs, identifiers
+     Geist Mono is kept as the fallback inside --font-mono rather than
+     deleted: it is already loaded, and it matches JetBrains Mono's
+     metrics closely enough that a swap is invisible. */
+  --font-display: var(--font-satoshi), var(--font-geist-sans), ui-sans-serif, system-ui;
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  /* Documentation code blocks only — see the note in `app/layout.tsx`.
-     Repointing `--font-mono` at JetBrains Mono would restyle every run
-     id, trace timestamp and log line in the product. */
-  --font-mono-docs: var(--font-jetbrains-mono);
+  --font-mono: var(--font-jetbrains-mono), var(--font-geist-mono), ui-monospace, monospace;
 }
 
 @layer base {
@@ -234,6 +351,22 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  /*
+   * Headings take Satoshi automatically, so the locked type roles hold
+   * without every heading in the product remembering a class. Applied
+   * in `base`, so a surface that genuinely needs otherwise (a code
+   * sample's heading, say) still wins with one utility.
+   *
+   * `text-balance` because Satoshi's display weights are wide: a
+   * two-word orphan on the second line of a page title is the most
+   * common way a heading looks unconsidered.
+   */
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-tight text-balance;
   }
 }
 
@@ -291,7 +424,7 @@
      border, so a sentence with three `identifiers` in it does not turn
      into a row of boxes. */
   .docs-prose :not(pre) > code {
-    @apply rounded bg-muted px-1.5 py-0.5 font-[family-name:var(--font-mono-docs)] text-[0.875em];
+    @apply rounded bg-muted px-1.5 py-0.5 font-mono text-[0.875em];
   }
 
   .docs-prose pre {
@@ -299,7 +432,7 @@
   }
 
   .docs-prose pre code {
-    @apply font-[family-name:var(--font-mono-docs)];
+    @apply font-mono;
   }
 
   /*

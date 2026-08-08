@@ -47,20 +47,26 @@ export default async function WorkspaceShellLayout({
   const docsIndex = await buildDocsSearchIndex();
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <Topbar
-        workspaces={workspaces}
-        activeWorkspaceId={workspaceId}
-        userEmail={session.user.email}
-        userName={session.user.name}
-        docsIndex={docsIndex}
-      />
-      <div className="flex flex-1">
-        <Sidebar workspaceId={workspaceId} />
-        <main className="min-w-0 flex-1 px-6 py-6 lg:px-8">
+    // The sidebar runs the full height with the top bar beside it, not
+    // beneath it — the arrangement in the approved reference (panel 05).
+    // It also means the rail stays put while the content scrolls, so
+    // navigation never scrolls out of reach on a long run history.
+    <div className="flex min-h-screen">
+      <Sidebar workspaceId={workspaceId} />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Topbar
+          workspaces={workspaces}
+          activeWorkspaceId={workspaceId}
+          userEmail={session.user.email}
+          userName={session.user.name}
+          docsIndex={docsIndex}
+        />
+        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
           <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>
       </div>
+
       <AssistantLauncher workspaceId={workspaceId} />
     </div>
   );

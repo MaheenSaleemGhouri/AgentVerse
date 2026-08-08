@@ -9,6 +9,8 @@ import type { Workspace } from "@/lib/api/workspaces";
 
 import { Breadcrumbs } from "@/components/shell/breadcrumbs";
 import { CommandPalette } from "@/components/shell/command-palette";
+import { MobileNav } from "@/components/shell/mobile-nav";
+import { ShortcutHint } from "@/components/shell/shortcut-hint";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { UserMenu } from "@/components/shell/user-menu";
 import { WorkspaceSwitcher } from "@/components/shell/workspace-switcher";
@@ -41,18 +43,11 @@ export function Topbar({
   docsIndex: readonly DocsSearchEntry[];
 }): React.JSX.Element {
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-md">
-      <Link href={`/dashboard/${activeWorkspaceId}`} className="flex items-center gap-2">
-        <span
-          aria-hidden="true"
-          className="flex size-7 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground"
-        >
-          A
-        </span>
-        <span className="text-sm font-semibold tracking-tight">AgentVerse</span>
-      </Link>
-
-      <Separator orientation="vertical" className="h-5" />
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur-md sm:gap-3 sm:px-4">
+      {/* The brand lives on the sidebar now, so the top bar starts with
+          the drawer trigger on phones and with the workspace everywhere
+          else — one identity, stated once. */}
+      <MobileNav workspaceId={activeWorkspaceId} />
 
       <WorkspaceSwitcher workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} />
 
@@ -79,9 +74,7 @@ export function Topbar({
             >
               <Search className="size-3.5" />
               <span>Search</span>
-              <kbd className="rounded border border-border bg-muted px-1 font-mono text-[10px]">
-                ⌘K
-              </kbd>
+              <ShortcutHint />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Search pages and actions</TooltipContent>

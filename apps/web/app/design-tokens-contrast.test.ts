@@ -107,6 +107,13 @@ const TEXT_PAIRS: ReadonlyArray<{ fg: string; bg: string; where: string }> = [
   { fg: "primary-foreground", bg: "primary", where: "button.tsx default variant" },
   { fg: "secondary-foreground", bg: "secondary", where: "filter group, secondary badges" },
   { fg: "destructive-foreground", bg: "destructive", where: "document-library.tsx count badge" },
+  // Added with the warm palette: the terracotta tint is a real surface
+  // (active nav, selected rows, hover) and it carries text.
+  { fg: "accent-foreground", bg: "accent", where: "active sidebar item, selected row" },
+  // The approved #E0AFA0 used as a fill. Its label is --primary at
+  // 5.32:1; white on it is 1.94:1, so this pair is asserted precisely
+  // because the obvious choice is the wrong one.
+  { fg: "accent-solid-foreground", bg: "accent-solid", where: "accent CTA label" },
 ];
 // `--success-foreground`, `--warning-foreground`, and `--info-foreground`
 // are deliberately absent: grepping the components shows nothing renders
@@ -185,5 +192,20 @@ describe.each([
     // that meets the letter of that while being invisible against the
     // page meets none of its intent.
     expectGraphicAA("ring", "background");
+    expectGraphicAA("ring", "card");
+  });
+
+  it("a form control's outline is visible against both surfaces", () => {
+    // WCAG 1.4.11: an input's boundary *is* required to identify the
+    // component, so it is held to 3:1 — unlike `--border`, which draws
+    // dividers and card edges that identify nothing on their own and is
+    // deliberately lighter.
+    //
+    // This is the pair the warm palette is most likely to regress:
+    // `--input` is the approved #8A817C, which clears the bar at 3.43:1
+    // with little room. Nudging it lighter to "soften" a form would
+    // break it, and this is what says so.
+    expectGraphicAA("input", "background");
+    expectGraphicAA("input", "card");
   });
 });
