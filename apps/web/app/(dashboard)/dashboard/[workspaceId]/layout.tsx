@@ -5,6 +5,7 @@ import { listMyWorkspaces } from "@/lib/api/workspaces";
 import { auth } from "@/lib/auth";
 import { buildDocsSearchIndex } from "@/lib/docs/search-index";
 
+import { AssistantLauncher } from "@/components/assistant/assistant-launcher";
 import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
 
@@ -60,6 +61,7 @@ export default async function WorkspaceShellLayout({
           <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>
       </div>
+      <AssistantLauncher workspaceId={workspaceId} />
     </div>
   );
 }

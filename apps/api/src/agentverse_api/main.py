@@ -3,6 +3,9 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from agentverse_api.assistant_service.interface.routes.assistant import (
+    router as assistant_router,
+)
 from agentverse_api.auth_service.interface.routes.api_keys import router as api_keys_router
 from agentverse_api.auth_service.interface.routes.audit_logs import router as audit_logs_router
 from agentverse_api.auth_service.interface.routes.internal_auth_events import (
@@ -22,6 +25,9 @@ from agentverse_api.auth_service.interface.routes.organization_settings import (
 )
 from agentverse_api.auth_service.interface.routes.organizations import (
     router as organizations_router,
+)
+from agentverse_api.auth_service.interface.routes.platform_admin import (
+    router as platform_admin_router,
 )
 from agentverse_api.auth_service.interface.routes.rbac import (
     router as rbac_router,
@@ -191,6 +197,8 @@ def create_app() -> FastAPI:
     app.include_router(marketplace_admin_router)
     app.include_router(webhooks_router)
     app.include_router(search_router)
+    app.include_router(assistant_router)
+    app.include_router(platform_admin_router)
     app.include_router(metrics_router)
     app.include_router(api_keys_router)
     app.include_router(audit_logs_router)

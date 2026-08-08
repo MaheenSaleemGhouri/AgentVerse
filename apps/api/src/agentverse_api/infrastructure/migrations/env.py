@@ -9,6 +9,9 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from agentverse_api.assistant_service.infrastructure import (  # noqa: F401
+    models as assistant_models,
+)
 from agentverse_api.auth_service.infrastructure import models as auth_models  # noqa: F401
 from agentverse_api.billing_service.infrastructure import models as billing_models  # noqa: F401
 from agentverse_api.infrastructure.config import get_settings

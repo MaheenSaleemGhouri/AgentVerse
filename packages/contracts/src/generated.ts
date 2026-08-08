@@ -99,6 +99,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Platform Admin Session Route
+         * @description Authenticated, deliberately not authorized past that.
+         *
+         *     A non-staff caller gets `false`, not a 404 — this is the one route
+         *     whose whole purpose is to answer the question, and gating it would
+         *     make it useless for the thing it exists to do.
+         */
+        get: operations["platform_admin_session_route_api_v1_admin_session_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing/webhooks/stripe": {
         parameters: {
             query?: never;
@@ -902,6 +926,58 @@ export interface paths {
         put?: never;
         /** Rotate Api Key */
         post: operations["rotate_api_key_api_v1_workspaces__workspace_id__api_keys__api_key_id__rotate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/assistant/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sessions Route
+         * @description Your own recent conversations in this workspace, newest first.
+         */
+        get: operations["list_sessions_route_api_v1_workspaces__workspace_id__assistant_sessions_get"];
+        put?: never;
+        /**
+         * Create Session Route
+         * @description Opens a conversation titled from its first question.
+         *
+         *     Takes the question but does not answer it: creating the session and
+         *     streaming the answer are separate calls because SSE cannot carry a
+         *     created resource's id back to the client before the body starts.
+         */
+        post: operations["create_session_route_api_v1_workspaces__workspace_id__assistant_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/assistant/sessions/{session_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Messages Route */
+        get: operations["list_messages_route_api_v1_workspaces__workspace_id__assistant_sessions__session_id__messages_get"];
+        put?: never;
+        /**
+         * Ask Route
+         * @description Asks a question and streams the answer as SSE.
+         *
+         *     The session is resolved before the response starts, so a 404 is a
+         *     real 404 rather than an error frame inside a 200 stream.
+         */
+        post: operations["ask_route_api_v1_workspaces__workspace_id__assistant_sessions__session_id__messages_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3035,6 +3111,15 @@ export interface components {
          * @enum {string}
          */
         ApiKeyScope: "full" | "read_only";
+        /**
+         * AskRequest
+         * @description `min_length=1` after stripping, so a stray Enter cannot spend a
+         *     provider call on an empty prompt.
+         */
+        AskRequest: {
+            /** Question */
+            question: string;
+        };
         /** AuditActivityPoint */
         AuditActivityPoint: {
             /** Count */
@@ -4296,6 +4381,20 @@ export interface components {
             /** Workspace Id */
             workspace_id: string;
         };
+        /** MessageResponse */
+        MessageResponse: {
+            /** Content */
+            content: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Role */
+            role: string;
+        };
         /** ModerationDecisionRequest */
         ModerationDecisionRequest: {
             /**
@@ -4643,6 +4742,11 @@ export interface components {
          * @enum {string}
          */
         PlanTier: "free" | "pro" | "team" | "enterprise";
+        /** PlatformAdminSessionResponse */
+        PlatformAdminSessionResponse: {
+            /** Is Platform Admin */
+            is_platform_admin: boolean;
+        };
         /** PortalResponse */
         PortalResponse: {
             /** Portal Url */
@@ -5213,6 +5317,23 @@ export interface components {
          * @enum {string}
          */
         SecuritySeverity: "info" | "warning" | "critical";
+        /** SessionResponse */
+        SessionResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            /**
+             * Last Message At
+             * Format: date-time
+             */
+            last_message_at: string;
+            /** Title */
+            title: string;
+        };
         /** SsoConfigurationResponse */
         SsoConfigurationResponse: {
             /** Client Id */
@@ -5891,6 +6012,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    platform_admin_session_route_api_v1_admin_session_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformAdminSessionResponse"];
                 };
             };
         };
@@ -7700,6 +7841,140 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IssuedApiKeyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_route_api_v1_workspaces__workspace_id__assistant_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_session_route_api_v1_workspaces__workspace_id__assistant_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_messages_route_api_v1_workspaces__workspace_id__assistant_sessions__session_id__messages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ask_route_api_v1_workspaces__workspace_id__assistant_sessions__session_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

@@ -1,0 +1,608 @@
+[
+  {
+    "doc_title": "Ground an agent in your documents",
+    "heading": "Overview",
+    "text": "A knowledge base is a collection of documents an agent can search while it runs. Attaching one turns an agent that answers from what the model was trained on into one that answers from what you gave it \u2014 and can point at the source.",
+    "url": "/docs/agent-builder/knowledge-bases"
+  },
+  {
+    "doc_title": "Ground an agent in your documents",
+    "heading": "Prerequisites",
+    "text": "- `member` or higher. - Documents you want the agent to use.",
+    "url": "/docs/agent-builder/knowledge-bases#prerequisites"
+  },
+  {
+    "doc_title": "Ground an agent in your documents",
+    "heading": "Create a knowledge base and add documents",
+    "text": "1. Open **Knowledge** in the sidebar. 2. Create a knowledge base and give it a name and description. 3. Upload documents to it. Uploaded files are split into chunks, embedded, and indexed. Until a document finishes indexing it is not searchable \u2014 a large upload is not instantly available, and the document list shows where each one is up to. Chunking is content-aware rather than a fixed cut every N characters: prose is split at roughly paragraph scale with overlap, markdown at heading boundaries, code at function and class boundaries. That is why a retrieved chunk usually reads as a coherent passage instead of a sentence sliced in half.",
+    "url": "/docs/agent-builder/knowledge-bases#create-a-knowledge-base-and-add-documents"
+  },
+  {
+    "doc_title": "Ground an agent in your documents",
+    "heading": "Attach it to an agent",
+    "text": "Add the knowledge base's id to the agent's `knowledge_base_ids`. The agent can then retrieve from it during a run. Then tell the agent to use it. Retrieval being available is not the same as the agent choosing to rely on it:",
+    "url": "/docs/agent-builder/knowledge-bases#attach-it-to-an-agent"
+  },
+  {
+    "doc_title": "Ground an agent in your documents",
+    "heading": "Citations",
+    "text": "Retrieved chunks carry their source document through the whole pipeline, so a grounded answer can name where each claim came from. An agent that cites nothing is usually an agent whose instructions never asked it to.",
+    "url": "/docs/agent-builder/knowledge-bases#citations"
+  },
+  {
+    "doc_title": "Ground an agent in your documents",
+    "heading": "A note on installed templates",
+    "text": "Installing a marketplace listing does **not** bring the publisher's knowledge bases with it. Those named documents in *their* workspace, and there is nothing in yours to point them at. An installed agent that was built around a knowledge base needs one of your own attached before it behaves as its author intended.",
+    "url": "/docs/agent-builder/knowledge-bases#a-note-on-installed-templates"
+  },
+  {
+    "doc_title": "Ground an agent in your documents",
+    "heading": "Expected result",
+    "text": "Asking the agent something answerable only from your documents produces an answer drawn from them, with the source named.",
+    "url": "/docs/agent-builder/knowledge-bases#expected-result"
+  },
+  {
+    "doc_title": "Ground an agent in your documents",
+    "heading": "Troubleshooting",
+    "text": "**The agent ignores the documents.** Retrieval is available but not compulsory. Instruct it explicitly, as above. **Nothing is retrieved.** Check the documents finished indexing. A document still processing is not yet searchable. **Answers are drawn from the wrong passages.** Usually a query-phrasing mismatch: the words in the question are not the words in the document. Adding the vocabulary your documents actually use to the system instructions helps more than raising the number of chunks retrieved.",
+    "url": "/docs/agent-builder/knowledge-bases#troubleshooting"
+  },
+  {
+    "doc_title": "Ground an agent in your documents",
+    "heading": "Related guides",
+    "text": "- [Build and run your first agent](/docs/agent-builder/quickstart) - [Give an agent tools](/docs/agent-builder/tools)",
+    "url": "/docs/agent-builder/knowledge-bases#related-guides"
+  },
+  {
+    "doc_title": "Build and run your first agent",
+    "heading": "Overview",
+    "text": "An agent in AgentVerse is stored configuration: a name, a model, system instructions, and optionally tools and knowledge. You author that configuration, publish a version of it, and then run it. This guide walks the shortest path through all three.",
+    "url": "/docs/agent-builder/quickstart"
+  },
+  {
+    "doc_title": "Build and run your first agent",
+    "heading": "Prerequisites",
+    "text": "- A workspace. You get one when you sign up. - The `member` role or higher. `viewer` can read agents but not create or run them.",
+    "url": "/docs/agent-builder/quickstart#prerequisites"
+  },
+  {
+    "doc_title": "Build and run your first agent",
+    "heading": "Create the agent",
+    "text": "The fastest route is to install one of the first-party templates and edit it, rather than starting from a blank prompt \u2014 see [Install a template](/docs/marketplace/install-a-template). To start from nothing instead: 1. Open **Agents** in the sidebar. 2. Choose **New agent**. 3. Give it a name, pick a model, and write the system instructions. The same thing over the API: System instructions are the single largest lever on how an agent behaves. Say what it does, what it must not do, and what its output should look like \u2014 vague instructions produce vague agents.",
+    "url": "/docs/agent-builder/quickstart#create-the-agent"
+  },
+  {
+    "doc_title": "Build and run your first agent",
+    "heading": "Publish a version",
+    "text": "An agent is created as a draft. Drafts cannot run: publishing is what freezes a configuration into a version, so that a run always records exactly which configuration produced it. Editing a published agent creates a new version. Older versions stay readable, so a run from last month still shows the instructions it actually ran with.",
+    "url": "/docs/agent-builder/quickstart#publish-a-version"
+  },
+  {
+    "doc_title": "Build and run your first agent",
+    "heading": "Run it",
+    "text": "Runs are asynchronous. Submitting one returns `202 Accepted` with a run id immediately, and the work happens on a worker \u2014 an agent that calls three tools and two models is not something to hold an HTTP request open for. Send an `Idempotency-Key` on every run you trigger. Runs cost money, and without one a network retry starts a second run and bills you for both. Replaying the same key returns the original run instead. Or from the CLI, which prints the run id on stdout and its status on stderr so `$(...)` captures exactly the id:",
+    "url": "/docs/agent-builder/quickstart#run-it"
+  },
+  {
+    "doc_title": "Build and run your first agent",
+    "heading": "Expected result",
+    "text": "`GET .../runs/{run_id}` reports the run's status, and the streaming endpoint shows each step as it happens \u2014 see [Watch a run happen](/docs/observability/watch-a-run). A completed run carries its output, the steps it took, and the tokens it spent.",
+    "url": "/docs/agent-builder/quickstart#expected-result"
+  },
+  {
+    "doc_title": "Build and run your first agent",
+    "heading": "Troubleshooting",
+    "text": "**The run finishes immediately with an error about the agent not being published.** Drafts cannot run. Publish a version first. **The run is queued and stays queued.** Queued means no worker has claimed it yet. If it persists, check your workspace's usage against its quota under **Billing** \u2014 a workspace over quota stops accepting new runs rather than silently running them for free. **A tool you configured was ignored.** Only tools the platform recognises are attached. See [Give an agent tools](/docs/agent-builder/tools) for the list.",
+    "url": "/docs/agent-builder/quickstart#troubleshooting"
+  },
+  {
+    "doc_title": "Build and run your first agent",
+    "heading": "Related guides",
+    "text": "- [Give an agent tools](/docs/agent-builder/tools) - [Ground an agent in your documents](/docs/agent-builder/knowledge-bases) - [Install a template](/docs/marketplace/install-a-template)",
+    "url": "/docs/agent-builder/quickstart#related-guides"
+  },
+  {
+    "doc_title": "Give an agent tools",
+    "heading": "Overview",
+    "text": "A tool is something an agent can call while it is running: a calculation, a lookup, an action in another system. Without tools an agent can only produce text from what it already knows. With them it can act.",
+    "url": "/docs/agent-builder/tools"
+  },
+  {
+    "doc_title": "Give an agent tools",
+    "heading": "Prerequisites",
+    "text": "- An agent you can edit (`member` or higher). - For MCP tools, the `admin` role \u2014 connecting an external service means storing credentials for it.",
+    "url": "/docs/agent-builder/tools#prerequisites"
+  },
+  {
+    "doc_title": "Give an agent tools",
+    "heading": "Built-in tools",
+    "text": "Two tools ship with the platform and need no configuration: | Tool | What it does | | --- | --- | | `get_current_time` | The current time, so an agent stops guessing dates. | | `calculator` | Arithmetic, so an agent stops doing it in its head. | Name them in the agent's `tools` list: A tool name the platform does not recognise is rejected when you save, not silently dropped at runtime. That is deliberate: an agent that quietly runs without the tool you configured produces plausible answers with none of the grounding you asked for.",
+    "url": "/docs/agent-builder/tools#built-in-tools"
+  },
+  {
+    "doc_title": "Give an agent tools",
+    "heading": "Connect an external service over MCP",
+    "text": "Anything beyond the built-ins comes from an MCP server \u2014 the open protocol AgentVerse uses to talk to external tools. Open **Integrations** in the sidebar to register one. Two things are worth knowing before you connect one: **Credentials never live in the agent's configuration.** They are stored encrypted and resolved at call time, so exporting or publishing an agent never carries its secrets with it. **Tool descriptions are part of the prompt.** The description an MCP server gives a tool is what the model reads when deciding whether to call it. A vague description (\"does stuff with data\") degrades tool selection exactly as much as a vague system prompt would.",
+    "url": "/docs/agent-builder/tools#connect-an-external-service-over-mcp"
+  },
+  {
+    "doc_title": "Give an agent tools",
+    "heading": "What happens when a tool fails",
+    "text": "A failing or unreachable MCP server disables only its own tools for that run and records why in the trace. The run continues without them rather than crashing \u2014 but the agent will be working without a capability you expected it to have, which is why the trace says so explicitly. Every tool call, including refused ones, is recorded. Open **MCP** in the sidebar for the full history across your integrations.",
+    "url": "/docs/agent-builder/tools#what-happens-when-a-tool-fails"
+  },
+  {
+    "doc_title": "Give an agent tools",
+    "heading": "Expected result",
+    "text": "Running the agent produces a trace with a step per tool call, showing the arguments the model chose and what came back.",
+    "url": "/docs/agent-builder/tools#expected-result"
+  },
+  {
+    "doc_title": "Give an agent tools",
+    "heading": "Troubleshooting",
+    "text": "**The agent never calls the tool.** Almost always the description or the system instructions. Say explicitly when the tool should be used (\"use the calculator for every sum\") rather than assuming the model will infer it. **A tool call was refused.** Tool arguments produced by a model are untrusted input and are validated against the tool's schema before anything executes. A refusal means the arguments did not match the schema \u2014 the trace records the call and the reason.",
+    "url": "/docs/agent-builder/tools#troubleshooting"
+  },
+  {
+    "doc_title": "Give an agent tools",
+    "heading": "Related guides",
+    "text": "- [Build and run your first agent](/docs/agent-builder/quickstart) - [Read a run's trace](/docs/observability/watch-a-run)",
+    "url": "/docs/agent-builder/tools#related-guides"
+  },
+  {
+    "doc_title": "Install a template",
+    "heading": "Overview",
+    "text": "The marketplace is the fastest way to a working agent. Installing copies a listing's configuration into your workspace as a new agent that is yours to edit \u2014 you are not subscribing to someone else's agent, you are taking a copy.",
+    "url": "/docs/marketplace/install-a-template"
+  },
+  {
+    "doc_title": "Install a template",
+    "heading": "Prerequisites",
+    "text": "- `member` or higher.",
+    "url": "/docs/marketplace/install-a-template#prerequisites"
+  },
+  {
+    "doc_title": "Install a template",
+    "heading": "The first-party template library",
+    "text": "Twelve templates ship with the platform, marked **official**: | Slug | What it does | | --- | --- | | `research-assistant` | Answers questions from sources, with citations. | | `code-reviewer` | Reviews a diff for correctness and clarity. | | `sql-analyst` | Turns a question about a schema into SQL. | | `support-triage` | Classifies and routes inbound support messages. | | `meeting-notes` | Turns a transcript into decisions and actions. | | `content-writer` | Drafts long-form content from a brief. | | `sales-qualifier` | Scores an inbound lead against your criteria. | | `onboarding-guide` | Walks a new user through a process. | | `document-summarizer` | Summarises a long document faithfully. | | `data-cleaner` | Normalises messy tabular input. | | `email-drafter` | Drafts a reply in your voice. | | `process-automator` | Turns a described process into repeatable steps. |",
+    "url": "/docs/marketplace/install-a-template#the-first-party-template-library"
+  },
+  {
+    "doc_title": "Install a template",
+    "heading": "Install from the API or an SDK",
+    "text": "`created` is the field to check. Installing is idempotent per workspace, listing and version: a repeated install returns the agent you already have rather than a second copy. `created: false` means \"you already had this\", which is different from \"it worked\" and worth distinguishing in any script that wraps it. Pin a version with `version_number` if you want a specific one; the default is the latest published version.",
+    "url": "/docs/marketplace/install-a-template#install-from-the-api-or-an-sdk"
+  },
+  {
+    "doc_title": "Install a template",
+    "heading": "What comes across, and what does not",
+    "text": "Installed: the system instructions, the model, and the tool configuration. **Not installed: knowledge bases.** The listing named the publisher's knowledge bases, and there is nothing in your workspace to remap them to. An agent built around retrieval will install cleanly and then answer without any \u2014 attach one of your own. See [Ground an agent in your documents](/docs/agent-builder/knowledge-bases). **Not installed: credentials.** MCP credentials belong to the workspace that stored them and never travel with a listing. Connect your own under **Integrations**.",
+    "url": "/docs/marketplace/install-a-template#what-comes-across-and-what-does-not"
+  },
+  {
+    "doc_title": "Install a template",
+    "heading": "After installing",
+    "text": "The installed agent is a normal agent in your workspace. Edit it, publish a new version, run it. Changes you make are yours and do not propagate back; a later version of the listing does not overwrite your copy.",
+    "url": "/docs/marketplace/install-a-template#after-installing"
+  },
+  {
+    "doc_title": "Install a template",
+    "heading": "Expected result",
+    "text": "A new agent in **Agents**, editable, with the listing's instructions and model.",
+    "url": "/docs/marketplace/install-a-template#expected-result"
+  },
+  {
+    "doc_title": "Install a template",
+    "heading": "Troubleshooting",
+    "text": "**Installing again returned the same agent.** Working as intended \u2014 see `created` above. **The agent runs but ignores documents.** No knowledge base came across. Attach one. **A tool does not work.** It needs an MCP integration you have not connected.",
+    "url": "/docs/marketplace/install-a-template#troubleshooting"
+  },
+  {
+    "doc_title": "Install a template",
+    "heading": "Related guides",
+    "text": "- [Publish a listing](/docs/marketplace/publish-a-listing) - [Ground an agent in your documents](/docs/agent-builder/knowledge-bases)",
+    "url": "/docs/marketplace/install-a-template#related-guides"
+  },
+  {
+    "doc_title": "Publish a listing",
+    "heading": "Overview",
+    "text": "Publishing puts a copy of one of your agents in the public catalog, where anyone can install it. This guide covers the lifecycle: draft, submit, review, published.",
+    "url": "/docs/marketplace/publish-a-listing"
+  },
+  {
+    "doc_title": "Publish a listing",
+    "heading": "Prerequisites",
+    "text": "- A published agent worth sharing. - `admin` or higher \u2014 publishing is a public act on behalf of the workspace.",
+    "url": "/docs/marketplace/publish-a-listing#prerequisites"
+  },
+  {
+    "doc_title": "Publish a listing",
+    "heading": "Create the listing",
+    "text": "A listing needs a title, a one-line summary, a longer description, and a category. The summary is what appears in the catalog and in search results; it is the only thing most people read before deciding whether to look further. Listings start as **drafts**. A draft is visible only to your workspace \u2014 it does not appear in the catalog, in search, or at its own URL for anyone else. A draft URL that someone outside guesses returns 404 rather than 403, so unpublished work cannot be found by probing.",
+    "url": "/docs/marketplace/publish-a-listing#create-the-listing"
+  },
+  {
+    "doc_title": "Publish a listing",
+    "heading": "Readiness",
+    "text": "Submitting checks the listing is complete: title, summary, description, category, and at least one version whose configuration can actually be installed. Anything missing is reported as a list, not one error at a time.",
+    "url": "/docs/marketplace/publish-a-listing#readiness"
+  },
+  {
+    "doc_title": "Publish a listing",
+    "heading": "Submit for review",
+    "text": "Submitting moves the listing to **pending**. A platform administrator approves or rejects it. Approval publishes it; rejection returns it to draft with a reason, and you can fix and resubmit. Review exists because installing runs someone else's instructions in your workspace. That warrants a look by a person.",
+    "url": "/docs/marketplace/publish-a-listing#submit-for-review"
+  },
+  {
+    "doc_title": "Publish a listing",
+    "heading": "Versions",
+    "text": "A listing has versions. Publishing a new one does not change anything for people who already installed an older one \u2014 an install is a copy, and copies do not update themselves. Installers choose when to take a new version by installing again.",
+    "url": "/docs/marketplace/publish-a-listing#versions"
+  },
+  {
+    "doc_title": "Publish a listing",
+    "heading": "Pricing",
+    "text": "A listing records a price, and the catalog shows it. > **Not yet enforced.** Payment for paid listings is not implemented: a listing with a non-zero price installs without charging. Do not rely on the price field as a paywall \u2014 it is displayed, not collected. Publish paid listings only when you are content for them to be installed for free until this ships.",
+    "url": "/docs/marketplace/publish-a-listing#pricing"
+  },
+  {
+    "doc_title": "Publish a listing",
+    "heading": "Reviews and ratings",
+    "text": "Installers can rate and review a listing. You cannot review your own \u2014 the check is server-side, so it holds for API callers too.",
+    "url": "/docs/marketplace/publish-a-listing#reviews-and-ratings"
+  },
+  {
+    "doc_title": "Publish a listing",
+    "heading": "Expected result",
+    "text": "An approved listing visible in the catalog, findable by search, and installable by anyone.",
+    "url": "/docs/marketplace/publish-a-listing#expected-result"
+  },
+  {
+    "doc_title": "Publish a listing",
+    "heading": "Troubleshooting",
+    "text": "**Submitting was refused.** The readiness check lists what is missing. **The listing was rejected.** The reason comes back with it. Fix and resubmit; there is no limit on attempts. **Your listing does not appear in search.** Only published listings are searchable. Drafts and pending listings are excluded. **Workflow listings are refused.** Only agent listings exist today. The workflow kind is defined but inert until the DAG workflow builder ships, and attempting one is refused explicitly rather than accepted and quietly ignored.",
+    "url": "/docs/marketplace/publish-a-listing#troubleshooting"
+  },
+  {
+    "doc_title": "Publish a listing",
+    "heading": "Related guides",
+    "text": "- [Install a template](/docs/marketplace/install-a-template) - [Roles and permissions](/docs/platform/roles-and-permissions)",
+    "url": "/docs/marketplace/publish-a-listing#related-guides"
+  },
+  {
+    "doc_title": "Watch a run happen and read its trace",
+    "heading": "Overview",
+    "text": "Every run produces one connected trace covering the whole path \u2014 the API request, the orchestration decisions, each tool call, each model call. When an agent does something surprising, the trace is where you find out why.",
+    "url": "/docs/observability/watch-a-run"
+  },
+  {
+    "doc_title": "Watch a run happen and read its trace",
+    "heading": "Prerequisites",
+    "text": "- A run id. See [Build and run your first agent](/docs/agent-builder/quickstart). - `viewer` or higher.",
+    "url": "/docs/observability/watch-a-run#prerequisites"
+  },
+  {
+    "doc_title": "Watch a run happen and read its trace",
+    "heading": "Stream it live",
+    "text": "The run stream is a Server-Sent Events endpoint. Each event is a step as it happens: In the product, **Playground** streams a run against a published agent and shows the same steps as they arrive. Streaming is the only way to see a run in progress. A run that is still going has produced steps that a status poll will not show you.",
+    "url": "/docs/observability/watch-a-run#stream-it-live"
+  },
+  {
+    "doc_title": "Watch a run happen and read its trace",
+    "heading": "Read the trace",
+    "text": "Every orchestration step emits a trace event: model calls with their token usage, tool calls with the arguments the model chose and what came back, retrieval with the chunks it pulled, and handoffs between agents in a team. Steps nest \u2014 a tool call sits under the model call that decided to make it \u2014 so the trace reads as the shape of what happened rather than a flat log.",
+    "url": "/docs/observability/watch-a-run#read-the-trace"
+  },
+  {
+    "doc_title": "Watch a run happen and read its trace",
+    "heading": "Cost",
+    "text": "Each model call records its token usage, attributed to the workspace and the run. A run's cost is the sum of its calls, which means an expensive run can be traced to the specific step that made it expensive \u2014 usually one retrieval pulling far more context than the answer needed, or a loop repeating a call.",
+    "url": "/docs/observability/watch-a-run#cost"
+  },
+  {
+    "doc_title": "Watch a run happen and read its trace",
+    "heading": "Tool-call history",
+    "text": "**MCP** in the sidebar lists tool calls across every integration, including refused ones. A refused call is recorded with its reason: tool arguments produced by a model are validated against the tool's schema before anything executes, and a refusal is that validation doing its job.",
+    "url": "/docs/observability/watch-a-run#tool-call-history"
+  },
+  {
+    "doc_title": "Watch a run happen and read its trace",
+    "heading": "Audit logs",
+    "text": "Traces record what agents did. **Audit logs** record what *people* did: sign-ins, permission changes, destructive actions. The log is append-only \u2014 entries cannot be edited or removed, including by an admin. `admin` or higher to read it.",
+    "url": "/docs/observability/watch-a-run#audit-logs"
+  },
+  {
+    "doc_title": "Watch a run happen and read its trace",
+    "heading": "Expected result",
+    "text": "For any run: the steps it took, in order and nested, with what each one cost.",
+    "url": "/docs/observability/watch-a-run#expected-result"
+  },
+  {
+    "doc_title": "Watch a run happen and read its trace",
+    "heading": "Troubleshooting",
+    "text": "**The stream ends with nothing.** The run had already finished. Streams carry steps as they happen; use the run detail for a finished run. **A step shows a tool call that was refused.** Schema validation rejected the arguments the model produced. The trace records both. **The run stopped without an error.** It hit a ceiling \u2014 steps, cost, or wall-clock. The trace names which one. Ceilings are enforced on every run precisely so an unbounded loop is a stopped run rather than an invoice.",
+    "url": "/docs/observability/watch-a-run#troubleshooting"
+  },
+  {
+    "doc_title": "Watch a run happen and read its trace",
+    "heading": "Related guides",
+    "text": "- [Give an agent tools](/docs/agent-builder/tools) - [Build a team of agents](/docs/orchestration/teams)",
+    "url": "/docs/observability/watch-a-run#related-guides"
+  },
+  {
+    "doc_title": "Run an agent from your own code",
+    "heading": "Overview",
+    "text": "Everything the dashboard does, it does over the same public API you have. This guide covers triggering a run from outside the product.",
+    "url": "/docs/orchestration/running-agents"
+  },
+  {
+    "doc_title": "Run an agent from your own code",
+    "heading": "Prerequisites",
+    "text": "- A workspace-scoped API key \u2014 see [API keys and the SDKs](/docs/platform/api-keys-and-sdks). - A published agent.",
+    "url": "/docs/orchestration/running-agents#prerequisites"
+  },
+  {
+    "doc_title": "Run an agent from your own code",
+    "heading": "Runs are asynchronous",
+    "text": "`POST .../runs` returns `202 Accepted` with a run id and a status URL. It does not wait for the agent to finish. An agent that calls several tools and a model or two can take minutes, which is not something to hold an HTTP connection open for, and a client that assumes otherwise will time out on exactly its most useful runs.",
+    "url": "/docs/orchestration/running-agents#runs-are-asynchronous"
+  },
+  {
+    "doc_title": "Run an agent from your own code",
+    "heading": "Idempotency",
+    "text": "Run-triggering endpoints accept an `Idempotency-Key` header, and you should always send one. Replaying the same key returns the original run rather than starting another. Without it, a client that retries on a timeout \u2014 which is the normal thing for a client to do \u2014 starts a second run and pays for both. Both SDKs send one automatically for run creation. If you are calling the API directly, generate a UUID per logical run and reuse it across that run's retries.",
+    "url": "/docs/orchestration/running-agents#idempotency"
+  },
+  {
+    "doc_title": "Run an agent from your own code",
+    "heading": "Retries and rate limits",
+    "text": "The SDKs retry idempotent requests on `408`, `429`, `500`, `502`, `503` and `504`, with exponential backoff and full jitter, honouring `Retry-After` when the server sends it. They do **not** retry non-idempotent requests that lack an idempotency key \u2014 silently repeating a billable action is not a helpful default. Rate limits are per workspace and per API key, and vary by plan. Exceeding one returns `429` with a `rate_limited` code and a `Retry-After` header.",
+    "url": "/docs/orchestration/running-agents#retries-and-rate-limits"
+  },
+  {
+    "doc_title": "Run an agent from your own code",
+    "heading": "Expected result",
+    "text": "A run id you can poll or stream. See [Watch a run happen](/docs/observability/watch-a-run).",
+    "url": "/docs/orchestration/running-agents#expected-result"
+  },
+  {
+    "doc_title": "Run an agent from your own code",
+    "heading": "Troubleshooting",
+    "text": "**`202` but the run never starts.** Check usage against quota under **Billing**. A workspace over its quota stops accepting runs. **`429` immediately.** You are over your plan's per-minute limit. Back off for the interval in `Retry-After`; the SDKs do this for you. **Two runs where you expected one.** A retry without an `Idempotency-Key`.",
+    "url": "/docs/orchestration/running-agents#troubleshooting"
+  },
+  {
+    "doc_title": "Run an agent from your own code",
+    "heading": "Related guides",
+    "text": "- [API keys and the SDKs](/docs/platform/api-keys-and-sdks) - [Watch a run happen](/docs/observability/watch-a-run) - [Receive webhooks](/docs/platform/webhooks)",
+    "url": "/docs/orchestration/running-agents#related-guides"
+  },
+  {
+    "doc_title": "Build a team of agents",
+    "heading": "Overview",
+    "text": "A team is several agents working on one task, with a defined shape for how work moves between them. Use one when a task genuinely decomposes \u2014 research then write, draft then review \u2014 not because more agents sounds better.",
+    "url": "/docs/orchestration/teams"
+  },
+  {
+    "doc_title": "Build a team of agents",
+    "heading": "Prerequisites",
+    "text": "- At least two published agents. - `member` or higher.",
+    "url": "/docs/orchestration/teams#prerequisites"
+  },
+  {
+    "doc_title": "Build a team of agents",
+    "heading": "Start with one agent",
+    "text": "The simplest topology that works is the right one. A single agent with the right tools beats a three-agent team for most tasks, and it is far easier to debug: one set of instructions, one trace, one place a mistake can come from. Reach for a team when the task has genuinely separable parts, or when you want one agent to check another's work.",
+    "url": "/docs/orchestration/teams#start-with-one-agent"
+  },
+  {
+    "doc_title": "Build a team of agents",
+    "heading": "Topologies",
+    "text": "**Supervisor and specialists.** A supervisor agent decides which specialist handles what, and assembles the result. The common shape, and the one to start with. **Sequential handoff.** Each agent does its part and passes the work along. Good when the stages are fixed and ordered.",
+    "url": "/docs/orchestration/teams#topologies"
+  },
+  {
+    "doc_title": "Build a team of agents",
+    "heading": "Set one up",
+    "text": "1. Open **AI teams** in the sidebar. 2. Create a team and choose its topology. 3. Add member agents and give each one a handoff description. The handoff description is what the supervisor reads when deciding where to send work. Treat it as a prompt, because it is one: \"handles billing questions, including refunds and proration\" routes correctly; \"billing stuff\" does not.",
+    "url": "/docs/orchestration/teams#set-one-up"
+  },
+  {
+    "doc_title": "Build a team of agents",
+    "heading": "What crosses a handoff",
+    "text": "A handoff carries a structured payload \u2014 a summary and pointers such as a run id \u2014 not a raw transcript dump. One agent never silently rewrites another's context. This is why a team trace is readable: each handoff records what was actually passed.",
+    "url": "/docs/orchestration/teams#what-crosses-a-handoff"
+  },
+  {
+    "doc_title": "Build a team of agents",
+    "heading": "Bounds",
+    "text": "Every team run has enforced ceilings on steps, cost, and wall-clock time. All three matter: a run that stays under its step limit can still be a cost incident if each step is expensive, and a run that stays under both can still hang. When a run hits a ceiling it stops and the trace says which one.",
+    "url": "/docs/orchestration/teams#bounds"
+  },
+  {
+    "doc_title": "Build a team of agents",
+    "heading": "Expected result",
+    "text": "A run whose trace shows the supervisor's routing decisions, each specialist's work nested underneath, and the handoffs between them.",
+    "url": "/docs/orchestration/teams#expected-result"
+  },
+  {
+    "doc_title": "Build a team of agents",
+    "heading": "Troubleshooting",
+    "text": "**Work goes to the wrong specialist.** The handoff descriptions. Make them concrete and non-overlapping. **The team loops between two agents.** Usually neither has instructions that say when it is finished. Give each specialist an explicit completion condition. The step ceiling stops the loop, but it stops it by failing the run, which is a backstop and not a fix. **It costs more than the same work by one agent.** It will. Every handoff re-sends context to another model call. That is the price of decomposition, and it is only worth paying when decomposition genuinely improves the output.",
+    "url": "/docs/orchestration/teams#troubleshooting"
+  },
+  {
+    "doc_title": "Build a team of agents",
+    "heading": "Related guides",
+    "text": "- [Run an agent from your own code](/docs/orchestration/running-agents) - [Read a run's trace](/docs/observability/watch-a-run)",
+    "url": "/docs/orchestration/teams#related-guides"
+  },
+  {
+    "doc_title": "API keys and the SDKs",
+    "heading": "Overview",
+    "text": "Everything in the product is available over the public REST API. The SDKs and CLI are thin wrappers over it, so anything you can do in one you can do in all of them.",
+    "url": "/docs/platform/api-keys-and-sdks"
+  },
+  {
+    "doc_title": "API keys and the SDKs",
+    "heading": "Issue an API key",
+    "text": "1. Open **Settings \u2192 API keys**. 2. Create a key and give it a name that says what will use it. 3. Copy it. It is shown once. Keys are scoped to one workspace at issue time and stored hashed \u2014 nobody, including support, can read yours back. If you lose it, revoke it and issue another. `admin` or higher to issue or revoke.",
+    "url": "/docs/platform/api-keys-and-sdks#issue-an-api-key"
+  },
+  {
+    "doc_title": "API keys and the SDKs",
+    "heading": "Configure",
+    "text": "Both SDKs and the CLI read the same environment variables: | Variable | Required | Meaning | | --- | --- | --- | | `AGENTVERSE_API_KEY` | yes | The key you issued. | | `AGENTVERSE_WORKSPACE_ID` | yes | Which workspace to act in. | | `AGENTVERSE_BASE_URL` | no | Override the API host. | Check what is resolved without printing the key: `whoami` deliberately never prints the key itself \u2014 it is exactly the command someone runs while sharing a screen, and printing credentials puts them in shell history and recordings.",
+    "url": "/docs/platform/api-keys-and-sdks#configure"
+  },
+  {
+    "doc_title": "API keys and the SDKs",
+    "heading": "Use it",
+    "text": "Both SDKs ship sync and async clients with the same surface. Use the context manager (or `close()`) \u2014 an unclosed client leaks a connection pool, which in a long-lived process is a slow file-descriptor leak rather than an obvious failure.",
+    "url": "/docs/platform/api-keys-and-sdks#use-it"
+  },
+  {
+    "doc_title": "API keys and the SDKs",
+    "heading": "CLI",
+    "text": "Every command accepts `--json`. `run` and `install` print the id on stdout and the human-readable status on stderr, so `$(agentverse run ...)` captures exactly the id.",
+    "url": "/docs/platform/api-keys-and-sdks#cli"
+  },
+  {
+    "doc_title": "API keys and the SDKs",
+    "heading": "Errors",
+    "text": "Errors map to typed exceptions \u2014 authentication, permission, not-found, validation, rate-limit, quota, server \u2014 rather than raw status codes, so you can branch on the case rather than the number. Every error carries the request id from the response, which is what to quote in a support conversation.",
+    "url": "/docs/platform/api-keys-and-sdks#errors"
+  },
+  {
+    "doc_title": "API keys and the SDKs",
+    "heading": "Retries",
+    "text": "Idempotent requests are retried on `408`, `429`, `500`, `502`, `503` and `504` with exponential backoff and full jitter, honouring `Retry-After`. Non-idempotent requests without an idempotency key are not retried, because silently repeating a billable action is not a safe default.",
+    "url": "/docs/platform/api-keys-and-sdks#retries"
+  },
+  {
+    "doc_title": "API keys and the SDKs",
+    "heading": "Rate limits",
+    "text": "Per workspace and per API key, varying by plan. Over the limit returns `429` with `rate_limited` and a `Retry-After` header.",
+    "url": "/docs/platform/api-keys-and-sdks#rate-limits"
+  },
+  {
+    "doc_title": "API keys and the SDKs",
+    "heading": "Troubleshooting",
+    "text": "**`ConfigurationError` on startup.** A required variable is unset. Run `agentverse whoami`. **`401`.** The key is wrong or revoked. Keys cannot be read back \u2014 issue a new one. **`404` on a resource you can see in the dashboard.** Almost always the wrong `AGENTVERSE_WORKSPACE_ID`. A resource in another workspace answers 404, not 403, so that workspaces cannot be enumerated.",
+    "url": "/docs/platform/api-keys-and-sdks#troubleshooting"
+  },
+  {
+    "doc_title": "API keys and the SDKs",
+    "heading": "Related guides",
+    "text": "- [Run an agent from your own code](/docs/orchestration/running-agents) - [Receive webhooks](/docs/platform/webhooks)",
+    "url": "/docs/platform/api-keys-and-sdks#related-guides"
+  },
+  {
+    "doc_title": "Roles and permissions",
+    "heading": "Overview",
+    "text": "A workspace is the unit of isolation in AgentVerse. Everything \u2014 agents, runs, knowledge bases, keys, billing \u2014 belongs to exactly one, and nothing crosses between them.",
+    "url": "/docs/platform/roles-and-permissions"
+  },
+  {
+    "doc_title": "Roles and permissions",
+    "heading": "The four roles",
+    "text": "Roles are a strict hierarchy: each includes everything below it. | Role | Can | | --- | --- | | `viewer` | Read agents, runs, traces, and knowledge bases. | | `member` | Everything above, plus create and edit agents, upload documents, and trigger runs. | | `admin` | Everything above, plus manage members, issue and revoke API keys, connect integrations, publish listings, and read audit logs. | | `owner` | Everything above, plus billing, workspace deletion, and transferring ownership. | Access is deny-by-default and enforced on the server. A control the interface hides is also refused by the API \u2014 hiding a button is a courtesy, never the enforcement. A workspace always has at least one owner. The last owner cannot leave or be demoted; transfer ownership first.",
+    "url": "/docs/platform/roles-and-permissions#the-four-roles"
+  },
+  {
+    "doc_title": "Roles and permissions",
+    "heading": "Cross-workspace requests answer 404",
+    "text": "Asking for a resource in a workspace you are not a member of returns `404`, not `403`. This is deliberate: `403` would confirm the resource exists, which lets someone map another tenant's contents by probing ids. Inside a workspace, a permission you lack does return `403` \u2014 there, the resource's existence is not a secret. If the API returns `404` for something you can see in the dashboard, check which workspace your API key belongs to.",
+    "url": "/docs/platform/roles-and-permissions#cross-workspace-requests-answer-404"
+  },
+  {
+    "doc_title": "Roles and permissions",
+    "heading": "Resource permissions",
+    "text": "Beyond roles, specific permissions can be granted on specific resources \u2014 letting a `member` manage billing, for example, without making them an admin. These compose with roles rather than replacing them: the role sets the floor, the grant adds on top. Grants and revocations are recorded in the audit log.",
+    "url": "/docs/platform/roles-and-permissions#resource-permissions"
+  },
+  {
+    "doc_title": "Roles and permissions",
+    "heading": "API key scope",
+    "text": "An API key's effective permissions are the intersection of the key's own scope and the role of the identity that issued it. A read-only key issued by an owner is still read-only; a full-access key issued by a member cannot exceed what a member can do.",
+    "url": "/docs/platform/roles-and-permissions#api-key-scope"
+  },
+  {
+    "doc_title": "Roles and permissions",
+    "heading": "Organizations",
+    "text": "An organization groups several workspaces for billing and SSO. It is a grouping layer, not an access layer: **attaching a workspace to an organization grants nobody any access to it.** Workspace membership stays the only thing that decides who can read a workspace's data \u2014 an organization owner with no membership in one of its workspaces cannot open it. Deleting an organization detaches its workspaces; it never deletes them.",
+    "url": "/docs/platform/roles-and-permissions#organizations"
+  },
+  {
+    "doc_title": "Roles and permissions",
+    "heading": "Audit logs",
+    "text": "Sign-ins, permission grants and denials on sensitive actions, and destructive operations are written to an append-only log. It cannot be edited or deleted, including by an owner. `admin` or higher to read; filter by actor, action, and date under **Audit logs**.",
+    "url": "/docs/platform/roles-and-permissions#audit-logs"
+  },
+  {
+    "doc_title": "Roles and permissions",
+    "heading": "Troubleshooting",
+    "text": "**A member cannot publish a listing.** Publishing is `admin` \u2014 it is a public act on behalf of the workspace. **The last owner cannot leave.** Transfer ownership first. **An API key gets `403` where the dashboard works.** The key's scope, or the role of whoever issued it. The effective permission is the intersection.",
+    "url": "/docs/platform/roles-and-permissions#troubleshooting"
+  },
+  {
+    "doc_title": "Roles and permissions",
+    "heading": "Related guides",
+    "text": "- [API keys and the SDKs](/docs/platform/api-keys-and-sdks) - [Publish a listing](/docs/marketplace/publish-a-listing)",
+    "url": "/docs/platform/roles-and-permissions#related-guides"
+  },
+  {
+    "doc_title": "Receive webhooks",
+    "heading": "Overview",
+    "text": "Webhooks push events to your endpoint as they happen, so you do not have to poll for a run that might take minutes.",
+    "url": "/docs/platform/webhooks"
+  },
+  {
+    "doc_title": "Receive webhooks",
+    "heading": "Prerequisites",
+    "text": "- An HTTPS endpoint you control. - `admin` or higher.",
+    "url": "/docs/platform/webhooks#prerequisites"
+  },
+  {
+    "doc_title": "Receive webhooks",
+    "heading": "Events",
+    "text": "| Event | Fired when | | --- | --- | | `run.completed` | A run finished successfully. | | `run.failed` | A run failed. | | `agent.published` | A new agent version was published. | | `billing.quota_exceeded` | A workspace crossed its usage quota. | | `billing.subscription_changed` | A subscription changed plan or status. | | `marketplace.listing_approved` | One of your listings was approved. | | `marketplace.listing_installed` | Someone installed one of your listings. |",
+    "url": "/docs/platform/webhooks#events"
+  },
+  {
+    "doc_title": "Receive webhooks",
+    "heading": "Register an endpoint",
+    "text": "An endpoint must subscribe to at least one event \u2014 an empty list is refused rather than quietly created as an endpoint that never fires. The signing secret is returned when you create the endpoint and is readable afterwards, unlike an API key: you need it to configure your verifier.",
+    "url": "/docs/platform/webhooks#register-an-endpoint"
+  },
+  {
+    "doc_title": "Receive webhooks",
+    "heading": "Verify the signature",
+    "text": "Every delivery carries an `AgentVerse-Signature` header: Both SDKs verify it for you: **Verify the raw bytes, not a re-serialized object.** The single most common integration mistake is parsing the body and re-encoding it before verifying. The signature is over the exact bytes we sent, and `JSON.stringify(JSON.parse(x))` is not always `x`. Capture the raw body before any JSON middleware touches it. Verification also rejects deliveries whose timestamp is outside a five-minute window in either direction, which is what stops a captured delivery being replayed later. The header can carry more than one `v1=` digest during a secret rotation \u2014 a verifier that reads only the first will reject half of your deliveries during exactly the window rotation exists to make safe. Both SDKs check all of them.",
+    "url": "/docs/platform/webhooks#verify-the-signature"
+  },
+  {
+    "doc_title": "Receive webhooks",
+    "heading": "Retries and idempotency",
+    "text": "A delivery that fails is retried up to six times with increasing backoff, over roughly two hours. `4xx` responses other than `408` and `429` are treated as final \u2014 if your endpoint says the request was bad, sending it again will not help. **Your handler must be idempotent.** A retry after your endpoint processed a delivery but before its response reached us is indistinguishable, from our side, from one that never arrived. Deduplicate on the event `id`. Return `2xx` quickly and do the work afterwards. A handler that runs for thirty seconds before responding will be retried while it is still working. An endpoint that keeps failing is eventually disabled, and shows as disabled in `agentverse webhooks list`.",
+    "url": "/docs/platform/webhooks#retries-and-idempotency"
+  },
+  {
+    "doc_title": "Receive webhooks",
+    "heading": "Expected result",
+    "text": "Deliveries arriving at your endpoint within seconds of the event, each verifiable against your secret.",
+    "url": "/docs/platform/webhooks#expected-result"
+  },
+  {
+    "doc_title": "Receive webhooks",
+    "heading": "Troubleshooting",
+    "text": "**Every signature fails.** Almost certainly re-serialization \u2014 see above. Try the raw body. **Signatures fail only sometimes.** Clock drift. Verification allows five minutes either way; a server further out than that will fail intermittently. **Duplicate events.** Expected under retry. Deduplicate on the event `id`. **The endpoint went quiet.** Check whether it was auto-disabled after repeated failures.",
+    "url": "/docs/platform/webhooks#troubleshooting"
+  },
+  {
+    "doc_title": "Receive webhooks",
+    "heading": "Related guides",
+    "text": "- [API keys and the SDKs](/docs/platform/api-keys-and-sdks) - [Run an agent from your own code](/docs/orchestration/running-agents)",
+    "url": "/docs/platform/webhooks#related-guides"
+  }
+]

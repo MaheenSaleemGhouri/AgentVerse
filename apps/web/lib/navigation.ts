@@ -11,6 +11,7 @@ import {
   ScrollText,
   Settings,
   Shield,
+  ShieldCheck,
   Store,
   Terminal,
   Upload,
@@ -182,6 +183,16 @@ export const NAV_SECTIONS: readonly NavItem[] = [
     segment: "notifications",
     icon: Bell,
     description: "Billing events, quota thresholds, and referral rewards",
+    hiddenFromSidebar: true,
+  },
+  {
+    label: "Marketplace moderation",
+    segment: "admin/marketplace",
+    icon: ShieldCheck,
+    description: "Platform staff: review listings submitted for publication",
+    // Hidden from the sidebar like every other deep route, and the page
+    // itself 404s for anyone who is not platform staff. Being palette-
+    // searchable does not grant anything — the API is the gate.
     hiddenFromSidebar: true,
   },
 ];

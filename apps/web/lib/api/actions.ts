@@ -47,6 +47,19 @@ import {
   type NotificationList,
 } from "@/lib/api/notifications";
 import {
+  approveListing as approveListingApi,
+  featureListing as featureListingApi,
+  listModerationQueue as listModerationQueueApi,
+  rejectListing as rejectListingApi,
+} from "@/lib/api/admin";
+import type { ModerationListing } from "@/lib/admin/types";
+import {
+  listAssistantMessages as listAssistantMessagesApi,
+  listAssistantSessions as listAssistantSessionsApi,
+  openAssistantSession as openAssistantSessionApi,
+} from "@/lib/api/assistant";
+import type { AssistantMessage, AssistantSession } from "@/lib/assistant/types";
+import {
   browseListings as browseListingsApi,
   createListing as createListingApi,
   installListing as installListingApi,
@@ -1092,4 +1105,60 @@ export async function submitListingAction(workspaceId: string, slug: string): Pr
 
 export async function unlistListingAction(workspaceId: string, slug: string): Promise<Listing> {
   return unlistListingApi(workspaceId, slug);
+}
+
+// ---- assistant ---------------------------------------------------------
+// Answering is not here: it streams, and a Server Action cannot return a
+// stream. That path goes through the BFF route at
+// `app/api/assistant/[sessionId]/route.ts`.
+
+export async function listAssistantSessionsAction(
+  workspaceId: string
+): Promise<AssistantSession[]> {
+  return listAssistantSessionsApi(workspaceId);
+}
+
+export async function listAssistantMessagesAction(
+  workspaceId: string,
+  sessionId: string
+): Promise<AssistantMessage[]> {
+  return listAssistantMessagesApi(workspaceId, sessionId);
+}
+
+export async function openAssistantSessionAction(
+  workspaceId: string,
+  question: string
+): Promise<AssistantSession> {
+  return openAssistantSessionApi(workspaceId, question);
+}
+
+// ---- platform admin ----------------------------------------------------
+// Global, not workspace-scoped: moderating a listing is a judgement
+// about another workspace's listing, which no workspace role expresses.
+// Authority is `platform_admins`, checked server-side on every call —
+// these wrappers add no gate of their own and must not be read as one.
+
+export async function listModerationQueueAction(): Promise<ModerationListing[]> {
+  return listModerationQueueApi();
+}
+
+export async function approveListingAction(
+  listingId: string,
+  note: string
+): Promise<ModerationListing> {
+  return approveListingApi(listingId, note);
+}
+
+export async function rejectListingAction(
+  listingId: string,
+  note: string
+): Promise<ModerationListing> {
+  return rejectListingApi(listingId, note);
+}
+
+export async function featureListingAction(
+  listingId: string,
+  isFeatured: boolean
+): Promise<ModerationListing> {
+  return featureListingApi(listingId, isFeatured);
 }

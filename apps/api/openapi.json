@@ -360,6 +360,22 @@
         "title": "ApiKeyScope",
         "type": "string"
       },
+      "AskRequest": {
+        "description": "`min_length=1` after stripping, so a stray Enter cannot spend a\nprovider call on an empty prompt.",
+        "properties": {
+          "question": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "AskRequest",
+        "type": "object"
+      },
       "AuditActivityPoint": {
         "properties": {
           "count": {
@@ -3608,6 +3624,35 @@
         "title": "MemberResponse",
         "type": "object"
       },
+      "MessageResponse": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "content",
+          "created_at"
+        ],
+        "title": "MessageResponse",
+        "type": "object"
+      },
       "ModerationDecisionRequest": {
         "properties": {
           "note": {
@@ -4526,6 +4571,19 @@
         ],
         "title": "PlanTier",
         "type": "string"
+      },
+      "PlatformAdminSessionResponse": {
+        "properties": {
+          "is_platform_admin": {
+            "title": "Is Platform Admin",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "is_platform_admin"
+        ],
+        "title": "PlatformAdminSessionResponse",
+        "type": "object"
       },
       "PortalResponse": {
         "properties": {
@@ -5957,6 +6015,36 @@
         ],
         "title": "SecuritySeverity",
         "type": "string"
+      },
+      "SessionResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_message_at": {
+            "format": "date-time",
+            "title": "Last Message At",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "last_message_at"
+        ],
+        "title": "SessionResponse",
+        "type": "object"
       },
       "SsoConfigurationResponse": {
         "properties": {
@@ -7963,6 +8051,33 @@
         "summary": "Moderation Queue Route",
         "tags": [
           "marketplace-moderation"
+        ]
+      }
+    },
+    "/api/v1/admin/session": {
+      "get": {
+        "description": "Authenticated, deliberately not authorized past that.\n\nA non-staff caller gets `false`, not a 404 \u2014 this is the one route\nwhose whole purpose is to answer the question, and gating it would\nmake it useless for the thing it exists to do.",
+        "operationId": "platform_admin_session_route_api_v1_admin_session_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformAdminSessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Platform Admin Session Route",
+        "tags": [
+          "platform-admin"
         ]
       }
     },
@@ -10993,6 +11108,237 @@
         "summary": "Rotate Api Key",
         "tags": [
           "api-keys"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/assistant/sessions": {
+      "get": {
+        "description": "Your own recent conversations in this workspace, newest first.",
+        "operationId": "list_sessions_route_api_v1_workspaces__workspace_id__assistant_sessions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SessionResponse"
+                  },
+                  "title": "Response List Sessions Route Api V1 Workspaces  Workspace Id  Assistant Sessions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Sessions Route",
+        "tags": [
+          "assistant"
+        ]
+      },
+      "post": {
+        "description": "Opens a conversation titled from its first question.\n\nTakes the question but does not answer it: creating the session and\nstreaming the answer are separate calls because SSE cannot carry a\ncreated resource's id back to the client before the body starts.",
+        "operationId": "create_session_route_api_v1_workspaces__workspace_id__assistant_sessions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Session Route",
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/assistant/sessions/{session_id}/messages": {
+      "get": {
+        "operationId": "list_messages_route_api_v1_workspaces__workspace_id__assistant_sessions__session_id__messages_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MessageResponse"
+                  },
+                  "title": "Response List Messages Route Api V1 Workspaces  Workspace Id  Assistant Sessions  Session Id  Messages Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Messages Route",
+        "tags": [
+          "assistant"
+        ]
+      },
+      "post": {
+        "description": "Asks a question and streams the answer as SSE.\n\nThe session is resolved before the response starts, so a 404 is a\nreal 404 rather than an error frame inside a 200 stream.",
+        "operationId": "ask_route_api_v1_workspaces__workspace_id__assistant_sessions__session_id__messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ask Route",
+        "tags": [
+          "assistant"
         ]
       }
     },
