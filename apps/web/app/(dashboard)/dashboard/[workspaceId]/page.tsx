@@ -1,37 +1,54 @@
-import { Bot, BookOpen, FileText, Users } from "lucide-react";
+import { Activity, BookOpen, Bot, CircleDollarSign, Users2 } from "lucide-react";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { listAgents } from "@/lib/api/agents";
+import { getEntitlements, getInvoicePreview } from "@/lib/api/billing";
+import { listAuditLogs } from "@/lib/api/audit-logs";
 import { listKnowledgeBases } from "@/lib/api/knowledge";
+import { listTeams } from "@/lib/api/teams";
 import { listMembers, listMyWorkspaces } from "@/lib/api/workspaces";
 import { auth } from "@/lib/auth";
-import { formatRelativeTime } from "@/lib/format";
+import { formatCents, formatNumber, formatRelativeTime } from "@/lib/format";
+import { ROLE_ORDER } from "@/lib/roles";
 
 import { AgentStatusBadge } from "@/components/agents/agent-status-badge";
+import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { QuickActions } from "@/components/dashboard/quick-actions";
+import { UsageOverview } from "@/components/dashboard/usage-overview";
+import { WelcomeBanner } from "@/components/dashboard/welcome-banner";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { IntegrationPending } from "@/components/patterns/integration-pending";
-import { PageHeader } from "@/components/patterns/page-header";
 import { StatCard } from "@/components/patterns/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-function greeting(): string {
+function greeting(name: string | null): string {
   const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
+  const time = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  return name ? `${time}, ${name}` : time;
 }
 
 /**
  * Workspace overview.
  *
- * Every number here is counted from a real API response — there is no
- * synthetic activity feed. The one panel without data (run history) says
- * so and names the endpoint it needs, rather than showing an invented
- * chart.
+ * Every number on this page is counted from a real API response. The
+ * approved reference (panel 05) shows four stat cards with
+ * month-over-month deltas and a six-month executions chart; two of those
+ * are not things this backend can answer:
+ *
+ *   - **Success rate** needs run outcomes, and runs have no read path
+ *     (`feature-availability.ts` → `runHistory`).
+ *   - **Deltas and the monthly series** need a previous-period
+ *     comparison. Usage is metered against the *current* billing period
+ *     only.
+ *
+ * So this page shows what the data supports — real runs metered this
+ * period, real cost in integer cents, real usage against real
+ * allowances — and names the missing endpoint where the reference's
+ * fourth card would go. A dashboard with an invented success rate is
+ * worse than one that says what it is waiting for.
  */
 export default async function DashboardPage({
   params,
@@ -41,16 +58,32 @@ export default async function DashboardPage({
   const { workspaceId } = await params;
   const session = await auth.api.getSession({ headers: await headers() });
 
-  const [workspaces, agents, knowledgeBases, members] = await Promise.all([
+  const [workspaces, agents, knowledgeBases, members, teams] = await Promise.all([
     listMyWorkspaces(),
     listAgents(workspaceId),
     listKnowledgeBases(workspaceId),
     listMembers(workspaceId),
+    listTeams(workspaceId),
   ]);
 
   const current = workspaces.find((workspace) => workspace.id === workspaceId);
   if (!current) notFound();
 
+  // Billing and audit are role-gated, and the dashboard must render for
+  // every role. Fetched separately from the block above so one 403 for a
+  // viewer cannot take the whole page down with it.
+  const canReadBilling = ROLE_ORDER[current.role] >= ROLE_ORDER.admin;
+  const canReadAudit = ROLE_ORDER[current.role] >= ROLE_ORDER.analyst;
+
+  const [entitlements, invoice, auditPage] = await Promise.all([
+    canReadBilling ? getEntitlements(workspaceId).catch(() => null) : Promise.resolve(null),
+    canReadBilling ? getInvoicePreview(workspaceId).catch(() => null) : Promise.resolve(null),
+    canReadAudit
+      ? listAuditLogs(workspaceId, { limit: 6 }).catch(() => null)
+      : Promise.resolve(null),
+  ]);
+
+  const runsThisPeriod = entitlements?.metered.find((line) => line.dimension === "agent_runs");
   const published = agents.filter((agent) => agent.status === "active").length;
   const recentAgents = [...agents]
     .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))
@@ -58,59 +91,68 @@ export default async function DashboardPage({
 
   const firstName = session?.user.name?.split(" ")[0] ?? null;
 
+  const status =
+    agents.length === 0
+      ? "No agents yet — the fastest way in is to install a template and edit it."
+      : runsThisPeriod && runsThisPeriod.used > 0
+        ? `${formatNumber(runsThisPeriod.used)} ${runsThisPeriod.used === 1 ? "run" : "runs"} this billing period.`
+        : `${agents.length} ${agents.length === 1 ? "agent" : "agents"} configured, nothing run yet this period.`;
+
   return (
     <div className="flex flex-col gap-8">
-      <PageHeader
-        title={firstName ? `${greeting()}, ${firstName}` : greeting()}
-        description={`Here's where ${current.name} stands right now.`}
-        actions={
-          <Button asChild>
-            <Link href={`/dashboard/${workspaceId}/agents`}>
-              <Bot />
-              New agent
-            </Link>
-          </Button>
-        }
+      <WelcomeBanner
+        greeting={greeting(firstName)}
+        workspaceName={current.name}
+        status={status}
       />
 
       <section aria-label="Workspace statistics">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             label="Agents"
-            value={agents.length}
-            hint={`${published} published`}
+            value={formatNumber(agents.length)}
+            hint={`${formatNumber(published)} published`}
             icon={Bot}
           />
           <StatCard
-            label="Knowledge bases"
-            value={knowledgeBases.length}
-            hint={knowledgeBases.length === 0 ? "None yet" : "Available for grounding"}
+            label="Runs this period"
+            value={runsThisPeriod ? formatNumber(runsThisPeriod.used) : "—"}
+            hint={
+              runsThisPeriod
+                ? runsThisPeriod.limit === null
+                  ? "Unlimited on this plan"
+                  : `of ${formatNumber(runsThisPeriod.limit)} included`
+                : "Visible to admins and owners"
+            }
+            icon={Activity}
+          />
+          <StatCard
+            label="Cost this period"
+            // `subtotal_cents`, not a total: the draft invoice is the
+            // plan fee plus accrued overage before tax, and calling it a
+            // total would overstate what the API actually computed.
+            value={invoice ? formatCents(invoice.subtotal_cents, invoice.currency) : "—"}
+            hint={invoice ? "Accrued so far, before tax" : "Visible to admins and owners"}
+            icon={CircleDollarSign}
+          />
+          <StatCard
+            label="Knowledge & teams"
+            value={formatNumber(knowledgeBases.length + teams.length)}
+            hint={`${formatNumber(knowledgeBases.length)} knowledge · ${formatNumber(teams.length)} teams`}
             icon={BookOpen}
-          />
-          <StatCard
-            label="Team members"
-            value={members.length}
-            hint={`You are ${current.role}`}
-            icon={Users}
-          />
-          <StatCard
-            label="Your role"
-            value={<span className="capitalize">{current.role}</span>}
-            hint="Determines what you can change"
-            icon={FileText}
           />
         </div>
       </section>
 
       <section aria-label="Quick actions" className="space-y-3">
-        <h2 className="text-sm font-medium text-muted-foreground">Quick actions</h2>
+        <h2 className="font-display text-base font-semibold tracking-tight">Quick actions</h2>
         <QuickActions workspaceId={workspaceId} />
       </section>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <section aria-label="Recent agents" className="space-y-3">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <section aria-label="Agents" className="space-y-3 xl:col-span-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-muted-foreground">Recent agents</h2>
+            <h2 className="font-display text-base font-semibold tracking-tight">Your agents</h2>
             <Button variant="ghost" size="sm" asChild>
               <Link href={`/dashboard/${workspaceId}/agents`}>View all</Link>
             </Button>
@@ -120,11 +162,16 @@ export default async function DashboardPage({
             <EmptyState
               icon={Bot}
               title="No agents yet"
-              description="Create your first agent to reach a working run in minutes."
+              description="An agent is instructions, a model, and optionally tools and knowledge. Installing a template and editing it is faster than starting from a blank prompt."
               action={
-                <Button asChild>
-                  <Link href={`/dashboard/${workspaceId}/agents`}>Create an agent</Link>
-                </Button>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button asChild>
+                    <Link href={`/dashboard/${workspaceId}/marketplace`}>Browse templates</Link>
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <Link href={`/dashboard/${workspaceId}/agents`}>Start from scratch</Link>
+                  </Button>
+                </div>
               }
             />
           ) : (
@@ -137,7 +184,7 @@ export default async function DashboardPage({
                 >
                   <span
                     aria-hidden="true"
-                    className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground"
                   >
                     <Bot className="size-4" />
                   </span>
@@ -154,56 +201,79 @@ export default async function DashboardPage({
           )}
         </section>
 
-        <section aria-label="Knowledge bases" className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-muted-foreground">Knowledge bases</h2>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href={`/dashboard/${workspaceId}/knowledge`}>View all</Link>
-            </Button>
-          </div>
-
-          {knowledgeBases.length === 0 ? (
-            <EmptyState
-              icon={BookOpen}
-              title="No knowledge bases yet"
-              description="Upload documents your agents can cite instead of guessing."
-              action={
-                <Button asChild>
-                  <Link href={`/dashboard/${workspaceId}/knowledge`}>Create one</Link>
-                </Button>
-              }
-            />
+        <section aria-label="Usage" className="space-y-3">
+          <h2 className="sr-only">Usage</h2>
+          {entitlements ? (
+            <UsageOverview metered={entitlements.metered} plan={entitlements.plan} />
           ) : (
-            <Card className="gap-0 divide-y divide-border p-0">
-              {knowledgeBases.slice(0, 5).map((kb) => (
-                <Link
-                  key={kb.id}
-                  href={`/dashboard/${workspaceId}/knowledge/${kb.id}`}
-                  className="flex items-center gap-3 px-4 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl hover:bg-accent/40"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground"
-                  >
-                    <BookOpen className="size-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{kb.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {kb.description ?? kb.embedding_model}
-                    </p>
-                  </div>
-                </Link>
-              ))}
+            <Card className="gap-2 p-6">
+              <h3 className="font-display text-base font-semibold tracking-tight">
+                Usage this period
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Plan usage and cost are visible to admins and owners.
+              </p>
             </Card>
           )}
         </section>
       </div>
 
-      <section aria-label="Recent activity" className="space-y-3">
-        <h2 className="text-sm font-medium text-muted-foreground">Run activity</h2>
-        <IntegrationPending feature="runHistory" />
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <section aria-label="Recent activity" className="xl:col-span-2">
+          <ActivityFeed
+            workspaceId={workspaceId}
+            entries={auditPage?.data ?? []}
+            canRead={auditPage !== null}
+          />
+        </section>
+
+        <section aria-label="Run history" className="space-y-3">
+          <h2 className="sr-only">Run history</h2>
+          <IntegrationPending feature="runHistory" />
+        </section>
+      </div>
+
+      <section aria-label="Teams" className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-base font-semibold tracking-tight">AI teams</h2>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`/dashboard/${workspaceId}/teams`}>View all</Link>
+          </Button>
+        </div>
+        {teams.length === 0 ? (
+          <EmptyState
+            icon={Users2}
+            title="No teams yet"
+            description="A team lets several agents hand work to each other — a supervisor delegating to specialists, or a planner, executor and critic."
+            action={
+              <Button variant="outline" asChild>
+                <Link href={`/dashboard/${workspaceId}/teams`}>Create a team</Link>
+              </Button>
+            }
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {teams.slice(0, 3).map((team) => (
+              <Card key={team.id} className="gap-1 p-5">
+                <Link
+                  href={`/dashboard/${workspaceId}/teams/${team.id}`}
+                  className="font-medium hover:underline"
+                >
+                  {team.name}
+                </Link>
+                <p className="line-clamp-2 text-sm text-muted-foreground">
+                  {team.description ?? `${team.topology.replace(/_/g, " ")} topology`}
+                </p>
+              </Card>
+            ))}
+          </div>
+        )}
       </section>
+
+      <p className="text-xs text-muted-foreground">
+        You are {current.role} in {current.name} · {formatNumber(members.length)}{" "}
+        {members.length === 1 ? "member" : "members"}
+      </p>
     </div>
   );
 }
