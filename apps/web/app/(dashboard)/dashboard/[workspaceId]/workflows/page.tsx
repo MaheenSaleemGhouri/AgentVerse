@@ -45,7 +45,9 @@ export default function WorkflowsPage(): React.JSX.Element {
 
       <IntegrationPending feature="workflows">
         <section className="space-y-3">
-          <h2 className="text-sm font-medium text-muted-foreground">Planned node types</h2>
+          <h2 className="font-display text-base font-semibold tracking-tight">
+            Planned node types
+          </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {NODE_TYPES.map((node) => {
               const Icon = node.icon;
