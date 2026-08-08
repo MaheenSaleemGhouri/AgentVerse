@@ -130,6 +130,7 @@ export function AgentsGrid({
     return (
       <EmptyState
         icon={Bot}
+        mascot="waving"
         title="No agents yet"
         description="An agent is a stored configuration — instructions, model, tools, and knowledge. Create one to reach a working run in minutes."
         action={<CreateAgentDialog workspaceId={workspaceId} />}

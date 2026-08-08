@@ -64,6 +64,7 @@ export function KnowledgeBaseGrid({
     return (
       <EmptyState
         icon={BookOpen}
+        mascot="thinking"
         title="No knowledge bases yet"
         description="A knowledge base is a collection of documents your agents retrieve from and cite. Create one, upload a file, then attach it to an agent."
         action={<CreateKnowledgeBaseDialog workspaceId={workspaceId} />}
