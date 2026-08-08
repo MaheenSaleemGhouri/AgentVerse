@@ -29,15 +29,18 @@ export const MIN_SEARCH_LENGTH = 2;
 /**
  * Kinds the dashboard can actually open.
  *
- * `listing` is deliberately absent. The API searches the catalog and is
- * tested doing so — the SDK and CLI already consume those results — but
- * the dashboard has no marketplace route yet (it ships with the
- * marketplace UI). A search result that navigates to a 404 is worse than
- * one that is not offered, so the palette asks only for what it can
- * open. Add `listing` here when that route exists; nothing else needs to
- * change.
+ * `listing` joined the list once `/dashboard/[workspaceId]/marketplace/
+ * [slug]` shipped — until then it was withheld, because a search result
+ * that navigates to a 404 is worse than one that is not offered. This is
+ * now every kind the search API returns, which is the intended state:
+ * the list exists to be empty of exclusions.
  */
-export const NAVIGABLE_KINDS: readonly SearchKind[] = ["agent", "knowledge_base", "team"];
+export const NAVIGABLE_KINDS: readonly SearchKind[] = [
+  "agent",
+  "knowledge_base",
+  "team",
+  "listing",
+];
 
 /** Where a hit lives, so the palette can navigate to it. */
 export function hrefForHit(workspaceId: string, kind: SearchKind, id: string): string {
@@ -50,8 +53,7 @@ export function hrefForHit(workspaceId: string, kind: SearchKind, id: string): s
       return `/dashboard/${workspaceId}/teams/${id}`;
     case "listing":
       // Listings are addressed by slug, not row id — the API returns the
-      // slug as the hit's `id` for exactly this reason. Unreachable from
-      // the palette today; see `NAVIGABLE_KINDS`.
+      // slug as the hit's `id` for exactly this reason.
       return `/dashboard/${workspaceId}/marketplace/${id}`;
   }
 }

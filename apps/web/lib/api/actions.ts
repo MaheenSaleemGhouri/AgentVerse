@@ -46,6 +46,30 @@ import {
   markNotificationRead as markNotificationReadApi,
   type NotificationList,
 } from "@/lib/api/notifications";
+import {
+  browseListings as browseListingsApi,
+  createListing as createListingApi,
+  installListing as installListingApi,
+  listMyListings as listMyListingsApi,
+  listReviews as listReviewsApi,
+  publishListingVersion as publishListingVersionApi,
+  submitListing as submitListingApi,
+  submitReview as submitReviewApi,
+  unlistListing as unlistListingApi,
+  updateListing as updateListingApi,
+  withdrawReview as withdrawReviewApi,
+} from "@/lib/api/marketplace";
+import type {
+  CatalogFilters,
+  CreateListingRequest,
+  Install,
+  Listing,
+  ListingPage,
+  ListingVersion,
+  PublishVersionRequest,
+  Review,
+  UpdateListingRequest,
+} from "@/lib/marketplace/types";
 import { searchWorkspace as searchWorkspaceApi } from "@/lib/api/search";
 import type { SearchKind, SearchResults } from "@/lib/search/kinds";
 import {
@@ -1003,4 +1027,69 @@ export async function searchWorkspaceAction(
   kinds?: readonly SearchKind[]
 ): Promise<SearchResults> {
   return searchWorkspaceApi(workspaceId, query, kinds);
+}
+
+// ── Marketplace ─────────────────────────────────────────────────────
+
+export async function browseListingsAction(filters: CatalogFilters): Promise<ListingPage> {
+  return browseListingsApi(filters);
+}
+
+export async function listReviewsAction(slug: string): Promise<Review[]> {
+  return listReviewsApi(slug);
+}
+
+export async function listMyListingsAction(workspaceId: string): Promise<Listing[]> {
+  return listMyListingsApi(workspaceId);
+}
+
+export async function installListingAction(
+  workspaceId: string,
+  slug: string,
+  body: { version_number?: number | null; name?: string | null }
+): Promise<Install> {
+  return installListingApi(workspaceId, slug, body);
+}
+
+export async function submitReviewAction(
+  workspaceId: string,
+  slug: string,
+  body: { rating: number; body: string }
+): Promise<Review> {
+  return submitReviewApi(workspaceId, slug, body);
+}
+
+export async function withdrawReviewAction(workspaceId: string, slug: string): Promise<void> {
+  return withdrawReviewApi(workspaceId, slug);
+}
+
+export async function createListingAction(
+  workspaceId: string,
+  body: CreateListingRequest
+): Promise<Listing> {
+  return createListingApi(workspaceId, body);
+}
+
+export async function updateListingAction(
+  workspaceId: string,
+  slug: string,
+  body: UpdateListingRequest
+): Promise<Listing> {
+  return updateListingApi(workspaceId, slug, body);
+}
+
+export async function publishListingVersionAction(
+  workspaceId: string,
+  slug: string,
+  body: PublishVersionRequest
+): Promise<ListingVersion> {
+  return publishListingVersionApi(workspaceId, slug, body);
+}
+
+export async function submitListingAction(workspaceId: string, slug: string): Promise<Listing> {
+  return submitListingApi(workspaceId, slug);
+}
+
+export async function unlistListingAction(workspaceId: string, slug: string): Promise<Listing> {
+  return unlistListingApi(workspaceId, slug);
 }

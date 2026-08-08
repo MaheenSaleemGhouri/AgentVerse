@@ -17,10 +17,13 @@ export function CopyButton({
   value,
   label = "Copy",
   size = "icon-sm",
+  className,
 }: {
   value: string;
   label?: string;
   size?: "icon-xs" | "icon-sm" | "icon";
+  /** For positioning only — the API explorer overlays it on a code block. */
+  className?: string;
 }): React.JSX.Element {
   const [copied, setCopied] = React.useState(false);
 
@@ -35,6 +38,7 @@ export function CopyButton({
       type="button"
       variant="ghost"
       size={size}
+      className={className}
       aria-label={copied ? "Copied" : label}
       onClick={() => {
         void navigator.clipboard

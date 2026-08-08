@@ -131,4 +131,18 @@ export const queryKeys = {
   // a refetch.
   search: (workspaceId: string, query: string) =>
     ["workspaces", workspaceId, "search", query] as const,
+
+  marketplace: {
+    // Not workspace-scoped: the catalog is public and identical for
+    // everyone, so two workspaces browsing the same filters should share
+    // a cache entry rather than each refetching the same rows.
+    catalog: (filters: Record<string, string | number | boolean | undefined>) =>
+      ["marketplace", "catalog", filters] as const,
+    reviews: (slug: string) => ["marketplace", "listings", slug, "reviews"] as const,
+    // Workspace-first, like every other tenant-scoped key: a publisher's
+    // drafts must never survive a workspace switch.
+    mine: (workspaceId: string) => ["workspaces", workspaceId, "marketplace", "listings"] as const,
+    installs: (workspaceId: string) =>
+      ["workspaces", workspaceId, "marketplace", "installs"] as const,
+  },
 } as const;

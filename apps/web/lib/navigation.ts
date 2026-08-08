@@ -11,6 +11,8 @@ import {
   ScrollText,
   Settings,
   Shield,
+  Store,
+  Terminal,
   Upload,
   Users,
   Users2,
@@ -87,6 +89,12 @@ export const NAV_SECTIONS: readonly NavItem[] = [
     hiddenFromSidebar: true,
   },
   {
+    label: "Marketplace",
+    segment: "marketplace",
+    icon: Store,
+    description: "Install first-party templates and community agents, and publish your own",
+  },
+  {
     label: "MCP",
     segment: "mcp",
     icon: Activity,
@@ -139,6 +147,20 @@ export const NAV_SECTIONS: readonly NavItem[] = [
     segment: "settings/security",
     icon: Shield,
     description: "Session, access control, and audit trail",
+    hiddenFromSidebar: true,
+  },
+  {
+    label: "API explorer",
+    segment: "settings/api-explorer",
+    icon: Terminal,
+    description: "Try API requests against this workspace and copy the code",
+    hiddenFromSidebar: true,
+  },
+  {
+    label: "Your listings",
+    segment: "marketplace/my-listings",
+    icon: Store,
+    description: "Marketplace listings you publish — drafts, reviews, and versions",
     hiddenFromSidebar: true,
   },
   {
