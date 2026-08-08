@@ -16,6 +16,13 @@ import { ErrorState } from "@/components/patterns/error-state";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -37,6 +44,33 @@ const FILTERS: ReadonlyArray<{ value: StatusFilter; label: string }> = [
   { value: "archived", label: "Archived" },
 ];
 
+type SortKey = "recent" | "name" | "status";
+
+/**
+ * Sort options are limited to fields `AgentResponse` actually carries.
+ * "Last run" and "most run" are the obvious other choices and are
+ * deliberately absent — runs have no read path, so either would be a
+ * control that silently sorts by nothing.
+ */
+const SORTERS: Record<SortKey, (a: Agent, b: Agent) => number> = {
+  recent: (a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at),
+  name: (a, b) => a.name.localeCompare(b.name),
+  // Published first, then drafts, then archived — the order someone
+  // scanning for "what is live" wants, not alphabetical on the status
+  // string, which would put archived at the top.
+  status: (a, b) =>
+    STATUS_RANK.indexOf(a.status) - STATUS_RANK.indexOf(b.status) ||
+    a.name.localeCompare(b.name),
+};
+
+const STATUS_RANK = ["active", "draft", "archived"];
+
+const SORT_OPTIONS: ReadonlyArray<{ value: SortKey; label: string }> = [
+  { value: "recent", label: "Recently updated" },
+  { value: "name", label: "Name (A–Z)" },
+  { value: "status", label: "Status" },
+];
+
 /**
  * Filtering and view mode are local UI state, never a query param round
  * trip — the full list is already in the cache, so re-filtering it
@@ -53,10 +87,11 @@ export function AgentsGrid({
   const [query, setQuery] = React.useState("");
   const [status, setStatus] = React.useState<StatusFilter>("all");
   const [view, setView] = React.useState<"grid" | "table">("grid");
+  const [sort, setSort] = React.useState<SortKey>("recent");
 
   const visible = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return (agents ?? []).filter((agent) => {
+    const matched = (agents ?? []).filter((agent) => {
       if (status !== "all" && agent.status !== status) return false;
       if (!needle) return true;
       return (
@@ -64,7 +99,12 @@ export function AgentsGrid({
         (agent.description ?? "").toLowerCase().includes(needle)
       );
     });
-  }, [agents, query, status]);
+
+    // Sorted on a copy — `agents` is TanStack Query's cached array, and
+    // sorting it in place would mutate the cache under every other
+    // consumer.
+    return [...matched].sort(SORTERS[sort]);
+  }, [agents, query, status, sort]);
 
   if (isError) {
     return (
@@ -123,6 +163,19 @@ export function AgentsGrid({
             ))}
           </TabsList>
         </Tabs>
+
+        <Select value={sort} onValueChange={(value) => setSort(value as SortKey)}>
+          <SelectTrigger size="sm" className="w-44" aria-label="Sort agents">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SORT_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <div className="flex items-center gap-1 rounded-lg border border-border p-0.5">
           <Button

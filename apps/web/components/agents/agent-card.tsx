@@ -52,7 +52,11 @@ export function AgentCard({
   const detailHref = `/dashboard/${workspaceId}/agents/${agent.id}`;
 
   return (
-    <Card className="group gap-0 p-5 transition-colors hover:border-primary/40">
+    // Hover is a 1px lift plus a border that darkens toward the primary
+    // — the reference's card treatment. No shadow bloom: on the warm
+    // ground a heavy shadow reads as dirt, and elevation here comes from
+    // the border, as it does everywhere else in this system.
+    <Card className="group relative gap-0 p-5 transition-[transform,border-color] duration-150 hover:-translate-y-px hover:border-primary/50 motion-reduce:transition-none motion-reduce:hover:translate-y-0">
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
