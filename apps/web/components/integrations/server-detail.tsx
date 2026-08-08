@@ -104,6 +104,12 @@ export function ServerDetail({
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {transport.label} · {transport.summary}
+            {server.version && (
+              <>
+                {" · "}
+                <span className="font-mono">v{server.version}</span>
+              </>
+            )}
           </p>
         </div>
 
