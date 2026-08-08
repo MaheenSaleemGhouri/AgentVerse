@@ -552,6 +552,42 @@
     "url": "/docs/platform/roles-and-permissions#related-guides"
   },
   {
+    "doc_title": "The AgentVerse assistant",
+    "heading": "Overview",
+    "text": "The assistant is the small robot button in the bottom-right corner of every dashboard page. It answers questions about how AgentVerse works \u2014 where a setting lives, what a role can do, why a run failed \u2014 using these guides as its source.",
+    "url": "/docs/platform/the-assistant"
+  },
+  {
+    "doc_title": "The AgentVerse assistant",
+    "heading": "Asking a question",
+    "text": "Select the button, or ask one of the suggested questions to start. Enter sends; Shift+Enter starts a new line. Answers stream in as they are written, and finish with links to the guides they came from. Follow a link before acting on anything that changes billing, permissions, or production agents \u2014 the link is there so you can check.",
+    "url": "/docs/platform/the-assistant#asking-a-question"
+  },
+  {
+    "doc_title": "The AgentVerse assistant",
+    "heading": "What it can and cannot do",
+    "text": "The assistant reads documentation. It does not act on your workspace. It cannot create an agent, start or cancel a run, change a setting, issue a key, or edit billing. If an answer tells you to do one of those, it is telling you where *you* do it. There is no way to ask it to do the thing for you, and that is deliberate: an assistant with a hand on production is a different product with a different risk profile. It also does not read your workspace. It cannot see your agents, your runs, your documents, or your usage \u2014 so it cannot answer \"why did *my* run fail last night\". For that, open the run and read its trace ([Watch a run](/docs/observability/watch-a-run)).",
+    "url": "/docs/platform/the-assistant#what-it-can-and-cannot-do"
+  },
+  {
+    "doc_title": "The AgentVerse assistant",
+    "heading": "When it says it could not find something",
+    "text": "The assistant is instructed to say so plainly rather than guess. An answer of \"that is not covered in the guides\" means exactly that \u2014 not that the feature does not exist. Two things worth doing when you see it: - Search the documentation directly at [/docs](/docs), or press <kbd>\u2318</kbd><kbd>K</kbd> anywhere in the dashboard. The search matches headings the assistant may have scored differently. - Rephrase using the product's own words. \"Publish a version\" finds more than \"make it live\".",
+    "url": "/docs/platform/the-assistant#when-it-says-it-could-not-find-something"
+  },
+  {
+    "doc_title": "The AgentVerse assistant",
+    "heading": "Who can use it",
+    "text": "Any role, including `viewer`. The answers come from documentation that is public anyway.",
+    "url": "/docs/platform/the-assistant#who-can-use-it"
+  },
+  {
+    "doc_title": "The AgentVerse assistant",
+    "heading": "Privacy",
+    "text": "Conversations are scoped to you, not to your workspace. Other members \u2014 including admins and owners \u2014 cannot read them. Questions and answers are stored so a conversation survives closing the panel. They are subject to the same data-protection controls as the rest of your workspace's data; see [Roles and permissions](/docs/platform/roles-and-permissions) for how workspace isolation works.",
+    "url": "/docs/platform/the-assistant#privacy"
+  },
+  {
     "doc_title": "Receive webhooks",
     "heading": "Overview",
     "text": "Webhooks push events to your endpoint as they happen, so you do not have to poll for a run that might take minutes.",
