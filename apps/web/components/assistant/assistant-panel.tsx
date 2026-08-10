@@ -11,6 +11,7 @@ import { MAX_QUESTION_LENGTH, type AssistantMessage } from "@/lib/assistant/type
 import { useAssistantAnswer } from "@/lib/hooks/useAssistantAnswer";
 
 import { AssistantAnswer } from "@/components/assistant/assistant-answer";
+import { AgentVerseMascot } from "@/components/brand/agentverse-mascot";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
@@ -107,6 +108,7 @@ export function AssistantPanel({ workspaceId }: { workspaceId: string }): React.
         <div className="space-y-4 py-4">
           {messages.length === 0 && status === "idle" && (
             <div className="space-y-3">
+              <AgentVerseMascot pose="thinking" className="h-20 w-auto" />
               <p className="text-sm text-muted-foreground">
                 Ask about anything in AgentVerse. Answers come from the documentation and link
                 back to it, so you can check them.

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { AgentVerseMark } from "@/components/brand/agentverse-mark";
 import {
   Sheet,
   SheetContent,
@@ -10,49 +11,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-
-/**
- * The mascot, flattened to a 2D mark.
- *
- * Inline SVG on `currentColor` rather than an asset: it costs no
- * request, and it is theme-correct in both palettes without a second
- * file. The `robot.glb` scene on the auth page stays where it is —
- * loading three.js behind a floating button on every dashboard route
- * would be an absurd price for an icon.
- *
- * It is the same CC0 placeholder character noted at the start of this
- * phase, not a branded asset.
- */
-function MascotMark({ className }: { className?: string }): React.JSX.Element {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path
-        d="M12 2v3"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-      <circle cx="12" cy="2" r="1.2" fill="currentColor" />
-      <rect
-        x="3.5"
-        y="5"
-        width="17"
-        height="13"
-        rx="4"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      />
-      <circle cx="9" cy="11.5" r="1.4" fill="currentColor" />
-      <circle cx="15" cy="11.5" r="1.4" fill="currentColor" />
-      <path
-        d="M9.5 21h5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 const AssistantPanel = React.lazy(() =>
   import("@/components/assistant/assistant-panel").then((module) => ({
@@ -82,7 +40,7 @@ export function AssistantLauncher({ workspaceId }: { workspaceId: string }): Rea
         className="fixed right-5 bottom-5 z-40 flex size-12 items-center justify-center rounded-full border border-border bg-card shadow-lg transition-transform hover:scale-105 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none motion-reduce:transition-none motion-reduce:hover:scale-100"
         aria-label="Ask the AgentVerse assistant"
       >
-        <MascotMark className="size-6 text-primary" />
+        <AgentVerseMark className="size-6 text-primary" />
       </SheetTrigger>
 
       <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">

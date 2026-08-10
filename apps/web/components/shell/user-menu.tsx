@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, LogOut, Settings, Shield, User } from "lucide-react";
+import { HelpCircle, KeyRound, LogOut, Settings, Shield, User } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -78,6 +78,12 @@ export function UserMenu({
           <Link href={`/dashboard/${workspaceId}/settings/security`}>
             <Shield className="size-4" />
             Security
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/dashboard/${workspaceId}/help`}>
+            <HelpCircle className="size-4" />
+            Help center
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

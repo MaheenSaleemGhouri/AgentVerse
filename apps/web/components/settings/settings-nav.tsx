@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, KeyRound, Palette, Shield, User } from "lucide-react";
+import { Bell, Building2, KeyRound, Palette, Shield, Terminal, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
@@ -11,7 +11,9 @@ const SECTIONS = [
   { segment: "", label: "Workspace", icon: Building2 },
   { segment: "profile", label: "Profile", icon: User },
   { segment: "api-keys", label: "API keys", icon: KeyRound },
+  { segment: "api-explorer", label: "API explorer", icon: Terminal },
   { segment: "security", label: "Security", icon: Shield },
+  { segment: "notifications", label: "Notifications", icon: Bell },
   { segment: "appearance", label: "Appearance", icon: Palette },
 ] as const;
 

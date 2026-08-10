@@ -72,6 +72,24 @@ export const PENDING_INTEGRATIONS = {
     capability:
       "Aggregated run volume, success rate, latency percentiles, and per-model cost attribution over time.",
   },
+  /**
+   * `notification_service` sends real notifications (see
+   * `notification_service/domain/notification.py`'s `NotificationKind`)
+   * but has no per-channel opt-in/out concept — `domain/ports.py` has no
+   * preference or mute port. Unlike the other entries here, this was
+   * never scoped into a numbered roadmap phase, so `phase` marks it as
+   * backlog rather than citing a phase that doesn't cover it.
+   */
+  notificationPreferences: {
+    phase: 13,
+    phaseName: "Notification preferences (not yet scheduled on the roadmap)",
+    endpoints: [
+      "GET /api/v1/workspaces/{workspace_id}/notification-preferences",
+      "PATCH /api/v1/workspaces/{workspace_id}/notification-preferences",
+    ],
+    capability:
+      "Choose which notification categories (billing, agent runs, team, security) arrive by email vs. in-app only, per user.",
+  },
 } as const satisfies Record<string, PendingIntegration>;
 
 export type PendingIntegrationKey = keyof typeof PENDING_INTEGRATIONS;
