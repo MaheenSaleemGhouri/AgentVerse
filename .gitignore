@@ -154,3 +154,12 @@ desktop.ini
 *.swp
 *.swo
 *~
+.env*
+
+# ---------- Auto-installed agent-skill docs (Vercel marketplace integrations) ----------
+# Scoped to apps/web specifically — NOT a blanket rule, since the repo
+# root's own .claude/skills/ (the 80-skill library CLAUDE.md is built
+# from) is intentionally tracked and must never be gitignored.
+apps/web/.agents/
+apps/web/.claude/
+apps/web/skills-lock.json
