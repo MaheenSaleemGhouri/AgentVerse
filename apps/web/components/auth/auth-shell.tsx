@@ -47,7 +47,7 @@ export function AuthShell({
         </div>
 
         {/* Hero. Ordered last on small screens so the form a user came
-            for is the first thing they reach, not 500px of scene. */}
+            for is the first thing they reach, not a tall hero column. */}
         <div className="order-3 lg:order-2">
           <AuthHero />
         </div>
@@ -71,7 +71,7 @@ function PanelSkeleton(): React.JSX.Element {
   return (
     <div
       aria-hidden="true"
-      className="h-[560px] w-full animate-pulse rounded-3xl border border-white/10 bg-white/[0.03]"
+      className="h-[560px] w-full animate-pulse rounded-xl border border-border bg-card"
     />
   );
 }

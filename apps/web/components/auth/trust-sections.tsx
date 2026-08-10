@@ -1,22 +1,20 @@
 "use client";
 
 /**
- * The two strips below the auth panels: the "trusted by" logo row and
- * the six-item trust bar.
+ * The two strips below the auth panels: the "built on" strip and the
+ * six-item trust bar.
  *
- * ## A deliberate change from the reference
+ * ## A deliberate change from the original concept art
  *
- * The approved design shows Microsoft, Google, AWS, OpenAI, NVIDIA, and
+ * Early concept art showed Microsoft, Google, AWS, OpenAI, NVIDIA, and
  * Vercel under "Trusted by innovators worldwide". Those are not
- * AgentVerse customers, and the reference is concept art — shipping it
- * literally would put a false claim on the front door of the product,
- * using other companies' trademarks to make it.
+ * AgentVerse customers, and shipping it literally would put a false
+ * claim on the front door of the product, using other companies'
+ * trademarks to make it.
  *
  * `CLAUDE.md` §2 requires every factual claim in customer-facing copy to
  * be verifiable against the shipped product, so the row is reframed to
- * what is actually true: the technologies AgentVerse is built on. Same
- * position, same visual weight, same six slots — a claim that survives
- * being read closely.
+ * what is actually true: the technologies AgentVerse is built on.
  *
  * Swap in real customer logos the moment there are real customers who
  * have agreed to be named.
@@ -56,13 +54,13 @@ const BUILT_ON = [
 
 export function BuiltOnStrip(): React.JSX.Element {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-6 py-4 backdrop-blur-xl">
-      <p className="text-center text-[11px] font-medium tracking-wide text-[#8b84b0]">
+    <div className="rounded-lg border border-border bg-card px-6 py-4">
+      <p className="text-center text-[11px] font-medium tracking-wide text-muted-foreground">
         Built on the open standards teams already trust
       </p>
       <ul className="mt-3 flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
         {BUILT_ON.map((name) => (
-          <li key={name} className="text-sm font-semibold text-[#cfcae8]/85">
+          <li key={name} className="text-sm font-semibold text-foreground/85">
             {name}
           </li>
         ))}
@@ -75,24 +73,26 @@ export function TrustBar(): React.JSX.Element {
   const reduceMotion = useReducedMotion();
 
   return (
-    <ul className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06] sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <ul className="grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       {TRUST.map((item, index) => {
         const Icon = item.icon;
         return (
           <motion.li
             key={item.title}
-            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+            initial={reduceMotion ? false : { opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 0.45, delay: index * 0.06 }}
-            className="flex items-start gap-3 bg-[#0b0920]/90 px-5 py-4 backdrop-blur-xl"
+            transition={{ duration: 0.35, delay: index * 0.05 }}
+            className="flex items-start gap-3 bg-card px-5 py-4"
           >
-            <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl bg-[#7c3aed]/18 ring-1 ring-[#a855f7]/30">
-              <Icon className="size-4 text-[#c4b5fd]" aria-hidden="true" />
+            <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-md bg-accent text-accent-foreground">
+              <Icon className="size-4" aria-hidden="true" />
             </span>
             <span className="min-w-0">
-              <span className="block text-[13px] font-semibold text-white">{item.title}</span>
-              <span className="mt-0.5 block text-[11px] leading-snug text-[#8b84b0]">
+              <span className="block text-[13px] font-semibold text-foreground">
+                {item.title}
+              </span>
+              <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
                 {item.body}
               </span>
             </span>

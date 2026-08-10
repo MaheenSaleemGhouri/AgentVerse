@@ -38,7 +38,7 @@ export function PasswordRequirements({ value }: { value: string }): React.JSX.El
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[11px] font-medium text-[#a8a2c8]">Password must contain:</p>
+      <p className="text-xs font-medium text-muted-foreground">Password must contain:</p>
 
       {/* Strength bar. Four segments, one per rule — a percentage would
           imply a precision the rules do not have. */}
@@ -50,11 +50,11 @@ export function PasswordRequirements({ value }: { value: string }): React.JSX.El
               "h-1 flex-1 rounded-full transition-colors duration-300",
               index < met
                 ? met === PASSWORD_RULES.length
-                  ? "bg-[#17b26a]"
+                  ? "bg-success"
                   : met >= 3
-                    ? "bg-[#a855f7]"
-                    : "bg-[#f79009]"
-                : "bg-white/10",
+                    ? "bg-accent-solid"
+                    : "bg-warning"
+                : "bg-muted"
             )}
           />
         ))}
@@ -64,15 +64,17 @@ export function PasswordRequirements({ value }: { value: string }): React.JSX.El
         {PASSWORD_RULES.map((rule) => {
           const passed = rule.test(value);
           return (
-            <li key={rule.label} className="flex items-center gap-1.5 text-[11px]">
+            <li key={rule.label} className="flex items-center gap-1.5 text-xs">
               {/* Icon *and* colour *and* the sentence below — status is
                   never colour-alone (Rule 7). */}
               {passed ? (
-                <Check className="size-3 shrink-0 text-[#17b26a]" aria-hidden="true" />
+                <Check className="size-3 shrink-0 text-success" aria-hidden="true" />
               ) : (
-                <X className="size-3 shrink-0 text-[#6f6892]" aria-hidden="true" />
+                <X className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
               )}
-              <span className={passed ? "text-[#8fe3bb]" : "text-[#8b84b0]"}>{rule.label}</span>
+              <span className={passed ? "text-success-strong" : "text-muted-foreground"}>
+                {rule.label}
+              </span>
               <span className="sr-only">{passed ? "— met" : "— not met"}</span>
             </li>
           );

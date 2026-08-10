@@ -8,14 +8,17 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { AgentVerseLockup } from "@/components/auth/agentverse-mark";
+import { AuthLockup } from "@/components/auth/auth-lockup";
+import { AuthSubmitButton } from "@/components/auth/auth-buttons";
 import { AuthField } from "@/components/auth/auth-field";
-import { GradientButton } from "@/components/auth/auth-buttons";
-import { GlassPanel } from "@/components/auth/glass-panel";
+import { AuthPanel } from "@/components/auth/auth-panel";
 import { authClient } from "@/lib/auth-client";
 
 const schema = z.object({
-  email: z.string().min(1, "Email is required.").email("Enter a valid email address."),
+  // Trimmed before the format check — a stray leading/trailing space
+  // (autocomplete, mobile keyboards) would otherwise fail `.email()`
+  // silently with no visual cue the space is even there.
+  email: z.string().trim().min(1, "Email is required.").email("Enter a valid email address."),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -51,39 +54,39 @@ export function ForgotPasswordForm(): React.JSX.Element {
 
   if (sent) {
     return (
-      <div className="mx-auto flex w-full max-w-[520px] flex-col px-4 py-16 sm:px-6">
-        <GlassPanel>
-          <AgentVerseLockup className="mb-6" />
-          <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-white">
-            <CheckCircle2 className="size-5 text-[#c084fc]" aria-hidden="true" />
+      <div className="mx-auto flex w-full max-w-[480px] flex-col px-4 py-16 sm:px-6">
+        <AuthPanel elevated>
+          <AuthLockup className="mb-6" />
+          <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-foreground">
+            <CheckCircle2 className="size-5 text-success" aria-hidden="true" />
             Check your email
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-[#a8a2c8]">
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             If that email has an AgentVerse account, a reset link is on its way. It expires in
             an hour.
           </p>
           <Link
             href="/login"
-            className="mt-6 inline-flex items-center gap-2 rounded-lg px-1 text-sm font-medium text-[#c084fc] transition-colors hover:text-[#d8b4fe] focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#a855f7]/40"
+            className="mt-6 inline-flex items-center gap-2 rounded px-1 text-sm font-medium text-primary transition-colors hover:underline focus:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
             Back to login
           </Link>
-        </GlassPanel>
+        </AuthPanel>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[520px] flex-col px-4 py-16 sm:px-6">
-      <GlassPanel>
-        <AgentVerseLockup className="mb-6" />
+    <div className="mx-auto flex w-full max-w-[480px] flex-col px-4 py-16 sm:px-6">
+      <AuthPanel elevated>
+        <AuthLockup className="mb-6" />
 
-        <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-white">
-          <KeyRound className="size-5 text-[#c084fc]" aria-hidden="true" />
+        <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-foreground">
+          <KeyRound className="size-5 text-primary" aria-hidden="true" />
           Reset your password
         </h1>
-        <p className="mt-2 text-sm leading-relaxed text-[#a8a2c8]">
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Enter the email on your account and we&apos;ll send a link to reset your password.
         </p>
 
@@ -106,26 +109,26 @@ export function ForgotPasswordForm(): React.JSX.Element {
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
                 role="alert"
-                className="rounded-lg border border-[#f4655b]/30 bg-[#f4655b]/10 px-3 py-2 text-xs text-[#f4655b]"
+                className="rounded-md border border-destructive/30 bg-destructive-soft px-3 py-2 text-xs text-destructive-strong"
               >
                 {formError}
               </motion.p>
             )}
           </AnimatePresence>
 
-          <GradientButton type="submit" pending={isSubmitting} pendingLabel="Sending…" className="mt-1">
+          <AuthSubmitButton pending={isSubmitting} pendingLabel="Sending…" className="mt-1">
             Send reset link
-          </GradientButton>
+          </AuthSubmitButton>
         </form>
 
         <Link
           href="/login"
-          className="mt-6 inline-flex items-center gap-2 rounded-lg px-1 text-sm font-medium text-[#c084fc] transition-colors hover:text-[#d8b4fe] focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#a855f7]/40"
+          className="mt-6 inline-flex items-center gap-2 rounded px-1 text-sm font-medium text-primary transition-colors hover:underline focus:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
           Back to login
         </Link>
-      </GlassPanel>
+      </AuthPanel>
     </div>
   );
 }

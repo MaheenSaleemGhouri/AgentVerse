@@ -9,10 +9,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { AgentVerseLockup } from "@/components/auth/agentverse-mark";
+import { AuthLockup } from "@/components/auth/auth-lockup";
+import { AuthSubmitButton } from "@/components/auth/auth-buttons";
 import { AuthField } from "@/components/auth/auth-field";
-import { GradientButton } from "@/components/auth/auth-buttons";
-import { GlassPanel } from "@/components/auth/glass-panel";
+import { AuthPanel } from "@/components/auth/auth-panel";
 import { authClient } from "@/lib/auth-client";
 
 const schema = z.object({
@@ -52,35 +52,35 @@ export function ResetPasswordForm(): React.JSX.Element {
 
   if (!token || linkError) {
     return (
-      <div className="mx-auto flex w-full max-w-[520px] flex-col px-4 py-16 sm:px-6">
-        <GlassPanel>
-          <AgentVerseLockup className="mb-6" />
-          <h1 className="text-2xl font-semibold tracking-tight text-white">Link expired</h1>
-          <p className="mt-2 text-sm leading-relaxed text-[#a8a2c8]">
+      <div className="mx-auto flex w-full max-w-[480px] flex-col px-4 py-16 sm:px-6">
+        <AuthPanel elevated>
+          <AuthLockup className="mb-6" />
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Link expired</h1>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             This reset link is invalid or has already been used. Request a new one.
           </p>
           <Link
             href="/forgot-password"
-            className="mt-6 inline-flex items-center gap-2 rounded-lg px-1 text-sm font-medium text-[#c084fc] transition-colors hover:text-[#d8b4fe] focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#a855f7]/40"
+            className="mt-6 inline-flex items-center gap-2 rounded px-1 text-sm font-medium text-primary transition-colors hover:underline focus:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
             Request a new link
           </Link>
-        </GlassPanel>
+        </AuthPanel>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[520px] flex-col px-4 py-16 sm:px-6">
-      <GlassPanel>
-        <AgentVerseLockup className="mb-6" />
+    <div className="mx-auto flex w-full max-w-[480px] flex-col px-4 py-16 sm:px-6">
+      <AuthPanel elevated>
+        <AuthLockup className="mb-6" />
 
-        <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-white">
-          <Lock className="size-5 text-[#c084fc]" aria-hidden="true" />
+        <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-foreground">
+          <Lock className="size-5 text-primary" aria-hidden="true" />
           Set a new password
         </h1>
-        <p className="mt-2 text-sm leading-relaxed text-[#a8a2c8]">
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Choose a new password for your account.
         </p>
 
@@ -103,23 +103,18 @@ export function ResetPasswordForm(): React.JSX.Element {
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
                 role="alert"
-                className="rounded-lg border border-[#f4655b]/30 bg-[#f4655b]/10 px-3 py-2 text-xs text-[#f4655b]"
+                className="rounded-md border border-destructive/30 bg-destructive-soft px-3 py-2 text-xs text-destructive-strong"
               >
                 {formError}
               </motion.p>
             )}
           </AnimatePresence>
 
-          <GradientButton
-            type="submit"
-            pending={isSubmitting}
-            pendingLabel="Saving…"
-            className="mt-1"
-          >
+          <AuthSubmitButton pending={isSubmitting} pendingLabel="Saving…" className="mt-1">
             Reset password
-          </GradientButton>
+          </AuthSubmitButton>
         </form>
-      </GlassPanel>
+      </AuthPanel>
     </div>
   );
 }

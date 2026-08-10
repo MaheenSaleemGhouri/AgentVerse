@@ -8,8 +8,8 @@ import { auth } from "@/lib/auth";
 import { ApiError } from "@/lib/api/client";
 import { acceptInvite, type AcceptInviteResponse } from "@/lib/api/invitations";
 
-import { AgentVerseLockup } from "@/components/auth/agentverse-mark";
-import { GlassPanel } from "@/components/auth/glass-panel";
+import { AuthLockup } from "@/components/auth/auth-lockup";
+import { AuthPanel } from "@/components/auth/auth-panel";
 
 export const metadata: Metadata = {
   title: "Accept invitation — AgentVerse",
@@ -39,21 +39,21 @@ function extractDetail(rawBody: string): string {
 
 function InvalidInviteCard({ message }: { message: string }): React.JSX.Element {
   return (
-    <div className="mx-auto flex w-full max-w-[520px] flex-col px-4 py-16 sm:px-6">
-      <GlassPanel>
-        <AgentVerseLockup className="mb-6" />
-        <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-white">
-          <AlertTriangle className="size-5 text-[#c084fc]" aria-hidden="true" />
+    <div className="mx-auto flex w-full max-w-[480px] flex-col px-4 py-16 sm:px-6">
+      <AuthPanel elevated>
+        <AuthLockup className="mb-6" />
+        <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-foreground">
+          <AlertTriangle className="size-5 text-warning" aria-hidden="true" />
           Invitation not valid
         </h1>
-        <p className="mt-2 text-sm leading-relaxed text-[#a8a2c8]">{message}</p>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{message}</p>
         <Link
           href="/dashboard"
-          className="mt-6 inline-flex items-center gap-2 rounded-lg px-1 text-sm font-medium text-[#c084fc] transition-colors hover:text-[#d8b4fe] focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[#a855f7]/40"
+          className="mt-6 inline-flex items-center gap-2 rounded px-1 text-sm font-medium text-primary transition-colors hover:underline focus:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         >
           Go to AgentVerse
         </Link>
-      </GlassPanel>
+      </AuthPanel>
     </div>
   );
 }

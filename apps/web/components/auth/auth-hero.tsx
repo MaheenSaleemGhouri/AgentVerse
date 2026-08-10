@@ -1,80 +1,62 @@
 "use client";
 
 /**
- * The centre column: mark, wordmark, tagline, 3D scene, and the eight
- * capability cards flanking it.
+ * The centre column: wordmark, tagline, the official mascot, and the
+ * eight capability cards flanking it.
  *
- * The heading order matters more than it looks. The 3D canvas is
- * `aria-hidden`, so this `<h2>` and the card list are the *only* thing a
- * screen reader gets from the hero — they carry the product claim the
- * robot carries visually.
+ * Replaces a bespoke WebGL scene (a robot on a neon-city platform) with
+ * the one approved mascot asset. That scene was three problems at once:
+ * a second, unapproved robot illustration (docs/design/design-system.md
+ * §6 fixes the mascot's identity — no surface draws its own), a
+ * cyberpunk palette the brief rules out (§54), and a WebGL dependency
+ * with no accessible fallback content of its own (the a11y suite only
+ * passed because the canvas was `aria-hidden` and jsdom always rendered
+ * the *fallback*, never the thing shipped to real users' browsers).
+ *
+ * The heading and the card list are what a screen reader gets from this
+ * column — they carry the product claim the mascot carries visually.
  */
 
 import { motion, useReducedMotion } from "framer-motion";
 
-import { AgentVerseMark } from "./agentverse-mark";
+import { AgentVerseMascot } from "@/components/brand/agentverse-mascot";
+
 import { FeatureCards, FeatureCardsCompact } from "./feature-cards";
-import { SceneLoader } from "./scene/scene-loader";
 
 export function AuthHero(): React.JSX.Element {
   const reduceMotion = useReducedMotion();
 
   return (
     <div className="relative flex w-full flex-col items-center">
-      {/* Logo + wordmark + tagline, above the scene as in the design. */}
       <motion.div
-        initial={reduceMotion ? false : { opacity: 0, y: -18 }}
+        initial={reduceMotion ? false : { opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 flex flex-col items-center text-center"
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="flex flex-col items-center text-center"
       >
-        <motion.div
-          {...(reduceMotion
-            ? {}
-            : {
-                animate: { y: [0, -6, 0] },
-                transition: {
-                  duration: 5,
-                  repeat: Number.POSITIVE_INFINITY,
-                  ease: "easeInOut" as const,
-                },
-              })}
-        >
-          <AgentVerseMark className="size-20 lg:size-24" glow />
-        </motion.div>
-
-        <h2 className="mt-3 text-4xl font-bold tracking-tight text-white lg:text-5xl [text-shadow:0_0_38px_rgba(168,85,247,0.65)]">
-          Agent<span className="bg-gradient-to-r from-[#a855f7] to-[#22d3ee] bg-clip-text text-transparent">Verse</span>
+        <AgentVerseMascot pose="waving" className="h-40 w-auto sm:h-48" priority />
+        <h2 className="mt-4 font-display text-3xl font-bold tracking-tight text-foreground lg:text-4xl">
+          AgentVerse
         </h2>
-        <p className="mt-1.5 text-sm text-[#c4bde4] lg:text-base">
+        <p className="mt-1.5 text-sm text-muted-foreground lg:text-base">
           AI Workforce. Limitless Possibilities.
         </p>
       </motion.div>
 
-      {/* Scene + flanking cards. The canvas is absolutely positioned
-          behind the cards so they overlay it the way the design shows,
-          and the wrapper reserves its height so nothing shifts when the
-          renderer finishes loading (§6: avoid layout shift). */}
-      <div className="relative mt-2 w-full">
-        <div className="relative h-[440px] w-full lg:h-[520px]">
-          <SceneLoader />
-
-          {/* Desktop: four cards each side, vertically centred. */}
-          <div className="pointer-events-none absolute inset-0 hidden items-center justify-between px-1 lg:flex">
-            <div className="pointer-events-auto w-[190px]">
-              <FeatureCards side="left" />
-            </div>
-            <div className="pointer-events-auto w-[190px]">
-              <FeatureCards side="right" />
-            </div>
-          </div>
+      {/* Desktop: four cards each side, flanking the mascot. */}
+      <div className="mt-8 hidden w-full items-start justify-between gap-6 lg:flex">
+        <div className="w-[200px]">
+          <FeatureCards side="left" />
         </div>
-
-        {/* Tablet and below: one grid under the scene, since there is no
-            room to flank it without crushing the robot. */}
-        <div className="mt-6 lg:hidden">
-          <FeatureCardsCompact />
+        <div className="w-[200px]">
+          <FeatureCards side="right" />
         </div>
+      </div>
+
+      {/* Tablet and below: one grid, since there is no room to flank the
+          mascot without crushing it. */}
+      <div className="mt-6 w-full lg:hidden">
+        <FeatureCardsCompact />
       </div>
     </div>
   );
