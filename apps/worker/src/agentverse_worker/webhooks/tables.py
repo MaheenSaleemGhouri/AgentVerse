@@ -59,4 +59,6 @@ webhook_deliveries_table = Table(
     Column("last_response_status", Integer, nullable=True),
     Column("last_error", Text, nullable=True),
     Column("delivered_at", DateTime(timezone=True), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=True),
+    Column("updated_at", DateTime(timezone=True), nullable=True),
 )

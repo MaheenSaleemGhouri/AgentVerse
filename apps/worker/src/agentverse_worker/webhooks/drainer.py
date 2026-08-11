@@ -270,7 +270,7 @@ class WebhookDeliveryRepository:
                 webhook_deliveries_table.c.status == "delivering",
                 webhook_deliveries_table.c.updated_at < cutoff,
             )
-            .values(status="pending", next_attempt_at=datetime.now(UTC))
+            .values(status="pending", next_attempt_at=datetime.now(UTC), updated_at=datetime.now(UTC))
             .returning(webhook_deliveries_table.c.id)
         )
         requeued = len(result.all())
