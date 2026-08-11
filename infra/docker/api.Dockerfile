@@ -62,4 +62,10 @@ ENV PATH="/app/.venv/bin:$PATH" \
 COPY --from=builder --chown=agentverse:agentverse /src/apps/api /app
 USER agentverse
 EXPOSE 8000
-CMD ["uvicorn", "agentverse_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# `python -m uvicorn`, not the `uvicorn` console script: `uv sync` bakes
+# the venv's build-time absolute path (/src/apps/api/.venv/...) into
+# every console-script shebang, which no longer exists once this stage
+# copies the venv to /app — `exec: no such file or directory` at
+# container start. Invoking the module via the interpreter on PATH
+# sidesteps the shebang entirely.
+CMD ["python", "-m", "uvicorn", "agentverse_api.main:app", "--host", "0.0.0.0", "--port", "8000"]

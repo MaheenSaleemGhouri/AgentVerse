@@ -36,4 +36,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
 COPY --from=builder --chown=agentverse:agentverse /src/apps/worker /app
 USER agentverse
 EXPOSE 8001
-CMD ["uvicorn", "agentverse_worker.main:app", "--host", "0.0.0.0", "--port", "8001"]
+# python -m uvicorn, not the uvicorn console script — see api.Dockerfile's
+# runtime CMD for why the script's baked-in shebang breaks after this
+# stage's COPY.
+CMD ["python", "-m", "uvicorn", "agentverse_worker.main:app", "--host", "0.0.0.0", "--port", "8001"]
