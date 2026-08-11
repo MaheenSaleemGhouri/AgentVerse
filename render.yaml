@@ -1,0 +1,93 @@
+# Render Blueprint — apps/api + apps/worker (CLAUDE.md §12: same stack,
+# frontend stays on Vercel per docs/deployment/vercel-production.md).
+#
+# Deploy: Render Dashboard → New → Blueprint → connect
+# MaheenSaleemGhouri/AgentVerse → branch main. Render reads this file and
+# provisions everything below. Every `sync: false` var is prompted for
+# once during that flow and never stored in this repo (CLAUDE.md Rule 1).
+#
+# apps/web's Neon Postgres (already migrated) is reused here rather than
+# provisioning a second database — both services read AGENTVERSE_*_DATABASE_URL
+# as a pasted secret, not a Render-managed database resource.
+
+services:
+  - name: agentverse-api
+    type: web
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./infra/docker/api.Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: AGENTVERSE_API_ENVIRONMENT
+        value: production
+      - key: AGENTVERSE_API_LOG_LEVEL
+        value: INFO
+      # Neon connection string (asyncpg driver, ssl=require — not
+      # sslmode=require, per the same rewrite done for the Alembic
+      # migration in docs/deployment/vercel-production.md).
+      - key: AGENTVERSE_API_DATABASE_URL
+        sync: false
+      # apps/web's live Vercel URL — both the JWKS fetch (server-to-server)
+      # and the browser-facing issuer/audience are this same public URL,
+      # since the two services are not on a shared private network.
+      - key: AGENTVERSE_API_AUTH_INTERNAL_URL
+        value: https://agentverse-virid.vercel.app
+      - key: AGENTVERSE_API_AUTH_PUBLIC_URL
+        value: https://agentverse-virid.vercel.app
+      # Must equal the INTERNAL_API_SECRET already set in the Vercel
+      # project — same shared secret validating apps/web -> apps/api calls.
+      - key: AGENTVERSE_API_INTERNAL_API_SECRET
+        sync: false
+      - key: AGENTVERSE_API_OPENAI_API_KEY
+        sync: false
+      # This service's own Render-assigned public URL (OAuth redirect_uri
+      # target). Set to the predicted https://agentverse-api.onrender.com
+      # below; corrected after first deploy if Render assigns a different
+      # name.
+      - key: AGENTVERSE_API_API_PUBLIC_URL
+        value: https://agentverse-api.onrender.com
+      - key: AGENTVERSE_API_REDIS_URL
+        fromService:
+          type: keyvalue
+          name: agentverse-redis
+          property: connectionString
+      # Shared byte-identical with apps/worker's copy below — sealed
+      # MCP credentials must be openable by whichever service reads them.
+      - key: AGENTVERSE_CREDENTIAL_KEK_V1
+        sync: false
+
+  - name: agentverse-worker
+    type: web
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./infra/docker/worker.Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: AGENTVERSE_WORKER_ENVIRONMENT
+        value: production
+      - key: AGENTVERSE_WORKER_LOG_LEVEL
+        value: INFO
+      - key: AGENTVERSE_WORKER_DATABASE_URL
+        sync: false
+      - key: AGENTVERSE_WORKER_OPENAI_API_KEY
+        sync: false
+      - key: AGENTVERSE_WORKER_REDIS_URL
+        fromService:
+          type: keyvalue
+          name: agentverse-redis
+          property: connectionString
+      - key: AGENTVERSE_CREDENTIAL_KEK_V1
+        sync: false
+
+  - name: agentverse-redis
+    type: keyvalue
+    plan: free
+    region: oregon
+    maxmemoryPolicy: noeviction
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: allow-render-internal-services
