@@ -88,7 +88,14 @@ export function Playground({
   }, [steps, activeTurn?.id, activeTurn?.runId]);
 
   const selectedAgent = agents.find((agent) => agent.id === agentId) ?? null;
-  const isStreaming = status === "connecting" || status === "streaming";
+  // `useAgentRunStream` defaults to `status: "connecting"` and never
+  // leaves it while `runId` is null (its effect bails out immediately),
+  // so without this guard `isStreaming` is `true` from first render —
+  // before any message is ever sent — and the send button is
+  // permanently stuck on "Running…". Matches the `activeTurn?.runId`
+  // guard `RuntimeMonitor` already uses below.
+  const isStreaming =
+    Boolean(activeTurn?.runId) && (status === "connecting" || status === "streaming");
   const canSend = Boolean(agentId) && prompt.trim().length > 0 && !isSubmitting && !isStreaming;
 
   // `override` lets Retry resend a past turn's exact prompt without
