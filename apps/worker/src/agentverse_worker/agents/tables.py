@@ -26,6 +26,7 @@ run_status_enum = postgresql.ENUM(
 )
 run_step_type_enum = postgresql.ENUM(
     "run_started",
+    "retrieval",
     "llm_call",
     "tool_call",
     "run_completed",

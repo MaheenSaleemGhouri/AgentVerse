@@ -27,6 +27,7 @@ class RunStatus(StrEnum):
 
 class RunStepType(StrEnum):
     RUN_STARTED = "run_started"
+    RETRIEVAL = "retrieval"
     LLM_CALL = "llm_call"
     TOOL_CALL = "tool_call"
     RUN_COMPLETED = "run_completed"
