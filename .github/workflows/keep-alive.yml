@@ -1,0 +1,20 @@
+name: Keep Render services awake
+
+# Render's free plan spins a web service down after 15 minutes with no
+# inbound HTTP request — apps/worker's job loop dies with it, so any run
+# queued while it's asleep sits until the next request wakes it back up
+# (a ~60s cold start). Pinging both services well inside that window
+# keeps them warm instead of paying that latency on the next real run.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping apps/api
+        run: curl -fsS -o /dev/null https://agentverse-api-063d.onrender.com/health
+      - name: Ping apps/worker
+        run: curl -fsS -o /dev/null https://agentverse-worker.onrender.com/health
