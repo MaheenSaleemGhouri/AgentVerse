@@ -71,11 +71,14 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
-    // Increment 7.1. Safe to flip only because migration `c1e5a8d3f704`
-    // grandfathered every pre-existing user as verified in the same
-    // change — without that backfill this would lock out every current
-    // account on their next sign-in.
-    requireEmailVerification: true,
+    // Reverted from Increment 7.1's `true`: this deployment has no
+    // verified Resend sending domain, so a verification email can only
+    // ever reach the Resend account owner's own address (sandbox
+    // restriction) — gating login on it would lock out every other
+    // tester/signup. `sendOnSignUp` below still fires a best-effort
+    // verification email; login just never waits on it. Flip back to
+    // `true` once a domain is verified in Resend.
+    requireEmailVerification: false,
     minPasswordLength: 8,
     maxPasswordLength: 128,
     password: {

@@ -15,7 +15,7 @@ from agentverse_shared.locks.distributed_lock import DistributedLock
 from agentverse_shared.retrieval.port import ChunkSearchPort
 from agentverse_shared.retrieval.postgres_search import PostgresChunkSearch
 from agentverse_shared.security.envelope import CredentialVault, KeyRing
-from agentverse_shared.storage.document_store import DocumentStore, LocalDocumentStore
+from agentverse_shared.storage.document_store import DocumentStore, build_document_store
 from agentverse_shared.text.tokenizer import TiktokenCounter, TokenCounter
 from fastapi import Depends
 from redis.asyncio import Redis
@@ -155,13 +155,26 @@ def get_chunk_search(session: AsyncSession = Depends(get_db_session)) -> ChunkSe
 
 @lru_cache
 def get_document_store() -> DocumentStore:
-    """Process-wide singleton — it holds only a resolved root path.
+    """Process-wide singleton.
 
-    apps/worker constructs the same store over the same root under its
-    own setting. The two services share the key *layout* as a contract,
-    never a config object (CLAUDE.md §5).
+    apps/worker constructs the same kind of store under its own,
+    identically-named settings. The two services share the key *layout*
+    and the bucket/root as a contract, never a config object
+    (CLAUDE.md §5). S3 is chosen whenever a bucket is configured — the
+    two services run as separate containers with no shared filesystem,
+    so `LocalDocumentStore` is reachable by whichever service wrote to
+    it and no other; it survives here only for single-container/local
+    dev where that's not a problem.
     """
-    return LocalDocumentStore(get_settings().document_storage_root)
+    settings = get_settings()
+    return build_document_store(
+        root=settings.document_storage_root,
+        bucket=settings.document_storage_bucket,
+        endpoint_url=settings.document_storage_endpoint_url,
+        region=settings.document_storage_region,
+        access_key_id=settings.document_storage_access_key_id,
+        secret_access_key=settings.document_storage_secret_access_key,
+    )
 
 
 @lru_cache

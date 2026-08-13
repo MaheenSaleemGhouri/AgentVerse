@@ -57,6 +57,22 @@ services:
       # MCP credentials must be openable by whichever service reads them.
       - key: AGENTVERSE_CREDENTIAL_KEK_V1
         sync: false
+      # S3-compatible object storage (Neon Object Storage) for uploaded
+      # knowledge-base documents — this service and agentverse-worker run
+      # as separate containers with no shared filesystem, so the local
+      # disk fallback (LocalDocumentStore) silently loses every upload
+      # the moment ingestion runs on the other container. All five must
+      # match apps/worker's copy below byte-for-byte (same bucket).
+      - key: AGENTVERSE_API_DOCUMENT_STORAGE_BUCKET
+        sync: false
+      - key: AGENTVERSE_API_DOCUMENT_STORAGE_ENDPOINT_URL
+        sync: false
+      - key: AGENTVERSE_API_DOCUMENT_STORAGE_REGION
+        sync: false
+      - key: AGENTVERSE_API_DOCUMENT_STORAGE_ACCESS_KEY_ID
+        sync: false
+      - key: AGENTVERSE_API_DOCUMENT_STORAGE_SECRET_ACCESS_KEY
+        sync: false
 
   - name: agentverse-worker
     type: web
@@ -81,6 +97,18 @@ services:
           name: agentverse-redis
           property: connectionString
       - key: AGENTVERSE_CREDENTIAL_KEK_V1
+        sync: false
+      # Same bucket as agentverse-api above — this worker reads what that
+      # service writes, so these five must match it exactly.
+      - key: AGENTVERSE_WORKER_DOCUMENT_STORAGE_BUCKET
+        sync: false
+      - key: AGENTVERSE_WORKER_DOCUMENT_STORAGE_ENDPOINT_URL
+        sync: false
+      - key: AGENTVERSE_WORKER_DOCUMENT_STORAGE_REGION
+        sync: false
+      - key: AGENTVERSE_WORKER_DOCUMENT_STORAGE_ACCESS_KEY_ID
+        sync: false
+      - key: AGENTVERSE_WORKER_DOCUMENT_STORAGE_SECRET_ACCESS_KEY
         sync: false
 
   - name: agentverse-redis

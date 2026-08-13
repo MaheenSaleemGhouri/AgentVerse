@@ -82,6 +82,50 @@ class Settings(BaseSettings):
     # share the key layout as a contract, never a config object.
     document_storage_root: str = "/var/lib/agentverse/documents"
 
+    # S3-compatible object storage (Neon Object Storage in production).
+    # All four optional and all-or-nothing: `get_document_store()` uses
+    # `S3DocumentStore` when `document_storage_bucket` is set, else falls
+    # back to `LocalDocumentStore` at `document_storage_root` above — the
+    # local path is fine for single-container dev, wrong the moment
+    # apps/api and apps/worker run as separate containers with no shared
+    # filesystem (Increment: object storage escalation).
+    document_storage_bucket: str | None = None
+    document_storage_endpoint_url: str | None = None
+    document_storage_region: str | None = None
+    document_storage_access_key_id: str | None = None
+    document_storage_secret_access_key: str | None = None
+
+    @property
+    def document_storage_configured(self) -> bool:
+        """All four S3 settings, or none. A bucket without full
+        credentials would look configured but fail on the first upload —
+        `validate_document_storage` below refuses to start on that half
+        state instead (same shape as `stripe_configured`).
+        """
+        return bool(
+            self.document_storage_bucket
+            and self.document_storage_endpoint_url
+            and self.document_storage_region
+            and self.document_storage_access_key_id
+            and self.document_storage_secret_access_key
+        )
+
+    def validate_document_storage(self) -> None:
+        fields = (
+            self.document_storage_bucket,
+            self.document_storage_endpoint_url,
+            self.document_storage_region,
+            self.document_storage_access_key_id,
+            self.document_storage_secret_access_key,
+        )
+        if any(fields) and not self.document_storage_configured:
+            raise ValueError(
+                "Refusing to start: AGENTVERSE_API_DOCUMENT_STORAGE_* is partially "
+                "configured. Set bucket, endpoint_url, region, access_key_id, and "
+                "secret_access_key together, or leave all five unset to fall back "
+                "to LocalDocumentStore."
+            )
+
     # Caps the blast radius of one upload — embedding spend, worker
     # memory, and request-body buffering all scale with it. 25 MB fits a
     # large PDF manual without letting a single request pin a worker.

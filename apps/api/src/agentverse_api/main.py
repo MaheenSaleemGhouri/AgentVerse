@@ -1,5 +1,7 @@
 """ASGI entrypoint: `uvicorn agentverse_api.main:app`."""
 
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
@@ -75,7 +77,7 @@ from agentverse_api.billing_service.interface.routes.webhooks import (
     router as billing_webhooks_router,
 )
 from agentverse_api.infrastructure.config import get_settings
-from agentverse_api.infrastructure.logging import configure_logging
+from agentverse_api.infrastructure.logging import configure_logging, request_id_var
 from agentverse_api.interface.middleware import request_id_middleware
 from agentverse_api.interface.routes.health import router as health_router
 from agentverse_api.interface.routes.metrics import router as metrics_router
@@ -134,6 +136,10 @@ def create_app() -> FastAPI:
     # and a live-mode key outside production means a test run can move
     # real money. Both are silent until money is involved.
     settings.validate_stripe_mode()
+    # Fails startup rather than the first upload: a bucket configured
+    # without full credentials would look ready and then fail opaquely
+    # the moment someone drags a file onto a knowledge base.
+    settings.validate_document_storage()
 
     app = FastAPI(
         title="AgentVerse API",
@@ -159,6 +165,23 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=502,
             content={"detail": exc.detail, "retryable": exc.retryable},
+        )
+
+    # Starlette's default `ServerErrorMiddleware` returns a plain-text
+    # 500 body, which every frontend caller here parses as JSON — an
+    # unhandled exception (e.g. a storage backend misconfiguration) was
+    # surfacing as an unparseable response instead of a readable error,
+    # so every failure looked identical no matter the actual cause. This
+    # is the last resort: every exception with a purpose-built handler
+    # above is caught there first.
+    @app.exception_handler(Exception)
+    async def _unhandled_exception(request: Request, exc: Exception) -> JSONResponse:
+        logging.getLogger(__name__).exception(
+            "unhandled_exception", extra={"path": request.url.path}
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error", "request_id": request_id_var.get()},
         )
 
     app.include_router(health_router)

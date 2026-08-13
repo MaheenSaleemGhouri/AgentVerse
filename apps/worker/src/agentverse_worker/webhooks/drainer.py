@@ -264,13 +264,14 @@ class WebhookDeliveryRepository:
         a duplicate delivery.
         """
         cutoff = datetime.now(UTC) - timedelta(seconds=older_than_seconds)
+        now = datetime.now(UTC)
         result = await self._session.execute(
             update(webhook_deliveries_table)
             .where(
                 webhook_deliveries_table.c.status == "delivering",
                 webhook_deliveries_table.c.updated_at < cutoff,
             )
-            .values(status="pending", next_attempt_at=datetime.now(UTC), updated_at=datetime.now(UTC))
+            .values(status="pending", next_attempt_at=now, updated_at=now)
             .returning(webhook_deliveries_table.c.id)
         )
         requeued = len(result.all())

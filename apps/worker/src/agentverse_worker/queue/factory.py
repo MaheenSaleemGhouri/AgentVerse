@@ -10,7 +10,7 @@ import uuid
 from agentverse_shared.embeddings.openai_provider import OpenAIEmbeddingProvider
 from agentverse_shared.retrieval.postgres_search import PostgresChunkSearch
 from agentverse_shared.security.envelope import CredentialVault, KeyRing
-from agentverse_shared.storage.document_store import LocalDocumentStore
+from agentverse_shared.storage.document_store import build_document_store
 from agentverse_shared.text.tokenizer import TiktokenCounter
 from redis.asyncio import Redis
 
@@ -45,7 +45,14 @@ def build_queue(redis_client: Redis, settings: Settings) -> RedisStreamQueue:
         model_version=settings.embedding_model_version,
         base_url=settings.openai_base_url,
     )
-    store = LocalDocumentStore(settings.document_storage_root)
+    store = build_document_store(
+        root=settings.document_storage_root,
+        bucket=settings.document_storage_bucket,
+        endpoint_url=settings.document_storage_endpoint_url,
+        region=settings.document_storage_region,
+        access_key_id=settings.document_storage_access_key_id,
+        secret_access_key=settings.document_storage_secret_access_key,
+    )
 
     # Built once, like the embedder: the key ring is read from the
     # environment at construction and a missing key must fail here — at

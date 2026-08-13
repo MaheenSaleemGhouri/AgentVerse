@@ -69,6 +69,43 @@ class Settings(BaseSettings):
     # reads. In Docker that is a shared volume.
     document_storage_root: str = "/var/lib/agentverse/documents"
 
+    # S3-compatible object storage (Neon Object Storage in production) —
+    # mirrors apps/api's settings of the same name exactly, since both
+    # services must resolve to the same store (this worker reads what
+    # apps/api wrote). See apps/api's config.py for the full rationale.
+    document_storage_bucket: str | None = None
+    document_storage_endpoint_url: str | None = None
+    document_storage_region: str | None = None
+    document_storage_access_key_id: str | None = None
+    document_storage_secret_access_key: str | None = None
+
+    @property
+    def document_storage_configured(self) -> bool:
+        """All four S3 settings, or none — mirrors apps/api's Settings."""
+        return bool(
+            self.document_storage_bucket
+            and self.document_storage_endpoint_url
+            and self.document_storage_region
+            and self.document_storage_access_key_id
+            and self.document_storage_secret_access_key
+        )
+
+    def validate_document_storage(self) -> None:
+        fields = (
+            self.document_storage_bucket,
+            self.document_storage_endpoint_url,
+            self.document_storage_region,
+            self.document_storage_access_key_id,
+            self.document_storage_secret_access_key,
+        )
+        if any(fields) and not self.document_storage_configured:
+            raise ValueError(
+                "Refusing to start: AGENTVERSE_WORKER_DOCUMENT_STORAGE_* is partially "
+                "configured. Set bucket, endpoint_url, region, access_key_id, and "
+                "secret_access_key together, or leave all five unset to fall back "
+                "to LocalDocumentStore."
+            )
+
     # Phase 6 gap-closure — scheduled MCP health sweep (previously
     # on-demand only via `check_health`, which nothing called). A whole
     # sweep cycle, not a per-server cadence: simpler to reason about, and

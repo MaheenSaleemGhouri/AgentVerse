@@ -33,4 +33,11 @@ export const env = {
   // authentication regardless of how real it looks.
   googleClientId: process.env.GOOGLE_CLIENT_ID,
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  // Optional like the OAuth providers above: `lib/email/sender.ts` falls
+  // back to a logging stub when this is absent, so local dev never needs
+  // a real Resend account. Without a verified sending domain, Resend's
+  // sandbox `resendFromEmail` default can only deliver to the address
+  // that owns the API key — see `requireEmailVerification` in auth.ts.
+  resendApiKey: process.env.RESEND_API_KEY,
+  resendFromEmail: process.env.RESEND_FROM_EMAIL ?? "AgentVerse <onboarding@resend.dev>",
 } as const;

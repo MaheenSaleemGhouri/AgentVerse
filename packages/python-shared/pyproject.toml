@@ -43,6 +43,13 @@ dependencies = [
     # (Rule 3). The boring choice deliberately (CLAUDE.md §3, KISS):
     # a scrape endpoint and a text format, no agent, no push gateway.
     "prometheus-client>=0.21,<1",
+    # S3-compatible client for `storage.document_store.S3DocumentStore`
+    # (Neon Object Storage in production — apps/api and apps/worker are
+    # separate containers with no shared filesystem, so uploaded
+    # knowledge-base documents need a network-reachable store both can
+    # address). Sync SDK, offloaded via `asyncio.to_thread` like every
+    # other blocking call in this module (CLAUDE.md Rule 12).
+    "boto3>=1.35,<2",
 ]
 
 [dependency-groups]
@@ -53,6 +60,10 @@ dev = [
     "pytest-asyncio>=0.25,<0.26",
     "fakeredis>=2.26,<3",
     "asyncpg>=0.31,<0.32",
+    # Type stubs only — `boto3` itself ships no `py.typed` marker, so
+    # `mypy --strict` on `storage/document_store.py` needs these to
+    # resolve `S3Client`/`Config` instead of failing on `import-untyped`.
+    "boto3-stubs[s3]>=1.35,<2",
 ]
 
 [build-system]

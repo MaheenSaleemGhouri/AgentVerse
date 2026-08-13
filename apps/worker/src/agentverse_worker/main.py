@@ -90,6 +90,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
+    # Fails startup rather than the first ingestion job: a bucket
+    # configured without full credentials would look ready and then fail
+    # opaquely on every `kb_ingest` job (CLAUDE.md Rule 1).
+    settings.validate_document_storage()
 
     # AgentVerse translates the SDK's own trace spans into its own
     # trace-event schema (CLAUDE.md §9) — the frontend must never depend
