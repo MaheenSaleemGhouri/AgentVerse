@@ -132,11 +132,19 @@ def _row_to_chunk(row: _ChunkRow) -> RetrievedChunk:
     # underscore is their namespace-collision convention (a row's columns
     # are attributes), not a private API.
     chunk_id, document_id, kb_id, workspace_id, index, content, tokens, score = row._t  # noqa: SLF001
+    # These queries are raw `text()` SQL (not typed Core Table/Column
+    # selects), so asyncpg hands back native `uuid.UUID` objects for the
+    # UUID columns — the `UUID(as_uuid=False)` coercion to `str` that
+    # Core queries get from the Alembic-defined column type never fires
+    # here, despite `RetrievedChunk`'s fields being typed `str`. Cast
+    # explicitly rather than relying on every downstream consumer (a
+    # citation payload eventually reaches `agent_run_steps.payload`,
+    # JSONB, whose default `json.dumps` can't serialize a raw UUID).
     return RetrievedChunk(
-        chunk_id=chunk_id,
-        kb_document_id=document_id,
-        knowledge_base_id=kb_id,
-        workspace_id=workspace_id,
+        chunk_id=str(chunk_id),
+        kb_document_id=str(document_id),
+        knowledge_base_id=str(kb_id),
+        workspace_id=str(workspace_id),
         chunk_index=index,
         content=content,
         token_count=tokens,
