@@ -431,6 +431,13 @@ class FakeAuditLogRepository:
         # that returned them unordered would let a gap-filling bug pass.
         return sorted(counts.items())
 
+    async def count_by_action(self, workspace_id: str, *, actions: list[str]) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for entry in self.entries:
+            if entry.workspace_id == workspace_id and entry.action in actions:
+                counts[entry.action] = counts.get(entry.action, 0) + 1
+        return counts
+
 
 @dataclass
 class FakeWorkspaceSettingsRepository:

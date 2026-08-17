@@ -94,6 +94,7 @@ def create_app() -> FastAPI:
     # configured without full credentials would look ready and then fail
     # opaquely on every `kb_ingest` job (CLAUDE.md Rule 1).
     settings.validate_document_storage()
+    settings.validate_anthropic()
 
     # AgentVerse translates the SDK's own trace spans into its own
     # trace-event schema (CLAUDE.md §9) — the frontend must never depend

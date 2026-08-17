@@ -466,6 +466,31 @@ class TestReferrals:
         assert await service.balance(referrer) == 0
         await db_session.rollback()
 
+    async def test_ensure_code_makes_the_code_resolvable(self, db_session: AsyncSession) -> None:
+        # Phase 11: closes the gap where `attribute()` had no way to turn
+        # a client-supplied code back into a workspace id.
+        workspace_id = await _workspace(db_session)
+        service = _service(db_session)
+        code = await service.ensure_code(workspace_id)
+        assert code == service.code_for(workspace_id)
+        assert await service.resolve_referrer(code) == workspace_id
+        await db_session.rollback()
+
+    async def test_ensure_code_is_idempotent(self, db_session: AsyncSession) -> None:
+        workspace_id = await _workspace(db_session)
+        service = _service(db_session)
+        first = await service.ensure_code(workspace_id)
+        second = await service.ensure_code(workspace_id)
+        assert first == second
+        assert await service.resolve_referrer(first) == workspace_id
+        await db_session.rollback()
+
+    async def test_resolve_referrer_returns_none_for_an_unknown_code(
+        self, db_session: AsyncSession
+    ) -> None:
+        assert await _service(db_session).resolve_referrer("NOSUCH00") is None
+        await db_session.rollback()
+
     async def test_the_referrers_list_reports_every_status(self, db_session: AsyncSession) -> None:
         # The pending-to-rewarded ratio *is* the loop efficiency; hiding
         # the failures would make a loop that never converts look

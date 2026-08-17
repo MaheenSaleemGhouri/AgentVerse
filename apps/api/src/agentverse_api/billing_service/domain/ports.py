@@ -293,6 +293,21 @@ class ReferralRepository(Protocol):
         voided_reason: str | None = None,
     ) -> Referral: ...
 
+    async def ensure_code_indexed(self, *, workspace_id: str, code: str) -> None:
+        """Idempotent upsert into the reverse code->workspace index
+        (Phase 11). A no-op if this workspace's code is already indexed —
+        called every time a code is displayed, not just once, so the
+        index self-heals if it was ever missed.
+        """
+        ...
+
+    async def resolve_referrer(self, code: str) -> str | None:
+        """The `workspace_id` a shareable code belongs to, or `None` for
+        an unknown/never-indexed code. Never raises on a bad code — a
+        stranger can paste anything into a signup flow.
+        """
+        ...
+
 
 class WebhookEventRepository(Protocol):
     """The provider-event delivery log.

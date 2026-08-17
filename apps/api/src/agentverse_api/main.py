@@ -10,6 +10,7 @@ from agentverse_api.assistant_service.interface.routes.assistant import (
 )
 from agentverse_api.auth_service.interface.routes.api_keys import router as api_keys_router
 from agentverse_api.auth_service.interface.routes.audit_logs import router as audit_logs_router
+from agentverse_api.auth_service.interface.routes.growth import router as growth_router
 from agentverse_api.auth_service.interface.routes.internal_auth_events import (
     router as internal_auth_events_router,
 )
@@ -123,6 +124,9 @@ from agentverse_api.orchestration_service.interface.routers.teams import (
 from agentverse_api.search_service.interface.routes.search import (
     router as search_router,
 )
+from agentverse_api.support_service.interface.routes.support_tickets import (
+    router as support_tickets_router,
+)
 from agentverse_api.webhook_service.interface.routes.webhooks import (
     router as webhooks_router,
 )
@@ -140,6 +144,10 @@ def create_app() -> FastAPI:
     # without full credentials would look ready and then fail opaquely
     # the moment someone drags a file onto a knowledge base.
     settings.validate_document_storage()
+    # No-op today (see the method's own docstring) — kept alongside the
+    # other provider validations so every provider follows one startup
+    # discipline, not just the ones that currently have something to check.
+    settings.validate_anthropic()
 
     app = FastAPI(
         title="AgentVerse API",
@@ -225,6 +233,8 @@ def create_app() -> FastAPI:
     app.include_router(metrics_router)
     app.include_router(api_keys_router)
     app.include_router(audit_logs_router)
+    app.include_router(growth_router)
+    app.include_router(support_tickets_router)
     app.include_router(internal_auth_events_router)
     app.include_router(internal_provider_test_router)
     app.include_router(internal_job_test_router)

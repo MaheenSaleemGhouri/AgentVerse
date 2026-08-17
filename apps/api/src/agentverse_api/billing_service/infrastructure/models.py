@@ -683,3 +683,26 @@ class ReferralModel(Base):
     rewarded_at: Mapped[datetime | None] = mapped_column(default=None)
     voided_reason: Mapped[str | None] = mapped_column(Text, default=None)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class ReferralCodeModel(Base):
+    """Reverse index from a shareable `referral_code()` back to the
+    workspace it belongs to (Phase 11).
+
+    `referral_code()` itself is a one-way hash of `workspace_id` with
+    nothing stored — by design, so the code needs no table to be
+    *displayed*. But redeeming a code a stranger pasted into a signup
+    flow needs the opposite direction, which a hash cannot give back.
+    This table exists solely for that reverse lookup; `code` is what a
+    workspace already shows on `/billing/referrals`, populated lazily
+    and idempotently the first time that code is ever requested — never
+    computed differently here than `referral_code()` computes it.
+    """
+
+    __tablename__ = "billing_referral_codes"
+
+    workspace_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True
+    )
+    code: Mapped[str] = mapped_column(Text, unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())

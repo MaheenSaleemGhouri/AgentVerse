@@ -78,3 +78,25 @@ async def test_list_for_workspace_cursor_excludes_entries_at_or_after_it(
     )
 
     assert [entry.action for entry in page] == ["event.1", "event.0"]
+
+
+async def test_counts_for_actions_gap_fills_actions_with_no_events(
+    service: tuple[AuditService, FakeAuditLogRepository],
+) -> None:
+    audit_service, _ = service
+    await audit_service.record(
+        action="marketplace.share_created", outcome="success", workspace_id="ws-1"
+    )
+    await audit_service.record(
+        action="marketplace.share_created", outcome="success", workspace_id="ws-1"
+    )
+    # A different workspace's events must never leak into ws-1's count.
+    await audit_service.record(
+        action="marketplace.share_created", outcome="success", workspace_id="ws-2"
+    )
+
+    counts = await audit_service.counts_for_actions(
+        workspace_id="ws-1", actions=["marketplace.share_created", "marketplace.never_fired"]
+    )
+
+    assert counts == {"marketplace.share_created": 2, "marketplace.never_fired": 0}

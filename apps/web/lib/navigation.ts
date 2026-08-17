@@ -7,6 +7,7 @@ import {
   HelpCircle,
   KeyRound,
   LayoutDashboard,
+  LifeBuoy,
   MessageSquare,
   Plug,
   ScrollText,
@@ -199,6 +200,16 @@ export const NAV_SECTIONS: readonly NavItem[] = [
     segment: "help",
     icon: HelpCircle,
     description: "Guides, documentation, and how to reach support",
+    hiddenFromSidebar: true,
+  },
+  {
+    label: "Support",
+    segment: "support",
+    icon: LifeBuoy,
+    description: "File a ticket and an agent triages it — category, priority, and a draft reply",
+    // Dogfooding tooling (Phase 11), not a customer-facing pillar the
+    // fixed AVDS sidebar structure needs a permanent slot for — routable
+    // and palette-searchable like Integrations/Audit logs above.
     hiddenFromSidebar: true,
   },
   {

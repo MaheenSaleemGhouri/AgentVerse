@@ -46,6 +46,23 @@ class Settings(BaseSettings):
     openai_api_key: str
     openai_base_url: str | None = None
 
+    # Phase 11 — Anthropic as a second model provider on the real
+    # agent-run path, resolved by `agents.model_resolution.resolve_model`
+    # into an `agents.extensions.models.litellm_model.LitellmModel`.
+    # Optional, mirroring apps/api's Settings of the same name: a
+    # deployment simply doesn't offer Anthropic-prefixed models until
+    # this is set.
+    anthropic_api_key: str | None = None
+
+    @property
+    def anthropic_configured(self) -> bool:
+        return self.anthropic_api_key is not None
+
+    def validate_anthropic(self) -> None:
+        """No half-state to guard today — see apps/api's identical method
+        for the full rationale this mirrors."""
+        return
+
     # CLAUDE.md Rule 17: every reasoning loop needs step, cost, AND time
     # bounds — the SDK's own `max_turns` gives the step bound; the other
     # two are AgentVerse-specific (a generic SDK has no notion of our

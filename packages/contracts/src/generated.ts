@@ -734,7 +734,19 @@ export interface paths {
         /** List My Workspaces */
         get: operations["list_my_workspaces_api_v1_workspaces_get"];
         put?: never;
-        /** Create Workspace */
+        /**
+         * Create Workspace
+         * @description Creates a workspace, then attributes it to a referrer (Phase 11)
+         *     if `body.referral_code` resolves to one.
+         *
+         *     Attribution is best-effort and never blocking: `resolve_referrer`
+         *     returning `None` (unknown/garbage code) or `attribute` raising
+         *     `SelfReferralError` (a workspace's own code, pasted back at itself)
+         *     both leave the new workspace attributed to nobody rather than
+         *     failing account creation over a string a stranger typed in — the
+         *     referral system's own promise (`billing_service/domain/referral.py`)
+         *     is that a bad code costs nothing but a missed reward, never an error.
+         */
         post: operations["create_workspace_api_v1_workspaces_post"];
         delete?: never;
         options?: never;
@@ -1253,8 +1265,11 @@ export interface paths {
          * Get Referrals Route
          * @description This workspace's referral code and what it has produced.
          *
-         *     The code is derived from the workspace id rather than stored, so it
-         *     is the same every time it is displayed and needs no table of its own.
+         *     The code itself is derived from the workspace id, not stored — but
+         *     `ensure_code` also indexes it for reverse lookup (Phase 11:
+         *     `create_workspace`'s redemption path needs to resolve a pasted-in
+         *     code back to the workspace that owns it, which the hash alone
+         *     cannot do), so displaying a code is also what makes it redeemable.
          */
         get: operations["get_referrals_route_api_v1_workspaces__workspace_id__billing_referrals_get"];
         put?: never;
@@ -1476,6 +1491,23 @@ export interface paths {
          *     than a missing value — every dimension always has an answer.
          */
         get: operations["get_usage_route_api_v1_workspaces__workspace_id__billing_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/growth/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Growth Metrics Route */
+        get: operations["get_growth_metrics_route_api_v1_workspaces__workspace_id__growth_metrics_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2022,6 +2054,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/share": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Share Listing Route
+         * @description Records that this workspace generated a share link for `slug`
+         *     (Phase 11's growth loop). `require_member`, not `require_admin`:
+         *     sharing writes nothing to the listing or the sharer's own agents, so
+         *     the gate matches the referral code's own — visible to any member,
+         *     not a privileged action.
+         *
+         *     The share link itself is `.../marketplace/{slug}?ref={code}`, built
+         *     client-side from the sharer's own existing `referral_code()` — this
+         *     route only needs to know a share happened, not construct the link.
+         */
+        post: operations["share_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__share_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/submit": {
         parameters: {
             query?: never;
@@ -2355,6 +2415,63 @@ export interface paths {
         head?: never;
         /** Update Workspace Settings Route */
         patch: operations["update_workspace_settings_route_api_v1_workspaces__workspace_id__settings_patch"];
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/support-tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Support Tickets Route */
+        get: operations["list_support_tickets_route_api_v1_workspaces__workspace_id__support_tickets_get"];
+        put?: never;
+        /**
+         * Create Support Ticket Route
+         * @description `202 Accepted`: this route itself triggers a real, asynchronously
+         *     executed agent run (CLAUDE.md §7), the same run-triggering contract
+         *     `submit_run_route` uses — including `Idempotency-Key` passthrough.
+         */
+        post: operations["create_support_ticket_route_api_v1_workspaces__workspace_id__support_tickets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/support-tickets/{ticket_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Support Ticket Route */
+        get: operations["get_support_ticket_route_api_v1_workspaces__workspace_id__support_tickets__ticket_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/support-tickets/{ticket_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Support Ticket Route */
+        post: operations["resolve_support_ticket_route_api_v1_workspaces__workspace_id__support_tickets__ticket_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/workspaces/{workspace_id}/teams": {
@@ -3377,6 +3494,15 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** CreateSupportTicketRequest */
+        CreateSupportTicketRequest: {
+            /** Agent Id */
+            agent_id: string;
+            /** Body */
+            body: string;
+            /** Subject */
+            subject: string;
+        };
         /** CreateTeamRequest */
         CreateTeamRequest: {
             /** Description */
@@ -3417,6 +3543,8 @@ export interface components {
         CreateWorkspaceRequest: {
             /** Name */
             name: string;
+            /** Referral Code */
+            referral_code?: string | null;
         };
         /** CreatedEndpointResponse */
         CreatedEndpointResponse: {
@@ -3797,6 +3925,23 @@ export interface components {
             resource_id: string;
             /** Resource Type */
             resource_type: string;
+        };
+        /** GrowthMetricsResponse */
+        GrowthMetricsResponse: {
+            /** Marketplace Installs */
+            marketplace_installs: number;
+            /** Marketplace Shares */
+            marketplace_shares: number;
+            /** Referral Code */
+            referral_code: string;
+            /** Referral Earnings Cents */
+            referral_earnings_cents: number;
+            /** Referrals Pending */
+            referrals_pending: number;
+            /** Referrals Qualified */
+            referrals_qualified: number;
+            /** Referrals Rewarded */
+            referrals_rewarded: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -5443,6 +5588,50 @@ export interface components {
             status: string;
             /** Trial End */
             trial_end: string | null;
+            /** Workspace Id */
+            workspace_id: string;
+        };
+        /** SupportTicketPage */
+        SupportTicketPage: {
+            /** Data */
+            data: components["schemas"]["SupportTicketResponse"][];
+            /** Has More */
+            has_more: boolean;
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /** SupportTicketResponse */
+        SupportTicketResponse: {
+            /** Body */
+            body: string;
+            /** Category */
+            category: string | null;
+            /** Confidence */
+            confidence: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By User Id */
+            created_by_user_id: string;
+            /** Draft Reply */
+            draft_reply: string | null;
+            /** Id */
+            id: string;
+            /** Priority */
+            priority: string | null;
+            /** Status */
+            status: string;
+            /** Subject */
+            subject: string;
+            /** Triage Run Id */
+            triage_run_id: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
             /** Workspace Id */
             workspace_id: string;
         };
@@ -8710,6 +8899,37 @@ export interface operations {
             };
         };
     };
+    get_growth_metrics_route_api_v1_workspaces__workspace_id__growth_metrics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrowthMetricsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_installed_route_api_v1_workspaces__workspace_id__integrations_get: {
         parameters: {
             query?: never;
@@ -9907,6 +10127,36 @@ export interface operations {
             };
         };
     };
+    share_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__share_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     submit_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__submit_post: {
         parameters: {
             query?: never;
@@ -10681,6 +10931,141 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkspaceSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_support_tickets_route_api_v1_workspaces__workspace_id__support_tickets_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportTicketPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_support_ticket_route_api_v1_workspaces__workspace_id__support_tickets_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSupportTicketRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportTicketResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_support_ticket_route_api_v1_workspaces__workspace_id__support_tickets__ticket_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportTicketResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_support_ticket_route_api_v1_workspaces__workspace_id__support_tickets__ticket_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportTicketResponse"];
                 };
             };
             /** @description Validation Error */

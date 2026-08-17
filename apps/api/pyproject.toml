@@ -21,6 +21,7 @@ dependencies = [
     "python-multipart>=0.0.20,<0.1",
     "agentverse-shared",
     "stripe>=12,<13",
+    "anthropic>=0.40,<1",
 ]
 
 [dependency-groups]

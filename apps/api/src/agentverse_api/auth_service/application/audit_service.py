@@ -57,6 +57,17 @@ class AuditService:
             for offset in range(days)
         ]
 
+    async def counts_for_actions(
+        self, *, workspace_id: str, actions: list[str]
+    ) -> dict[str, int]:
+        """All-time counts per action, gap-filled to zero — every action
+        asked for is a key in the result, even one with no events yet,
+        so a caller building a fixed set of stat cards never has to
+        `.get(..., 0)` at every call site.
+        """
+        counts = await self.audit_logs.count_by_action(workspace_id, actions=actions)
+        return {action: counts.get(action, 0) for action in actions}
+
     async def list_for_workspace(
         self,
         *,

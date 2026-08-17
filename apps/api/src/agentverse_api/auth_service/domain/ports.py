@@ -552,3 +552,15 @@ class AuditLogRepository(Protocol):
         expensive way to draw a small chart.
         """
         ...
+
+    async def count_by_action(
+        self, workspace_id: str, *, actions: list[str]
+    ) -> dict[str, int]:
+        """All-time entry counts per `action`, for exactly the actions
+        asked for (Phase 11's growth-metrics cards). An action with zero
+        entries is simply absent from the result, not a zero — the
+        caller fills gaps the same way `activity_by_day` does, so a
+        typo'd action string is visibly missing rather than silently
+        reading as "zero events", which is the more common bug.
+        """
+        ...

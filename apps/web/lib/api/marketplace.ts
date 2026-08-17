@@ -109,6 +109,18 @@ export async function withdrawReview(workspaceId: string, slug: string): Promise
   );
 }
 
+/**
+ * Records that `workspaceId` generated a share link for `slug` (Phase
+ * 11's growth loop) — the link itself is built client-side from the
+ * sharer's own referral code, this call only logs that a share happened.
+ */
+export async function shareListing(workspaceId: string, slug: string): Promise<void> {
+  await apiFetch<undefined>(
+    `/api/v1/workspaces/${workspaceId}/marketplace/listings/${slug}/share`,
+    { method: "POST" },
+  );
+}
+
 export async function createListing(
   workspaceId: string,
   body: CreateListingRequest,

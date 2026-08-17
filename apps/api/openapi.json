@@ -1064,6 +1064,35 @@
         "title": "CreateOrganizationRequest",
         "type": "object"
       },
+      "CreateSupportTicketRequest": {
+        "properties": {
+          "agent_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "body": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "subject": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agent_id",
+          "subject",
+          "body"
+        ],
+        "title": "CreateSupportTicketRequest",
+        "type": "object"
+      },
       "CreateTeamRequest": {
         "properties": {
           "description": {
@@ -1155,6 +1184,19 @@
             "minLength": 1,
             "title": "Name",
             "type": "string"
+          },
+          "referral_code": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referral Code"
           }
         },
         "required": [
@@ -2068,6 +2110,49 @@
           "permission"
         ],
         "title": "GrantResourcePermissionRequest",
+        "type": "object"
+      },
+      "GrowthMetricsResponse": {
+        "properties": {
+          "marketplace_installs": {
+            "title": "Marketplace Installs",
+            "type": "integer"
+          },
+          "marketplace_shares": {
+            "title": "Marketplace Shares",
+            "type": "integer"
+          },
+          "referral_code": {
+            "title": "Referral Code",
+            "type": "string"
+          },
+          "referral_earnings_cents": {
+            "title": "Referral Earnings Cents",
+            "type": "integer"
+          },
+          "referrals_pending": {
+            "title": "Referrals Pending",
+            "type": "integer"
+          },
+          "referrals_qualified": {
+            "title": "Referrals Qualified",
+            "type": "integer"
+          },
+          "referrals_rewarded": {
+            "title": "Referrals Rewarded",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "referral_code",
+          "referrals_pending",
+          "referrals_qualified",
+          "referrals_rewarded",
+          "referral_earnings_cents",
+          "marketplace_shares",
+          "marketplace_installs"
+        ],
+        "title": "GrowthMetricsResponse",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -6314,6 +6399,149 @@
         "title": "SubscriptionResponse",
         "type": "object"
       },
+      "SupportTicketPage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SupportTicketResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor",
+          "has_more"
+        ],
+        "title": "SupportTicketPage",
+        "type": "object"
+      },
+      "SupportTicketResponse": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by_user_id": {
+            "title": "Created By User Id",
+            "type": "string"
+          },
+          "draft_reply": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Draft Reply"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "triage_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Run Id"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "subject",
+          "body",
+          "status",
+          "category",
+          "priority",
+          "confidence",
+          "draft_reply",
+          "triage_run_id",
+          "created_by_user_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SupportTicketResponse",
+        "type": "object"
+      },
       "TeamAnalyticsResponse": {
         "properties": {
           "average_cost_micro_usd": {
@@ -10277,6 +10505,7 @@
         ]
       },
       "post": {
+        "description": "Creates a workspace, then attributes it to a referrer (Phase 11)\nif `body.referral_code` resolves to one.\n\nAttribution is best-effort and never blocking: `resolve_referrer`\nreturning `None` (unknown/garbage code) or `attribute` raising\n`SelfReferralError` (a workspace's own code, pasted back at itself)\nboth leave the new workspace attributed to nobody rather than\nfailing account creation over a string a stranger typed in \u2014 the\nreferral system's own promise (`billing_service/domain/referral.py`)\nis that a bad code costs nothing but a missed reward, never an error.",
         "operationId": "create_workspace_api_v1_workspaces_post",
         "requestBody": {
           "content": {
@@ -12028,7 +12257,7 @@
     },
     "/api/v1/workspaces/{workspace_id}/billing/referrals": {
       "get": {
-        "description": "This workspace's referral code and what it has produced.\n\nThe code is derived from the workspace id rather than stored, so it\nis the same every time it is displayed and needs no table of its own.",
+        "description": "This workspace's referral code and what it has produced.\n\nThe code itself is derived from the workspace id, not stored \u2014 but\n`ensure_code` also indexes it for reverse lookup (Phase 11:\n`create_workspace`'s redemption path needs to resolve a pasted-in\ncode back to the workspace that owns it, which the hash alone\ncannot do), so displaying a code is also what makes it redeemable.",
         "operationId": "get_referrals_route_api_v1_workspaces__workspace_id__billing_referrals_get",
         "parameters": [
           {
@@ -12620,6 +12849,53 @@
         "summary": "Get Usage Route",
         "tags": [
           "billing-usage"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/growth/metrics": {
+      "get": {
+        "operationId": "get_growth_metrics_route_api_v1_workspaces__workspace_id__growth_metrics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrowthMetricsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Growth Metrics Route",
+        "tags": [
+          "growth"
         ]
       }
     },
@@ -14817,6 +15093,56 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/share": {
+      "post": {
+        "description": "Records that this workspace generated a share link for `slug`\n(Phase 11's growth loop). `require_member`, not `require_admin`:\nsharing writes nothing to the listing or the sharer's own agents, so\nthe gate matches the referral code's own \u2014 visible to any member,\nnot a privileged action.\n\nThe share link itself is `.../marketplace/{slug}?ref={code}`, built\nclient-side from the sharer's own existing `referral_code()` \u2014 this\nroute only needs to know a share happened, not construct the link.",
+        "operationId": "share_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__share_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Share Listing Route",
+        "tags": [
+          "marketplace-publishing"
+        ]
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/submit": {
       "post": {
         "description": "Submit for moderation. Reports *every* readiness problem at once,\nso a publisher does not make three round trips to submit.",
@@ -16184,6 +16510,265 @@
         "summary": "Update Workspace Settings Route",
         "tags": [
           "workspace-settings"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/support-tickets": {
+      "get": {
+        "operationId": "list_support_tickets_route_api_v1_workspaces__workspace_id__support_tickets_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Support Tickets Route",
+        "tags": [
+          "support-tickets"
+        ]
+      },
+      "post": {
+        "description": "`202 Accepted`: this route itself triggers a real, asynchronously\nexecuted agent run (CLAUDE.md \u00a77), the same run-triggering contract\n`submit_run_route` uses \u2014 including `Idempotency-Key` passthrough.",
+        "operationId": "create_support_ticket_route_api_v1_workspaces__workspace_id__support_tickets_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupportTicketRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Support Ticket Route",
+        "tags": [
+          "support-tickets"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/support-tickets/{ticket_id}": {
+      "get": {
+        "operationId": "get_support_ticket_route_api_v1_workspaces__workspace_id__support_tickets__ticket_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Support Ticket Route",
+        "tags": [
+          "support-tickets"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/support-tickets/{ticket_id}/resolve": {
+      "post": {
+        "operationId": "resolve_support_ticket_route_api_v1_workspaces__workspace_id__support_tickets__ticket_id__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resolve Support Ticket Route",
+        "tags": [
+          "support-tickets"
         ]
       }
     },

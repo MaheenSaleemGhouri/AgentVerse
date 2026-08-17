@@ -1162,6 +1162,17 @@ class SqlAuditLogRepository:
         result = await self._session.execute(stmt)
         return [(row.day.date(), int(row.entries)) for row in result]
 
+    async def count_by_action(self, workspace_id: str, *, actions: list[str]) -> dict[str, int]:
+        if not actions:
+            return {}
+        stmt = (
+            select(AuditLog.action, func.count().label("entries"))
+            .where(AuditLog.workspace_id == workspace_id, AuditLog.action.in_(actions))
+            .group_by(AuditLog.action)
+        )
+        result = await self._session.execute(stmt)
+        return {row.action: int(row.entries) for row in result}
+
 
 class SqlInvitationRepository:
     """Implements `domain.ports.InvitationRepository` against Postgres —

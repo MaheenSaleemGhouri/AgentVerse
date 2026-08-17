@@ -694,6 +694,43 @@ async def install_listing_route(
     )
 
 
+@publisher_router.post(
+    "/{workspace_id}/marketplace/listings/{slug}/share",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
+async def share_listing_route(
+    slug: str,
+    context: WorkspaceContext = Depends(require_member),
+    service: MarketplaceService = Depends(get_marketplace_service),
+    audit: AuditService = Depends(get_audit_service),
+) -> None:
+    """Records that this workspace generated a share link for `slug`
+    (Phase 11's growth loop). `require_member`, not `require_admin`:
+    sharing writes nothing to the listing or the sharer's own agents, so
+    the gate matches the referral code's own — visible to any member,
+    not a privileged action.
+
+    The share link itself is `.../marketplace/{slug}?ref={code}`, built
+    client-side from the sharer's own existing `referral_code()` — this
+    route only needs to know a share happened, not construct the link.
+    """
+    try:
+        await service.get(slug=slug, viewer_workspace_id=context.workspace_id)
+    except ListingNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No such listing"
+        ) from exc
+
+    await audit.record(
+        action="marketplace.share_created",
+        outcome="success",
+        workspace_id=context.workspace_id,
+        actor_user_id=context.user_id,
+        target=slug,
+    )
+
+
 @publisher_router.get(
     "/{workspace_id}/marketplace/installs", response_model=list[InstalledListingResponse]
 )

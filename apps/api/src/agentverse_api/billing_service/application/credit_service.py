@@ -244,6 +244,24 @@ class CreditService:
     def code_for(self, workspace_id: str) -> str:
         return referral_code(workspace_id)
 
+    async def ensure_code(self, workspace_id: str) -> str:
+        """The workspace's shareable code, guaranteed indexed for reverse
+        lookup by the time this returns (Phase 11: `resolve_referrer`
+        needs the row to exist before anyone could plausibly have shared
+        the code). Called every time a code is displayed — idempotent,
+        so a second call is a no-op upsert, not a duplicate.
+        """
+        code = referral_code(workspace_id)
+        await self.referrals.ensure_code_indexed(workspace_id=workspace_id, code=code)
+        return code
+
+    async def resolve_referrer(self, code: str) -> str | None:
+        """The workspace a shareable code belongs to, or `None` for an
+        unknown code — never raises, since the caller (workspace
+        creation) must never fail because a pasted-in code was garbage.
+        """
+        return await self.referrals.resolve_referrer(code)
+
     async def attribute(
         self, *, referrer_workspace_id: str, referred_workspace_id: str, code: str
     ) -> Referral:

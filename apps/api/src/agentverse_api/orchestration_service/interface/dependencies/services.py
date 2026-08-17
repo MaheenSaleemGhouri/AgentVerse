@@ -48,6 +48,12 @@ from agentverse_api.orchestration_service.infrastructure.knowledge_repository im
 from agentverse_api.orchestration_service.infrastructure.oauth.providers import (
     build_oauth_providers,
 )
+from agentverse_api.orchestration_service.infrastructure.providers.anthropic_adapter import (
+    AnthropicProviderAdapter,
+)
+from agentverse_api.orchestration_service.infrastructure.providers.multi_provider_adapter import (
+    MultiProviderAdapter,
+)
 from agentverse_api.orchestration_service.infrastructure.providers.openai_adapter import (
     OpenAIProviderAdapter,
 )
@@ -66,14 +72,28 @@ from agentverse_api.orchestration_service.infrastructure.team_repository import 
 @lru_cache
 def get_provider_adapter() -> ProviderAdapter:
     """Process-wide singleton, same rationale as `get_settings`/`get_engine`:
-    the underlying `AsyncOpenAI` client owns its own connection pool and
-    should not be reconstructed per request.
+    the underlying SDK clients own their own connection pools and should
+    not be reconstructed per request.
+
+    Returns a `MultiProviderAdapter` so both current consumers
+    (`ProviderTestService`, `AssistantService`) can address either
+    provider by an `anthropic/`-prefixed model string with zero changes
+    to either — Anthropic is wired in only when configured; an
+    unconfigured deployment behaves exactly as before Phase 11.
     """
     settings = get_settings()
-    return OpenAIProviderAdapter(
+    openai_adapter = OpenAIProviderAdapter(
         api_key=settings.openai_api_key,
         base_url=settings.openai_base_url,
     )
+    # Narrowed via a direct `is not None` check (not the `anthropic_configured`
+    # property) so mypy sees `settings.anthropic_api_key` as `str` here.
+    anthropic_adapter = (
+        AnthropicProviderAdapter(api_key=settings.anthropic_api_key)
+        if settings.anthropic_api_key is not None
+        else None
+    )
+    return MultiProviderAdapter(openai=openai_adapter, anthropic=anthropic_adapter)
 
 
 def get_provider_test_service() -> ProviderTestService:

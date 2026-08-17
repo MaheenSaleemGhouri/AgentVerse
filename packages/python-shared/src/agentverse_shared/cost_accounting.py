@@ -56,6 +56,17 @@ class ModelPricing:
 # Snapshot pricing, in micro-USD per 1,000 tokens. Source: OpenAI's
 # published per-token pricing at the `pricing_version` date below.
 # MUST be reconciled by `billing-expert` before Phase 7 bills anyone.
+#
+# `gpt-4.1`/`gpt-4.1-mini` were already offered by the agent-builder model
+# picker (apps/web/lib/validation/agent-config.ts) with no matching entry
+# here, so selecting either raised `UnknownModelPricingError` on every run
+# — a pre-existing bug, fixed alongside Phase 11's Anthropic entries below
+# rather than left in place while this table was already being touched.
+#
+# Anthropic entries are keyed by the `anthropic/<model-id>` strings
+# `apps/worker`'s `resolve_model()` resolves to a `LitellmModel` — see
+# that module's docstring for the provider-prefix convention. Pricing is
+# Anthropic's standing (non-promotional) published per-token rate.
 MODEL_PRICING: dict[str, ModelPricing] = {
     "gpt-4o-mini": ModelPricing(
         prompt_micro_usd_per_1k=150,
@@ -65,6 +76,26 @@ MODEL_PRICING: dict[str, ModelPricing] = {
     "gpt-4o": ModelPricing(
         prompt_micro_usd_per_1k=2500,
         completion_micro_usd_per_1k=10000,
+        pricing_version="2026-01-01",
+    ),
+    "gpt-4.1-mini": ModelPricing(
+        prompt_micro_usd_per_1k=400,
+        completion_micro_usd_per_1k=1600,
+        pricing_version="2026-01-01",
+    ),
+    "gpt-4.1": ModelPricing(
+        prompt_micro_usd_per_1k=2000,
+        completion_micro_usd_per_1k=8000,
+        pricing_version="2026-01-01",
+    ),
+    "anthropic/claude-haiku-4-5": ModelPricing(
+        prompt_micro_usd_per_1k=1000,
+        completion_micro_usd_per_1k=5000,
+        pricing_version="2026-01-01",
+    ),
+    "anthropic/claude-sonnet-5": ModelPricing(
+        prompt_micro_usd_per_1k=3000,
+        completion_micro_usd_per_1k=15000,
         pricing_version="2026-01-01",
     ),
 }
@@ -79,6 +110,10 @@ MODEL_PRICING: dict[str, ModelPricing] = {
 MODEL_CONTEXT_WINDOWS: dict[str, int] = {
     "gpt-4o-mini": 128_000,
     "gpt-4o": 128_000,
+    "gpt-4.1-mini": 1_047_576,
+    "gpt-4.1": 1_047_576,
+    "anthropic/claude-haiku-4-5": 200_000,
+    "anthropic/claude-sonnet-5": 1_000_000,
 }
 
 

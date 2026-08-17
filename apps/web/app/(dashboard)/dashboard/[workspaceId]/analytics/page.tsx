@@ -1,9 +1,12 @@
 import { Activity, Bot, BookOpen, Users } from "lucide-react";
 
 import { listAgents } from "@/lib/api/agents";
+import { getReferrals } from "@/lib/api/billing";
+import { getGrowthMetrics } from "@/lib/api/growth";
 import { listKnowledgeBases } from "@/lib/api/knowledge";
 import { listMembers } from "@/lib/api/workspaces";
 
+import { GrowthSection } from "@/components/analytics/growth-section";
 import { IntegrationPending } from "@/components/patterns/integration-pending";
 import { PageHeader } from "@/components/patterns/page-header";
 import { StatCard } from "@/components/patterns/stat-card";
@@ -23,10 +26,12 @@ export default async function AnalyticsPage({
   params: Promise<{ workspaceId: string }>;
 }): Promise<React.JSX.Element> {
   const { workspaceId } = await params;
-  const [agents, knowledgeBases, members] = await Promise.all([
+  const [agents, knowledgeBases, members, referrals, growthMetrics] = await Promise.all([
     listAgents(workspaceId),
     listKnowledgeBases(workspaceId),
     listMembers(workspaceId),
+    getReferrals(workspaceId),
+    getGrowthMetrics(workspaceId),
   ]);
 
   const published = agents.filter((agent) => agent.status === "active").length;
@@ -65,6 +70,8 @@ export default async function AnalyticsPage({
           />
         </div>
       </section>
+
+      <GrowthSection referrals={referrals} growthMetrics={growthMetrics} />
 
       <section className="space-y-3">
         <h2 className="text-sm font-medium text-muted-foreground">Time series</h2>

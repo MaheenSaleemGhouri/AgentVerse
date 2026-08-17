@@ -12,6 +12,12 @@ from agentverse_api.auth_service.domain.role import Role
 
 class CreateWorkspaceRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
+    #: A referrer's shareable code (Phase 11), e.g. pasted through a
+    #: marketplace share link. Optional, and resolved server-side — an
+    #: unknown/garbage/self-referential value never fails workspace
+    #: creation, it just attributes nothing (see `create_workspace`'s
+    #: route docstring).
+    referral_code: str | None = Field(default=None, min_length=8, max_length=8)
 
 
 class WorkspaceResponse(BaseModel):

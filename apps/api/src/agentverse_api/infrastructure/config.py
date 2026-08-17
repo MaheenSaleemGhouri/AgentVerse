@@ -68,6 +68,28 @@ class Settings(BaseSettings):
     # `None` means the SDK's own default (https://api.openai.com/v1).
     openai_base_url: str | None = None
 
+    # Phase 11 — Anthropic as a second `ProviderAdapter` implementation.
+    # Optional, unlike `openai_api_key`: OpenAI remains the required
+    # default provider, Anthropic is an add-on a deployment may simply
+    # not have credentials for — same "optional as a pair/single value,
+    # absent means not configured" shape as the Stripe fields below,
+    # not the required-field shape OpenAI uses.
+    anthropic_api_key: str | None = None
+
+    @property
+    def anthropic_configured(self) -> bool:
+        return self.anthropic_api_key is not None
+
+    def validate_anthropic(self) -> None:
+        """No half-state to guard today (a single optional field), but
+        every provider gets a `validate_*` method so a reader can grep
+        for "how does this service check its own provider config" and
+        find the same shape everywhere — and so a future second
+        Anthropic setting (e.g. a base-URL override) has a validation
+        home to grow into instead of scattering a new ad hoc check.
+        """
+        return
+
     # Phase 3: producer side of apps/worker's Redis Streams queue. The
     # two services share only this wire contract (stream key + field
     # schema, documented in docs/systems/queue-dlq-policy.md) — never

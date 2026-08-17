@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,7 +32,12 @@ from agentverse_api.auth_service.interface.schemas.workspace import (
     MemberResponse,
     WorkspaceResponse,
 )
+from agentverse_api.billing_service.application.credit_service import CreditService
+from agentverse_api.billing_service.domain.referral import SelfReferralError
+from agentverse_api.billing_service.interface.dependencies.services import get_credit_service
 from agentverse_api.infrastructure.db import get_db_session
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/workspaces", tags=["workspaces"])
 
@@ -59,11 +66,38 @@ async def create_workspace(
     body: CreateWorkspaceRequest,
     user_id: str = Depends(get_current_identity),
     service: WorkspaceService = Depends(get_workspace_service),
+    credits: CreditService = Depends(get_credit_service),
 ) -> WorkspaceResponse:
+    """Creates a workspace, then attributes it to a referrer (Phase 11)
+    if `body.referral_code` resolves to one.
+
+    Attribution is best-effort and never blocking: `resolve_referrer`
+    returning `None` (unknown/garbage code) or `attribute` raising
+    `SelfReferralError` (a workspace's own code, pasted back at itself)
+    both leave the new workspace attributed to nobody rather than
+    failing account creation over a string a stranger typed in — the
+    referral system's own promise (`billing_service/domain/referral.py`)
+    is that a bad code costs nothing but a missed reward, never an error.
+    """
     try:
         workspace = await service.create_workspace(name=body.name, owner_user_id=user_id)
     except WorkspaceSlugTakenError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    if body.referral_code is not None:
+        referrer_workspace_id = await credits.resolve_referrer(body.referral_code)
+        if referrer_workspace_id is not None:
+            try:
+                await credits.attribute(
+                    referrer_workspace_id=referrer_workspace_id,
+                    referred_workspace_id=workspace.id,
+                    code=body.referral_code,
+                )
+            except SelfReferralError:
+                logger.info(
+                    "workspace_referral_self_referral_ignored workspace_id=%s", workspace.id
+                )
+
     return WorkspaceResponse(
         id=workspace.id,
         name=workspace.name,

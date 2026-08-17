@@ -27,6 +27,7 @@ from agentverse_api.billing_service.infrastructure.models import (
     CouponRedemptionModel,
     CreditBalanceModel,
     CreditTransactionModel,
+    ReferralCodeModel,
     ReferralModel,
 )
 
@@ -301,6 +302,25 @@ class SqlReferralRepository:
             row.rewarded_at = datetime.now(row.created_at.tzinfo)
         await self._session.flush()
         return _to_referral(row)
+
+    async def ensure_code_indexed(self, *, workspace_id: str, code: str) -> None:
+        # `ON CONFLICT DO NOTHING` on the primary key: idempotent by
+        # construction, so calling this on every code display costs one
+        # no-op upsert per workspace after the first, never a duplicate
+        # row or a constraint error to catch.
+        stmt = (
+            pg_insert(ReferralCodeModel)
+            .values(workspace_id=workspace_id, code=code)
+            .on_conflict_do_nothing(index_elements=[ReferralCodeModel.workspace_id])
+        )
+        await self._session.execute(stmt)
+        await self._session.flush()
+
+    async def resolve_referrer(self, code: str) -> str | None:
+        result = await self._session.execute(
+            select(ReferralCodeModel.workspace_id).where(ReferralCodeModel.code == code)
+        )
+        return result.scalar_one_or_none()
 
 
 def _to_referral(row: ReferralModel) -> Referral:

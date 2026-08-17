@@ -10,7 +10,11 @@ dependencies = [
     "pydantic-settings>=2.7,<3",
     "redis>=5.2,<6",
     "agentverse-shared",
-    "openai-agents>=0.18.3",
+    # `[litellm]` extra (Phase 11): pulls in `litellm`, required by the
+    # SDK's own vendored `LitellmModel` (already present in 0.18.3 — no
+    # version bump), which `agents/model_resolution.py` uses to route
+    # `anthropic/`-prefixed model strings to Anthropic.
+    "openai-agents[litellm]>=0.18.3",
     "sqlalchemy[asyncio]>=2.0.51,<3",
     "asyncpg>=0.31,<0.32",
     "openai>=2.45,<3",

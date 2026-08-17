@@ -2,6 +2,7 @@ import { BadgeCheck, Download, Package } from "lucide-react";
 import { notFound } from "next/navigation";
 import * as React from "react";
 
+import { getReferrals } from "@/lib/api/billing";
 import { ApiError } from "@/lib/api/client";
 import {
   getListing,
@@ -16,6 +17,7 @@ import { InstallListingDialog } from "@/components/marketplace/install-listing-d
 import { ListingReviews } from "@/components/marketplace/listing-reviews";
 import { ListingStatusBadge } from "@/components/marketplace/listing-status-badge";
 import { RatingStars } from "@/components/marketplace/rating-stars";
+import { ShareListingButton } from "@/components/marketplace/share-listing-button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -38,13 +40,14 @@ export default async function ListingDetailPage({
     throw error;
   });
 
-  const [versions, reviews, myListings] = await Promise.all([
+  const [versions, reviews, myListings, referrals] = await Promise.all([
     listVersions(slug),
     listReviews(slug),
     // The only way to know whether this workspace publishes this
     // listing: the public response carries `publisher_name`, not an id,
     // deliberately — a workspace id has no business on a public page.
     listMyListings(workspaceId),
+    getReferrals(workspaceId),
   ]);
 
   const isMine = myListings.some((mine) => mine.slug === slug);
@@ -88,11 +91,18 @@ export default async function ListingDetailPage({
           </div>
         </div>
 
-        <InstallListingDialog
-          workspaceId={workspaceId}
-          listing={listing}
-          versions={versions}
-        />
+        <div className="flex shrink-0 gap-2">
+          <ShareListingButton
+            workspaceId={workspaceId}
+            slug={slug}
+            referralCode={referrals.code}
+          />
+          <InstallListingDialog
+            workspaceId={workspaceId}
+            listing={listing}
+            versions={versions}
+          />
+        </div>
       </div>
 
       <Tabs defaultValue="overview">

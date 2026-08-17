@@ -66,6 +66,7 @@ import {
   listMyListings as listMyListingsApi,
   listReviews as listReviewsApi,
   publishListingVersion as publishListingVersionApi,
+  shareListing as shareListingApi,
   submitListing as submitListingApi,
   submitReview as submitReviewApi,
   unlistListing as unlistListingApi,
@@ -272,6 +273,11 @@ import {
   acceptInvite as acceptInviteApi,
   type AcceptInviteResponse,
 } from "@/lib/api/invitations";
+import {
+  createSupportTicket as createSupportTicketApi,
+  resolveSupportTicket as resolveSupportTicketApi,
+  type SupportTicket,
+} from "@/lib/api/support-tickets";
 
 export async function createWorkspaceAction(name: string): Promise<Workspace> {
   return createWorkspaceApi(name);
@@ -1064,6 +1070,10 @@ export async function installListingAction(
   return installListingApi(workspaceId, slug, body);
 }
 
+export async function shareListingAction(workspaceId: string, slug: string): Promise<void> {
+  await shareListingApi(workspaceId, slug);
+}
+
 export async function submitReviewAction(
   workspaceId: string,
   slug: string,
@@ -1161,4 +1171,18 @@ export async function featureListingAction(
   isFeatured: boolean
 ): Promise<ModerationListing> {
   return featureListingApi(listingId, isFeatured);
+}
+
+export async function createSupportTicketAction(
+  workspaceId: string,
+  body: { agent_id: string; subject: string; body: string }
+): Promise<SupportTicket> {
+  return createSupportTicketApi(workspaceId, body);
+}
+
+export async function resolveSupportTicketAction(
+  workspaceId: string,
+  ticketId: string
+): Promise<SupportTicket> {
+  return resolveSupportTicketApi(workspaceId, ticketId);
 }

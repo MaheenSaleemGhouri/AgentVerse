@@ -10,6 +10,7 @@ import {
   listMyListingsAction,
   listReviewsAction,
   publishListingVersionAction,
+  shareListingAction,
   submitListingAction,
   submitReviewAction,
   unlistListingAction,
@@ -79,6 +80,12 @@ export function useInstallListing(workspaceId: string) {
       );
     },
     onError: () => toast.error("Could not install this listing. Try again."),
+  });
+}
+
+export function useShareListing(workspaceId: string) {
+  return useMutation({
+    mutationFn: (slug: string) => shareListingAction(workspaceId, slug),
   });
 }
 

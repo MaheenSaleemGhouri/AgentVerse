@@ -39,6 +39,7 @@ from agents.stream_events import RunItemStreamEvent
 from agentverse_worker.agents.builtin_tools import resolve_tools
 from agentverse_worker.agents.events import publish_event
 from agentverse_worker.agents.grounding import KnowledgeBaseDirectory, ground_run
+from agentverse_worker.agents.model_resolution import resolve_model, translate_run_exception
 from agentverse_worker.agents.repository import (
     AgentRepositoryProtocol,
     RunRecord,
@@ -143,14 +144,15 @@ async def handle_agent_run_job(
         return JobResult.ok({"run_id": run_id, "status": "error"})
     except Exception as exc:  # noqa: BLE001 - translated into a run failure, not a raw crash
         logger.exception("agent_run_job_failed run_id=%s", run_id)
-        await repo.update_run_status(run_id=run_id, status="error", error_message=str(exc))
+        reason = translate_run_exception(exc)
+        await repo.update_run_status(run_id=run_id, status="error", error_message=reason)
         await _record_and_publish_step(
             repo,
             redis,
             run=run,
             step_type="run_failed",
             sequence=sequence,
-            payload={"reason": str(exc)},
+            payload={"reason": reason},
             cost=None,
         )
         return JobResult.ok({"run_id": run_id, "status": "error"})
@@ -302,7 +304,13 @@ async def _execute(
     agent = Agent(
         name=f"agent-{run.agent_id}",
         instructions=grounding.instructions,
-        model=config["model"],
+        # `config["model"]` itself keeps being used everywhere else in
+        # this function (grounding's context budget, cost accounting) —
+        # the provider-prefix convention guarantees that raw string is
+        # exactly the dict key both `MODEL_CONTEXT_WINDOWS` and
+        # `MODEL_PRICING` carry, so only the SDK-facing `Agent(model=...)`
+        # needs the resolved value.
+        model=resolve_model(config["model"], anthropic_api_key=settings.anthropic_api_key),
         tools=resolve_tools(config.get("tools", [])),
         mcp_servers=attachment.servers,
         model_settings=ModelSettings(

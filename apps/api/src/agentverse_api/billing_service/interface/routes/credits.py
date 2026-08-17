@@ -163,15 +163,18 @@ async def get_referrals_route(
 ) -> ReferralSummaryResponse:
     """This workspace's referral code and what it has produced.
 
-    The code is derived from the workspace id rather than stored, so it
-    is the same every time it is displayed and needs no table of its own.
+    The code itself is derived from the workspace id, not stored — but
+    `ensure_code` also indexes it for reverse lookup (Phase 11:
+    `create_workspace`'s redemption path needs to resolve a pasted-in
+    code back to the workspace that owns it, which the hash alone
+    cannot do), so displaying a code is also what makes it redeemable.
     """
     referrals = await service.list_referrals(workspace_id=context.workspace_id)
     counts = {"pending": 0, "qualified": 0, "rewarded": 0, "voided": 0}
     for referral in referrals:
         counts[referral.status.value] += 1
     return ReferralSummaryResponse(
-        code=service.code_for(context.workspace_id),
+        code=await service.ensure_code(context.workspace_id),
         pending=counts["pending"],
         qualified=counts["qualified"],
         rewarded=counts["rewarded"],

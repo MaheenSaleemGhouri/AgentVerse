@@ -31,4 +31,22 @@ export const BUILTIN_TOOLS = [
   },
 ] as const;
 
-export const MODEL_OPTIONS = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"] as const;
+/**
+ * Provider-grouped catalog. Mirrors the provider-prefix convention
+ * `apps/worker`'s `resolve_model()` and `packages/python-shared`'s
+ * `cost_accounting.py` both key off (Phase 11): no `/` means OpenAI,
+ * resolved unchanged exactly as before; an `anthropic/` prefix routes
+ * through the worker's LiteLLM extension. Every model string here MUST
+ * have a matching `MODEL_PRICING`/`MODEL_CONTEXT_WINDOWS` entry in
+ * `cost_accounting.py`, or selecting it crashes the run.
+ */
+export const MODEL_CATALOG = [
+  { provider: "OpenAI", models: ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"] },
+  {
+    provider: "Anthropic",
+    models: ["anthropic/claude-haiku-4-5", "anthropic/claude-sonnet-5"],
+  },
+] as const;
+
+/** Flat list derived from `MODEL_CATALOG` — existing consumers that only need "is this a valid model string" keep working unchanged. */
+export const MODEL_OPTIONS = MODEL_CATALOG.flatMap((group) => group.models);

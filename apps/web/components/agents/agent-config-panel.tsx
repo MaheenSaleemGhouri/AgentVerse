@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { saveAgentVersionAction } from "@/lib/api/actions";
 import type { AgentVersion } from "@/lib/api/agents";
 import { useAgentBuilderStore, type BuilderPanelTab } from "@/lib/stores/agent-builder-store";
-import { agentConfigSchema, BUILTIN_TOOLS, MODEL_OPTIONS, type AgentConfigFormValues } from "@/lib/validation/agent-config";
+import { agentConfigSchema, BUILTIN_TOOLS, MODEL_CATALOG, type AgentConfigFormValues } from "@/lib/validation/agent-config";
 
 import { KnowledgeBaseAttach } from "@/components/agents/knowledge-base-attach";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,9 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -131,10 +133,15 @@ export function AgentConfigPanel({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {MODEL_OPTIONS.map((model) => (
-                          <SelectItem key={model} value={model}>
-                            {model}
-                          </SelectItem>
+                        {MODEL_CATALOG.map((group) => (
+                          <SelectGroup key={group.provider}>
+                            <SelectLabel>{group.provider}</SelectLabel>
+                            {group.models.map((model) => (
+                              <SelectItem key={model} value={model}>
+                                {model}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
                         ))}
                       </SelectContent>
                     </Select>

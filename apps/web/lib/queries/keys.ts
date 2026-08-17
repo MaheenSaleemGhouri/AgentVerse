@@ -145,4 +145,10 @@ export const queryKeys = {
     installs: (workspaceId: string) =>
       ["workspaces", workspaceId, "marketplace", "installs"] as const,
   },
+
+  supportTickets: {
+    all: (workspaceId: string) => ["workspaces", workspaceId, "support-tickets"] as const,
+    detail: (workspaceId: string, ticketId: string) =>
+      ["workspaces", workspaceId, "support-tickets", ticketId] as const,
+  },
 } as const;
