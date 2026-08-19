@@ -144,6 +144,29 @@ import {
   updateInstalled as updateInstalledApi,
 } from "@/lib/api/integrations";
 import {
+  type CollabTicketResponse,
+  type CreateWorkflowRequest,
+  createWorkflow as createWorkflowApi,
+  type CreateWorkflowVersionRequest,
+  createWorkflowVersion as createWorkflowVersionApi,
+  diffWorkflowVersions as diffWorkflowVersionsApi,
+  getLatestWorkflowVersion as getLatestWorkflowVersionApi,
+  getWorkflow as getWorkflowApi,
+  getWorkflowRun as getWorkflowRunApi,
+  getWorkflowVersion as getWorkflowVersionApi,
+  listWorkflowRunNodes as listWorkflowRunNodesApi,
+  listWorkflows as listWorkflowsApi,
+  mintCollabTicket as mintCollabTicketApi,
+  publishWorkflow as publishWorkflowApi,
+  resolveWorkflowApproval as resolveWorkflowApprovalApi,
+  submitWorkflowRun as submitWorkflowRunApi,
+  type Workflow,
+  type WorkflowNodeRun,
+  type WorkflowRun,
+  type WorkflowVersion,
+  type WorkflowVersionDiff,
+} from "@/lib/api/workflows";
+import {
   type AddMemberRequest,
   addTeamMember as addTeamMemberApi,
   type Communication,
@@ -1185,4 +1208,107 @@ export async function resolveSupportTicketAction(
   ticketId: string
 ): Promise<SupportTicket> {
   return resolveSupportTicketApi(workspaceId, ticketId);
+}
+
+// ---- workflows (Phase 10, docs/adr/0016) -------------------------------
+
+export async function listWorkflowsAction(workspaceId: string): Promise<Workflow[]> {
+  return listWorkflowsApi(workspaceId);
+}
+
+export async function getWorkflowAction(
+  workspaceId: string,
+  workflowId: string
+): Promise<Workflow> {
+  return getWorkflowApi(workspaceId, workflowId);
+}
+
+export async function createWorkflowAction(
+  workspaceId: string,
+  body: CreateWorkflowRequest
+): Promise<{ workflow: Workflow; version: WorkflowVersion }> {
+  return createWorkflowApi(workspaceId, body);
+}
+
+export async function getLatestWorkflowVersionAction(
+  workspaceId: string,
+  workflowId: string
+): Promise<WorkflowVersion | null> {
+  return getLatestWorkflowVersionApi(workspaceId, workflowId);
+}
+
+export async function getWorkflowVersionAction(
+  workspaceId: string,
+  workflowId: string,
+  versionId: string
+): Promise<WorkflowVersion> {
+  return getWorkflowVersionApi(workspaceId, workflowId, versionId);
+}
+
+export async function createWorkflowVersionAction(
+  workspaceId: string,
+  workflowId: string,
+  body: CreateWorkflowVersionRequest
+): Promise<WorkflowVersion> {
+  return createWorkflowVersionApi(workspaceId, workflowId, body);
+}
+
+export async function diffWorkflowVersionsAction(
+  workspaceId: string,
+  workflowId: string,
+  versionId: string,
+  against: string
+): Promise<WorkflowVersionDiff> {
+  return diffWorkflowVersionsApi(workspaceId, workflowId, versionId, against);
+}
+
+export async function publishWorkflowAction(
+  workspaceId: string,
+  workflowId: string,
+  versionId: string
+): Promise<Workflow> {
+  return publishWorkflowApi(workspaceId, workflowId, versionId);
+}
+
+export async function submitWorkflowRunAction(
+  workspaceId: string,
+  workflowId: string,
+  input: Record<string, unknown>,
+  idempotencyKey: string
+): Promise<WorkflowRun> {
+  return submitWorkflowRunApi(workspaceId, workflowId, input, idempotencyKey);
+}
+
+export async function getWorkflowRunAction(
+  workspaceId: string,
+  workflowId: string,
+  runId: string
+): Promise<WorkflowRun> {
+  return getWorkflowRunApi(workspaceId, workflowId, runId);
+}
+
+export async function listWorkflowRunNodesAction(
+  workspaceId: string,
+  workflowId: string,
+  runId: string
+): Promise<WorkflowNodeRun[]> {
+  return listWorkflowRunNodesApi(workspaceId, workflowId, runId);
+}
+
+export async function resolveWorkflowApprovalAction(
+  workspaceId: string,
+  workflowId: string,
+  runId: string,
+  nodeId: string,
+  decision: "approved" | "rejected",
+  comment: string | null
+): Promise<WorkflowNodeRun> {
+  return resolveWorkflowApprovalApi(workspaceId, workflowId, runId, nodeId, decision, comment);
+}
+
+export async function mintCollabTicketAction(
+  workspaceId: string,
+  workflowId: string
+): Promise<CollabTicketResponse> {
+  return mintCollabTicketApi(workspaceId, workflowId);
 }

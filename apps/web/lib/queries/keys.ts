@@ -151,4 +151,16 @@ export const queryKeys = {
     detail: (workspaceId: string, ticketId: string) =>
       ["workspaces", workspaceId, "support-tickets", ticketId] as const,
   },
+
+  workflows: {
+    all: (workspaceId: string) => ["workspaces", workspaceId, "workflows"] as const,
+    detail: (workspaceId: string, workflowId: string) =>
+      ["workspaces", workspaceId, "workflows", workflowId] as const,
+    latestVersion: (workspaceId: string, workflowId: string) =>
+      ["workspaces", workspaceId, "workflows", workflowId, "version", "latest"] as const,
+    run: (workspaceId: string, workflowId: string, runId: string) =>
+      ["workspaces", workspaceId, "workflows", workflowId, "runs", runId] as const,
+    runNodes: (workspaceId: string, workflowId: string, runId: string) =>
+      ["workspaces", workspaceId, "workflows", workflowId, "runs", runId, "nodes"] as const,
+  },
 } as const;

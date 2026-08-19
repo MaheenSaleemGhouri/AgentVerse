@@ -108,7 +108,6 @@ export const NAV_SECTIONS: readonly NavItem[] = [
     segment: "workflows",
     icon: Workflow,
     description: "Multi-step agent workflows on a DAG canvas",
-    pending: true,
   },
   {
     label: "Analytics",

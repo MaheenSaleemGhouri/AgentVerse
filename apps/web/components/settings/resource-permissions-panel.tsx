@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import * as React from "react";
 
 import type { ResourcePermission } from "@/lib/api/resource-permissions";
@@ -53,10 +54,17 @@ export function ResourcePermissionsPanel({
   const { data: grants } = useResourcePermissions(workspaceId, initialGrants);
   const grant = useGrantResourcePermission(workspaceId);
   const revoke = useRevokeResourcePermission(workspaceId);
+  const searchParams = useSearchParams();
+  const prefillType = searchParams.get("resourceType") ?? "";
+  const prefillId = searchParams.get("resourceId") ?? "";
 
-  const [open, setOpen] = React.useState(false);
-  const [resourceType, setResourceType] = React.useState("");
-  const [resourceId, setResourceId] = React.useState("");
+  // A deep link (e.g. the workflow builder's "Share" button) opens the
+  // grant dialog pre-filled rather than requiring the resource type/id
+  // to be typed by hand — the URL is the whole hand-off, no new backend
+  // call needed since `resource_type` is already unrestricted free text.
+  const [open, setOpen] = React.useState(Boolean(prefillType));
+  const [resourceType, setResourceType] = React.useState(prefillType);
+  const [resourceId, setResourceId] = React.useState(prefillId);
   const [principalId, setPrincipalId] = React.useState("");
   const [permission, setPermission] = React.useState("");
 
@@ -84,7 +92,7 @@ export function ResourcePermissionsPanel({
   }
 
   return (
-    <div className="space-y-4">
+    <div id="resource-permissions" className="space-y-4 scroll-mt-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="font-medium">Resource permissions</h2>

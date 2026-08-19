@@ -47,21 +47,12 @@ export const PENDING_INTEGRATIONS = {
     capability:
       "Read past runs back after the live stream ends — run history, dashboard activity, and the data every analytics chart aggregates.",
   },
-  workflows: {
-    phase: 10,
-    phaseName: "DAG Workflow Automation & Collaboration",
-    endpoints: [
-      "GET/POST /api/v1/workspaces/{workspace_id}/workflows",
-      "POST /api/v1/workspaces/{workspace_id}/workflows/{workflow_id}/runs",
-    ],
-    capability:
-      "Compose multi-step agent workflows on a DAG canvas with conditional branching and human-in-the-loop approval steps.",
-  },
-  // `mcp` and `integrations` were removed when Phase 6 shipped. Deleting
-  // the entry rather than leaving it is the point of this registry: any
-  // leftover `<IntegrationPending feature="mcp" />` now fails the
-  // TypeScript build instead of lingering as stale UI over a working
-  // backend.
+  // `mcp`, `integrations`, and `workflows` were removed when their
+  // phases shipped. Deleting the entry rather than leaving it is the
+  // point of this registry: any leftover `<IntegrationPending
+  // feature="workflows" />` now fails the TypeScript build instead of
+  // lingering as stale UI over a working backend (Phase 10,
+  // docs/adr/0016).
   analytics: {
     phase: 11,
     phaseName: "Growth Loops & Multi-Provider Breadth",
