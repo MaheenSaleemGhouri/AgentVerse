@@ -26,6 +26,22 @@ class Category:
 
 
 @dataclass(frozen=True, slots=True)
+class ListingSearchFilters:
+    """The catalog facets `browse` already exposes, factored out so the
+    hybrid search arms (`ListingSearchPort`) and the plain keyword path
+    filter identically — a divergence between them would mean switching
+    a category tab silently changed which ranking algorithm results came
+    from, which is not a filter behavior a user could ever explain.
+    """
+
+    category_slug: str | None = None
+    kind: ListingKind | None = None
+    featured_only: bool = False
+    free_only: bool = False
+    official_only: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ListingVersion:
     id: str
     listing_id: str
@@ -74,6 +90,17 @@ class ListingRepository(Protocol):
     async def search_published(self, *, tsquery: str, limit: int) -> list[SearchMatch]: ...
 
     async def get_by_slug(self, slug: str) -> Listing | None: ...
+
+    async def get_by_slugs(self, slugs: list[str]) -> list[Listing]:
+        """Every listing among `slugs` that still exists, in any order.
+
+        For re-hydrating a hybrid-search result: the ranked
+        `SearchMatch` list carries slugs and a score, not the full
+        catalog card, and this is the one bulk fetch that avoids an
+        N+1 `get_by_slug` per result. The caller re-sorts to the fused
+        rank order — this method does not promise to preserve it.
+        """
+        ...
 
     async def get_by_id(self, listing_id: str) -> Listing | None: ...
 
@@ -144,7 +171,64 @@ class ListingRepository(Protocol):
         self, *, listing_id: str, aggregate: RatingAggregate
     ) -> None: ...
 
+    async def set_embedding(
+        self,
+        *,
+        listing_id: str,
+        embedding: list[float],
+        embedding_model: str,
+        embedding_model_version: str,
+    ) -> None:
+        """Records the vector a listing's current title/summary/
+        description embeds to. Called on every PUBLISHED transition
+        (`marketplace_service.py`) — never on an ordinary detail edit,
+        so a listing can go briefly stale between an edit and its next
+        approval, which is an acceptable, documented trade against
+        re-embedding on every keystroke of a draft.
+        """
+        ...
+
     async def slug_exists(self, slug: str) -> bool: ...
+
+
+class ListingSearchPort(Protocol):
+    """The two ranked arms hybrid marketplace search fuses.
+
+    Deliberately not `agentverse_shared.retrieval.port.ChunkSearchPort`:
+    that port's contract is hard workspace-scoped (`vector-database-
+    expert`'s tenant-isolation rule for a knowledge base's own chunks),
+    the exact opposite of a catalog search that must span every
+    workspace. A published listing is public — see `domain/listing.py`
+    — so `workspace_id` never appears here; `status = 'published'` is
+    what does the security work instead, baked into every
+    implementation rather than left to a `filters` value the caller
+    could omit.
+    """
+
+    async def vector_search(
+        self,
+        *,
+        embedding: list[float],
+        embedding_model: str,
+        embedding_model_version: str,
+        filters: ListingSearchFilters,
+        limit: int,
+    ) -> list[SearchMatch]:
+        """Nearest neighbours by cosine distance, best first. Filtered
+        to listings embedded with exactly this model/version — mixing
+        embedding spaces in one ranking would produce distances that
+        are not comparable to each other.
+        """
+        ...
+
+    async def keyword_search(
+        self, *, tsquery: str, filters: ListingSearchFilters, limit: int
+    ) -> list[SearchMatch]:
+        """Full-text matches, best first — the same query `browse`'s
+        plain-keyword path runs, just also usable as fusion's second
+        arm.
+        """
+        ...
 
 
 class ListingVersionRepository(Protocol):

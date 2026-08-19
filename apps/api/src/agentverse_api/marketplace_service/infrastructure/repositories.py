@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from agentverse_shared.search import SearchMatch, to_prefix_tsquery
-from sqlalchemy import UnaryExpression, delete, false, func, select, update
+from sqlalchemy import ColumnElement, UnaryExpression, delete, false, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,7 +24,11 @@ from agentverse_api.marketplace_service.domain.listing import (
     ListingStatus,
     Pricing,
 )
-from agentverse_api.marketplace_service.domain.ports import Category, ListingVersion
+from agentverse_api.marketplace_service.domain.ports import (
+    Category,
+    ListingSearchFilters,
+    ListingVersion,
+)
 from agentverse_api.marketplace_service.domain.review import RatingAggregate, Review
 from agentverse_api.marketplace_service.infrastructure.models import (
     MarketplaceCategoryModel,
@@ -45,6 +49,30 @@ _SORTS: dict[str, UnaryExpression[Any]] = {
     "name": MarketplaceListingModel.title.asc(),
 }
 DEFAULT_SORT = "popular"
+
+
+def _catalog_filter_conditions(filters: ListingSearchFilters) -> list[ColumnElement[bool]]:
+    """The facet predicates `browse` and both `ListingSearchPort` arms
+    share, factored out once so a category tab cannot silently rank
+    through a different filtered set than the plain catalog view does.
+    `status = 'published'` is always first — the one predicate that does
+    the actual security work of keeping drafts out of every one of these
+    callers.
+    """
+    conditions: list[ColumnElement[bool]] = [
+        MarketplaceListingModel.status == ListingStatus.PUBLISHED.value
+    ]
+    if filters.category_slug:
+        conditions.append(MarketplaceListingModel.category_slug == filters.category_slug)
+    if filters.kind is not None:
+        conditions.append(MarketplaceListingModel.kind == filters.kind.value)
+    if filters.featured_only:
+        conditions.append(MarketplaceListingModel.is_featured.is_(True))
+    if filters.free_only:
+        conditions.append(MarketplaceListingModel.pricing == Pricing.FREE.value)
+    if filters.official_only is not None:
+        conditions.append(MarketplaceListingModel.is_official.is_(filters.official_only))
+    return conditions
 
 
 async def _flush_and_reload(session: AsyncSession, row: MarketplaceListingModel) -> None:
@@ -109,21 +137,20 @@ class SqlListingRepository:
         # published listing is public — see the module docstring on
         # `domain/listing.py`. The status filter is what keeps drafts
         # and rejections out, and it is not optional.
-        conditions = [MarketplaceListingModel.status == ListingStatus.PUBLISHED.value]
-        if category_slug:
-            conditions.append(MarketplaceListingModel.category_slug == category_slug)
-        if kind is not None:
-            conditions.append(MarketplaceListingModel.kind == kind.value)
-        if featured_only:
-            conditions.append(MarketplaceListingModel.is_featured.is_(True))
-        if free_only:
-            conditions.append(MarketplaceListingModel.pricing == Pricing.FREE.value)
-        if official_only is not None:
-            # Tri-state, not a bool: `True` is the template library,
-            # `False` is community listings only, and `None` is the whole
-            # catalog. A plain bool could not express "everything", which
-            # is the default the catalog page wants.
-            conditions.append(MarketplaceListingModel.is_official.is_(official_only))
+        #
+        # Tri-state `official_only`, not a bool: `True` is the template
+        # library, `False` is community listings only, and `None` is the
+        # whole catalog. A plain bool could not express "everything",
+        # which is the default the catalog page wants.
+        conditions = _catalog_filter_conditions(
+            ListingSearchFilters(
+                category_slug=category_slug,
+                kind=kind,
+                featured_only=featured_only,
+                free_only=free_only,
+                official_only=official_only,
+            )
+        )
         if query:
             # Full-text over title and summary, served by the GIN
             # expression index — the upgrade from the `ilike` scan this
@@ -157,24 +184,63 @@ class SqlListingRepository:
         return [_to_listing(row) for row in rows.scalars().all()], int(total.scalar_one())
 
     async def search_published(self, *, tsquery: str, limit: int) -> list[SearchMatch]:
-        """Full-text search over the *public* catalog.
-
-        The one searcher with no `workspace_id` predicate, and the reason
-        is the same one `browse` documents: a published listing belongs
-        to the catalog, not to a tenant. The `status` filter is what does
-        the security work here — without it this would expose every
-        workspace's drafts to every other workspace's search box.
-
-        `id` is the slug, not the row id: search results are rendered as
-        links, and the catalog is addressed by slug.
+        """Full-text search over the *public* catalog — the typeahead
+        search box's own arm, unfiltered by any catalog facet. A thin
+        call onto `keyword_search`, which is also fusion's second arm
+        for hybrid search (`hybrid_marketplace_search.py`); this is the
+        one caller that never combines it with facets.
         """
+        return await self.keyword_search(
+            tsquery=tsquery, filters=ListingSearchFilters(), limit=limit
+        )
+
+    async def vector_search(
+        self,
+        *,
+        embedding: list[float],
+        embedding_model: str,
+        embedding_model_version: str,
+        filters: ListingSearchFilters,
+        limit: int,
+    ) -> list[SearchMatch]:
+        conditions = [
+            *_catalog_filter_conditions(filters),
+            MarketplaceListingModel.embedding.is_not(None),
+            MarketplaceListingModel.embedding_model == embedding_model,
+            MarketplaceListingModel.embedding_model_version == embedding_model_version,
+        ]
+        # `<=>` is pgvector's cosine *distance*; converted to a
+        # similarity so `SearchMatch.rank` stays higher-is-better,
+        # consistent with the keyword arm's `ts_rank_cd`. The ORDER BY
+        # stays on the raw distance operator, which is what the partial
+        # HNSW index was built to serve.
+        distance = MarketplaceListingModel.embedding.cosine_distance(embedding)
+        result = await self._session.execute(
+            select(
+                MarketplaceListingModel.slug,
+                MarketplaceListingModel.title,
+                MarketplaceListingModel.summary,
+                (1 - distance).label("score"),
+            )
+            .where(*conditions)
+            .order_by(distance)
+            .limit(limit)
+        )
+        return [
+            SearchMatch(id=slug, title=title, subtitle=summary, rank=float(score))
+            for slug, title, summary, score in result.all()
+        ]
+
+    async def keyword_search(
+        self, *, tsquery: str, filters: ListingSearchFilters, limit: int
+    ) -> list[SearchMatch]:
         result = await self._session.execute(
             search_query(
                 id_column=MarketplaceListingModel.slug,
                 title_column=MarketplaceListingModel.title,
                 subtitle_column=MarketplaceListingModel.summary,
                 tsquery=tsquery,
-                where=[MarketplaceListingModel.status == ListingStatus.PUBLISHED.value],
+                where=_catalog_filter_conditions(filters),
                 limit=limit,
             )
         )
@@ -186,6 +252,14 @@ class SqlListingRepository:
         )
         row = result.scalar_one_or_none()
         return None if row is None else _to_listing(row)
+
+    async def get_by_slugs(self, slugs: list[str]) -> list[Listing]:
+        if not slugs:
+            return []
+        result = await self._session.execute(
+            select(MarketplaceListingModel).where(MarketplaceListingModel.slug.in_(slugs))
+        )
+        return [_to_listing(row) for row in result.scalars().all()]
 
     async def get_by_id(self, listing_id: str) -> Listing | None:
         result = await self._session.execute(
@@ -326,6 +400,24 @@ class SqlListingRepository:
             update(MarketplaceListingModel)
             .where(MarketplaceListingModel.id == listing_id)
             .values(rating_sum=aggregate.rating_sum, rating_count=aggregate.rating_count)
+        )
+
+    async def set_embedding(
+        self,
+        *,
+        listing_id: str,
+        embedding: list[float],
+        embedding_model: str,
+        embedding_model_version: str,
+    ) -> None:
+        await self._session.execute(
+            update(MarketplaceListingModel)
+            .where(MarketplaceListingModel.id == listing_id)
+            .values(
+                embedding=embedding,
+                embedding_model=embedding_model,
+                embedding_model_version=embedding_model_version,
+            )
         )
 
     async def slug_exists(self, slug: str) -> bool:

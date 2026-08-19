@@ -13,12 +13,17 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Index, Integer, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
 from agentverse_api.infrastructure.orm_base import Base
+
+#: Matches `kb_chunks.embedding` (Phase 5) — the shared
+#: `OpenAIEmbeddingProvider` default dimension.
+_EMBEDDING_DIM = 1536
 
 _KINDS = "('agent', 'workflow')"
 _STATUSES = "('draft', 'pending_review', 'published', 'rejected', 'unlisted')"
@@ -153,6 +158,14 @@ class MarketplaceListingModel(Base):
     # Why a submission was rejected. Shown to the publisher, so a
     # rejection is actionable rather than a dead end.
     moderation_note: Mapped[str | None] = mapped_column(Text, default=None)
+    # Null until the listing is first approved/relisted — hybrid search
+    # degrades to keyword-only for anything not yet embedded
+    # (`hybrid_marketplace_search.py`). Travels with `embedding_model`/
+    # `_version` so a similarity query never mixes vector spaces, same
+    # discipline as `kb_chunks`.
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(_EMBEDDING_DIM), default=None)
+    embedding_model: Mapped[str | None] = mapped_column(Text, default=None)
+    embedding_model_version: Mapped[str | None] = mapped_column(Text, default=None)
     published_at: Mapped[datetime | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())

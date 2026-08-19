@@ -923,4 +923,170 @@ class TeamIntegrationModel(Base):
     #: only members with their own per-agent grant may use it.
     shared_with_all_members: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime]
+
+
+# --- Workflows (Phase 10) ------------------------------------------------
+# Mirrors the `agents`/`agent_versions` split. Status/type/node-type
+# columns are TEXT + CHECK, not a Postgres ENUM (this repo's standing
+# preference for anything likely to grow a value — `ALTER TYPE ... DROP
+# VALUE` does not exist, and Phase 4's `run_step_type` ENUM already
+# needed a follow-up migration just to add one value).
+
+
+class WorkflowModel(Base):
+    __tablename__ = "workflows"
+
+    id: Mapped[str] = _uuid_pk()
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text, default=None)
+    status: Mapped[str] = mapped_column(Text, default="draft")
+    # No FK to workflow_versions here for the same reason `agents.
+    # published_version_id` has none: that table's own FK back to
+    # `workflows` must exist first. Added post-creation via the
+    # migration's ALTER TABLE.
+    published_version_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), nullable=True, default=None
+    )
+    created_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime]
     updated_at: Mapped[datetime]
+
+
+class WorkflowVersionModel(Base):
+    __tablename__ = "workflow_versions"
+    __table_args__ = (
+        UniqueConstraint("workflow_id", "version_number", name="uq_workflow_version"),
+    )
+
+    id: Mapped[str] = _uuid_pk()
+    workflow_id: Mapped[str] = mapped_column(
+        ForeignKey("workflows.id", ondelete="CASCADE"), index=True
+    )
+    version_number: Mapped[int] = mapped_column(Integer)
+    created_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime]
+
+
+class WorkflowNodeModel(Base):
+    __tablename__ = "workflow_nodes"
+    __table_args__ = (
+        CheckConstraint(
+            "(type = 'agent_step' AND agent_id IS NOT NULL AND team_id IS NULL) OR "
+            "(type = 'team_step' AND team_id IS NOT NULL AND agent_id IS NULL) OR "
+            "(type NOT IN ('agent_step', 'team_step') AND agent_id IS NULL AND team_id IS NULL)",
+            name="ck_workflow_nodes_target",
+        ),
+    )
+
+    # Caller-supplied (canvas-assigned), not server-generated — an edge
+    # must reference a node before the version row exists.
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    workflow_version_id: Mapped[str] = mapped_column(
+        ForeignKey("workflow_versions.id", ondelete="CASCADE"), index=True
+    )
+    type: Mapped[str] = mapped_column(Text)
+    position_x: Mapped[float] = mapped_column(default=0)
+    position_y: Mapped[float] = mapped_column(default=0)
+    config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    # RESTRICT: deleting an agent/team a published workflow depends on
+    # must fail loudly rather than leaving a node that can never run —
+    # same rule as `team_members.agent_id`.
+    agent_id: Mapped[str | None] = mapped_column(
+        ForeignKey("agents.id", ondelete="RESTRICT"), nullable=True, default=None
+    )
+    team_id: Mapped[str | None] = mapped_column(
+        ForeignKey("teams.id", ondelete="RESTRICT"), nullable=True, default=None
+    )
+
+
+class WorkflowEdgeModel(Base):
+    __tablename__ = "workflow_edges"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    workflow_version_id: Mapped[str] = mapped_column(
+        ForeignKey("workflow_versions.id", ondelete="CASCADE"), index=True
+    )
+    from_node_id: Mapped[str] = mapped_column(
+        ForeignKey("workflow_nodes.id", ondelete="CASCADE"), index=True
+    )
+    to_node_id: Mapped[str] = mapped_column(
+        ForeignKey("workflow_nodes.id", ondelete="CASCADE"), index=True
+    )
+    #: `{"field", "operator", "value"}` — a simple comparison, no
+    #: expression language. `None` is the default/else edge.
+    condition: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True, default=None)
+    branch_order: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+
+
+class WorkflowRunModel(Base):
+    __tablename__ = "workflow_runs"
+
+    id: Mapped[str] = _uuid_pk()
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    workflow_id: Mapped[str] = mapped_column(
+        ForeignKey("workflows.id", ondelete="CASCADE"), index=True
+    )
+    # RESTRICT, not CASCADE: a run is a durable record of what actually
+    # executed — the version it ran against must not silently disappear
+    # out from under an audit trail (same rule as `agent_runs.
+    # agent_version_id`).
+    workflow_version_id: Mapped[str] = mapped_column(
+        ForeignKey("workflow_versions.id", ondelete="RESTRICT")
+    )
+    status: Mapped[str] = mapped_column(Text, default="queued")
+    input: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    idempotency_key: Mapped[str | None] = mapped_column(Text, default=None)
+    cost_micro_usd: Mapped[int | None] = mapped_column(BigInteger, default=None)
+    error_message: Mapped[str | None] = mapped_column(Text, default=None)
+    started_at: Mapped[datetime | None] = mapped_column(default=None)
+    completed_at: Mapped[datetime | None] = mapped_column(default=None)
+    created_at: Mapped[datetime]
+
+
+class WorkflowNodeRunModel(Base):
+    """Partitioned by `created_at` — the per-node execution trail on a
+    DAG run is the highest-volume table this phase adds, matching
+    `agent_run_steps`/`execution_events`'s treatment from their first
+    migration.
+    """
+
+    __tablename__ = "workflow_node_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "approval_decision IS NULL OR approval_decision IN ('approved', 'rejected')",
+            name="ck_workflow_node_runs_approval_decision",
+        ),
+        {"postgresql_partition_by": "RANGE (created_at)"},
+    )
+
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    created_at: Mapped[datetime] = mapped_column(primary_key=True)
+    workflow_run_id: Mapped[str] = mapped_column(
+        ForeignKey("workflow_runs.id", ondelete="CASCADE"), index=True
+    )
+    # RESTRICT: a node belongs to an immutable published version, which
+    # never has rows deleted from under a run that referenced it.
+    node_id: Mapped[str] = mapped_column(ForeignKey("workflow_nodes.id", ondelete="RESTRICT"))
+    agent_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="RESTRICT"), nullable=True, default=None
+    )
+    team_session_id: Mapped[str | None] = mapped_column(
+        ForeignKey("team_sessions.id", ondelete="RESTRICT"), nullable=True, default=None
+    )
+    status: Mapped[str] = mapped_column(Text, default="queued")
+    output: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True, default=None)
+    approval_decision: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    approved_by_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, default=None
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(default=None)
+    sequence: Mapped[int] = mapped_column(Integer, default=0)
+    started_at: Mapped[datetime | None] = mapped_column(default=None)
+    completed_at: Mapped[datetime | None] = mapped_column(default=None)

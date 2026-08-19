@@ -121,6 +121,15 @@ from agentverse_api.orchestration_service.interface.routers.team_session_stream 
 from agentverse_api.orchestration_service.interface.routers.teams import (
     router as teams_router,
 )
+from agentverse_api.orchestration_service.interface.routers.workflow_collab import (
+    router as workflow_collab_router,
+)
+from agentverse_api.orchestration_service.interface.routers.workflow_runs import (
+    router as workflow_runs_router,
+)
+from agentverse_api.orchestration_service.interface.routers.workflows import (
+    router as workflows_router,
+)
 from agentverse_api.search_service.interface.routes.search import (
     router as search_router,
 )
@@ -212,6 +221,9 @@ def create_app() -> FastAPI:
     app.include_router(knowledge_router)
     app.include_router(run_stream_router)
     app.include_router(teams_router)
+    app.include_router(workflows_router)
+    app.include_router(workflow_runs_router)
+    app.include_router(workflow_collab_router)
     app.include_router(integrations_router)
     app.include_router(oauth_callback_router)
     app.include_router(team_session_stream_router)

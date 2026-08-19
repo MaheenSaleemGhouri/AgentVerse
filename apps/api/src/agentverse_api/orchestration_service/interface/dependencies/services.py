@@ -39,6 +39,12 @@ from agentverse_api.orchestration_service.domain.ports.knowledge_repository impo
 from agentverse_api.orchestration_service.domain.ports.provider_adapter import ProviderAdapter
 from agentverse_api.orchestration_service.domain.ports.run_repository import AgentRunRepository
 from agentverse_api.orchestration_service.domain.ports.team_repository import TeamRepository
+from agentverse_api.orchestration_service.domain.ports.workflow_repository import (
+    WorkflowRepository,
+)
+from agentverse_api.orchestration_service.domain.ports.workflow_run_repository import (
+    WorkflowRunRepository,
+)
 from agentverse_api.orchestration_service.infrastructure.integration_repository import (
     SqlIntegrationRepository,
 )
@@ -66,6 +72,12 @@ from agentverse_api.orchestration_service.infrastructure.repositories import (
 )
 from agentverse_api.orchestration_service.infrastructure.team_repository import (
     SqlTeamRepository,
+)
+from agentverse_api.orchestration_service.infrastructure.workflow_repository import (
+    SqlWorkflowRepository,
+)
+from agentverse_api.orchestration_service.infrastructure.workflow_run_repository import (
+    SqlWorkflowRunRepository,
 )
 
 
@@ -143,6 +155,18 @@ def get_agent_run_repository(
 
 def get_team_repository(session: AsyncSession = Depends(get_db_session)) -> TeamRepository:
     return SqlTeamRepository(session)
+
+
+def get_workflow_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> WorkflowRepository:
+    return SqlWorkflowRepository(session)
+
+
+def get_workflow_run_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> WorkflowRunRepository:
+    return SqlWorkflowRunRepository(session)
 
 
 def get_integration_repository(

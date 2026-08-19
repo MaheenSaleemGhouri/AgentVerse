@@ -1,0 +1,64 @@
+# ADR-0016: Workflow Engine Boundary, Collaboration State, and Hybrid Marketplace Search
+
+## Context
+
+`docs/roadmap.md`'s Phase 10 (DAG workflow automation & collaboration) was a real, unbuilt gap: zero backend workflow code existed anywhere, and the frontend had only an honest `IntegrationPending` placeholder naming the intended node vocabulary (Agent step / Conditional branch / Human approval / Parallel fan-out). This repo's shipped `docs/releases/phase-10-go-no-go.md` used "Phase 10" for a different, already-shipped body of work (marketplace/dev-platform) that actually matches `docs/roadmap.md`'s later phases; `docs/roadmap.md` is the canonical source of truth for what "Phase 10" means going forward, and no already-shipped doc is renamed.
+
+Three findings shaped this phase's design, each forcing a decision recorded here:
+
+**Finding 1 — Phase 9's execution primitives are already the right delegation target.** `run_agent()` (`orchestration_service/application/run_agent.py`) and `execute_team()` (`.../execute_team.py`) are plain async application-layer functions with no FastAPI imports, already called directly by HTTP routers. The worker's actual topology dispatch (SDK `Agent`/`Runner`) lives only in `apps/worker/src/agentverse_worker/jobs/agent_run_job.py` / `team_session_job.py` / `teams/topologies.py`. A workflow engine that reimplements any of this — rather than calling it — duplicates business logic (Rule 3).
+
+**Finding 2 — a per-resource RBAC grant system already exists and is directly reusable for workflow sharing at zero schema cost.** `ResourcePermission` (`auth_service`) takes a free-text `resource_type: str` (`Field(min_length=1, max_length=50)`, no closed enum) — `resource_type="workflow"` works with no backend change, and `apps/web/components/settings/resource-permissions-panel.tsx` already provides a working generic grant/revoke UI for it. No acceptance criterion requires non-member/unauthenticated access to a workflow, so a token-based public share-link system is not built — that would be exactly the speculative complexity Rule 10 forbids.
+
+**Finding 3 — two genuinely new capabilities have zero precedent in this codebase.** Real-time WebSocket collaboration (repo-wide grep found one hit, in a README's future-tense sentence) and hybrid semantic+keyword marketplace search (listings had no embedding column; `ChunkSearchPort` is hard workspace-scoped by design and cannot be reused verbatim for a cross-tenant published-listings collection). Both are built new below, following existing shapes rather than inventing new ones from nothing.
+
+## Decision
+
+### Workflow nodes call Phase 9's job handlers directly, in-process — never a second execution system
+
+`workflow_node_job.py`'s `agent_step`/`team_step` dispatch calls `handle_agent_run_job(...)`/`handle_team_session_job(...)` directly, in-process, awaiting the result — the literal same function object the queue calls for a standalone run, invoked synchronously instead of via a second queue hop. This is the strongest available form of "delegate, never reimplement": there is no parallel topology-dispatch code to drift out of sync with Phase 9. Durability comes from the `agent_runs`/`team_sessions` row itself, not from anything held in worker memory — if the workflow job crashes after the sub-run completed but before advancing the DAG, redelivery finds the terminal row (via the same `_TERMINAL_STATUSES` idempotency guard `team_session_job.py` already uses) and skips straight to advancing, never double-executing the sub-run.
+
+`human_approval` nodes pause by writing `workflow_node_runs.status = paused_for_approval` and `workflow_runs.status = paused` and then simply not enqueuing further work. No scheduler polls for approvals; the durable pause is Postgres row state alone, so it survives a worker restart by construction — the same principle already proven by `webhook_deliveries`' state machine in `apps/worker/src/agentverse_worker/webhooks/drainer.py`. The resolve route (`POST .../nodes/{node_id}/resolve`) **is** the resume mechanism: on approval it enqueues the next node(s) exactly like a normal terminal success, row-write-then-enqueue, same ordering discipline used everywhere else in this codebase.
+
+Conditional branching and parallel fan-out are plain application-layer logic (evaluate `branch_order`-ordered edge conditions against the triggering node's output; enqueue every outgoing edge concurrently, respectively) — no expression language, matching the KISS default of "the simplest topology the task needs."
+
+### No workflow-run SSE stream in this phase's cut
+
+DAG nodes complete on the order of seconds-to-minutes, not token-by-token — per-node polling (`GET .../runs/{run_id}/nodes`) satisfies the acceptance criteria without building a second streaming mechanism alongside the existing SSE run-stream. This is a deliberate scope line, not an oversight: revisit only if a future requirement needs sub-second node-status latency.
+
+### WebSocket collaboration state is Redis pub/sub, not in-process
+
+The roadmap explicitly flagged this as an open question. Decided in favor of Redis because it is the *proven* mechanism already carrying SSE fan-out across multiple API instances; extending it to a new `workflow:{workflow_version_id}:collab` channel is not a novel risk, whereas in-process state would silently break the moment there is more than one API instance (CLAUDE.md §5: every stateless hot-path component runs ≥2 instances). `run_relay_loop` (`orchestration_service/application/workflow_collab_relay.py`) is deliberately decoupled from the FastAPI/Starlette WebSocket transport behind a small `WebSocketLike` Protocol, so it can be unit-tested against a fake socket plus real Redis rather than requiring a live WS handshake for every test.
+
+Collaboration scope is presence + node-position/edge broadcast, not full operational-transform text co-editing of node configs. Conflict resolution is **last-write-wins per node position/edge**, documented here rather than building CRDT/OT machinery no requirement asked for — this satisfies the acceptance criterion ("changes propagate in real time, no lost updates under a documented conflict-resolution rule") with the simplest rule that is actually defensible for drag/drop canvas state.
+
+### WebSocket auth: a short-lived, single-use collab ticket
+
+Native `WebSocket`, like `EventSource`, cannot set custom headers, and the browser never holds the raw Bearer JWT (it lives only server-side; SSE solves this via a same-origin Next.js proxy route that resolves the session cookie to a token). That proxy trick does not extend to a long-lived bidirectional socket. Resolution: `POST .../collab-ticket` (`require_viewer`, authenticated REST, called from a Next.js Server Action reusing the same cookie→Bearer resolution step the SSE proxy already does) mints a random opaque token and stores `{user_id, workspace_id, workflow_id, role}` in Redis with a ~30s TTL. The browser then connects directly to the API's public WS origin with `?ticket=`; the FastAPI WS handshake validates the `Origin` header against configured allowed frontend origins, then validates and burns the ticket (single-use, deleted on first handshake) — **before** `accept()`. An invalid, expired, or already-burned ticket is rejected pre-accept, never leaking a live socket to an unauthenticated caller.
+
+### Hybrid marketplace search is a new, parallel pipeline — not a reuse of RAG's port
+
+`ChunkSearchPort` is hard workspace-scoped by design (every implementation is required to filter by `workspace_id`) — the exact opposite of a cross-tenant published-listings collection, so it is not reused. `hybrid_marketplace_search.py` copies the *shape* of `retrieval/pipeline.py`'s rewrite → dual-arm-retrieve → fuse pattern with lean, listing-specific types (`SearchMatch`, already the shared cross-context search-result value type, reused directly as the fusion type rather than inventing a `RetrievedListing`), not RAG's heavier token-budget/citation-assembly machinery — a marketplace search result is a catalog card, not an assembled context string, and that machinery has no analogue here.
+
+Fusion is Reciprocal Rank Fusion (`score = Σ 1/(60 + rank)` per arm, standard published constant, not hand-tuned absent a labeled eval set) over each arm's *rank position*, not raw score — cosine similarity and `ts_rank_cd` are not on comparable scales, and normalizing them would require corpus statistics this module has no principled way to guess. This is the same rationale RAG's own `retrieve.py` gives for the same choice.
+
+**Graceful degradation, not hard failure, is the defining property distinguishing this pipeline from RAG's.** A knowledge-base query that cannot be embedded is a grounding failure worth surfacing hard (`EmbeddingIdentityMismatchError`); a marketplace catalog page that cannot run its vector arm must never go blank — because the embedding backfill has not reached a listing yet, or the embedding provider is briefly unavailable. `hybrid_search()` catches only the shared `EmbeddingError` taxonomy and falls back to the keyword arm alone; any other exception is not swallowed, since only that taxonomy is a documented degrade-and-continue signal (CLAUDE.md §9). Embedding happens on listing `approve()`/`relist()`, best-effort and non-blocking — an embedding-provider hiccup must never block the moderation action of record.
+
+`MarketplaceService` gained `search`/`embedder` as optional trailing dataclass fields (defaults `None`) rather than required constructor arguments, so every pre-existing test call site continues to work unchanged — a non-breaking extension, not a rewrite of the service's construction contract.
+
+## Consequences
+
+- `workflow_node_runs` is partitioned by `created_at` from its first migration, matching `agent_run_steps`/`execution_events`' established treatment for the highest-volume table a phase adds.
+- `workflow_nodes.id`/`workflow_edges.id` are caller-supplied (canvas-assigned) rather than server-generated, because an edge must be able to reference a node before the version row exists on the wire — accepted as a deliberate deviation from this repo's usual server-generated-ID default, scoped to this one case.
+- `marketplace_listings.embedding`/`embedding_model`/`embedding_model_version` are nullable columns with a partial HNSW index (`WHERE status = 'published' AND embedding IS NOT NULL`) scoped to the only rows ever actually queried — a listing created before this phase, or before its embedding backfill runs, degrades to keyword-only search automatically rather than requiring a blocking backfill migration.
+- Hybrid search's reported `total` is a candidate-window approximation (bounded by the fixed per-arm candidate limit), not a true `COUNT(*)` — standard, expected behavior for ranked search UX, called out explicitly here so it does not read as an oversight later.
+- No new service, datastore, or cross-service dependency was introduced: workflow tables live in `orchestration_service`'s existing schema, collaboration state lives in the existing Redis instance, and marketplace embeddings live in `marketplace_service`'s existing schema.
+
+## Alternatives considered and rejected
+
+- **A second job queue for `workflow_node`, separate from the existing agent-run/team-session queue.** Rejected: `apps/worker/src/agentverse_worker/queue/factory.py` already dispatches by `job_type` on one queue; a second queue would duplicate backpressure/retry/DLQ machinery for no isolation benefit this phase's scale requires.
+- **A workflow-run SSE stream, mirroring the agent-run stream.** Rejected per the scope line above — DAG node granularity does not need token-level streaming, and building it would be a redundant mechanism where polling already satisfies the acceptance criteria.
+- **In-process (non-Redis) WebSocket collaboration state.** Rejected: breaks silently the moment the API runs more than one instance, violating CLAUDE.md §5's "no single point of failure in the request-serving path."
+- **CRDT/operational-transform for node-config co-editing.** Rejected: no acceptance criterion asks for concurrent text co-editing of a single node's config, only real-time position/edge sync — last-write-wins is the KISS-correct rule for that narrower scope.
+- **A token-based public share-link system for workflows.** Rejected: no acceptance criterion requires non-member/unauthenticated access; `ResourcePermission` already satisfies same-workspace co-editing sharing at zero new schema cost.
+- **Reusing `ChunkSearchPort` for marketplace search, with `workspace_id` made optional.** Rejected: would weaken a Protocol whose entire contract is "every implementation filters by `workspace_id`" for every one of its existing (correctly tenant-scoped) callers, just to accommodate one caller that structurally must not filter by it.

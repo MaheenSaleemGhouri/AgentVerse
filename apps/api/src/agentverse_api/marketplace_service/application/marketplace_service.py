@@ -15,9 +15,13 @@ writes those columns.
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 
+from agentverse_shared.embeddings.port import EmbeddingError, EmbeddingProvider
+
+from agentverse_api.marketplace_service.application.hybrid_marketplace_search import hybrid_search
 from agentverse_api.marketplace_service.domain.listing import (
     Listing,
     ListingKind,
@@ -33,6 +37,8 @@ from agentverse_api.marketplace_service.domain.ports import (
     Category,
     CategoryRepository,
     ListingRepository,
+    ListingSearchFilters,
+    ListingSearchPort,
     ListingVersion,
     ListingVersionRepository,
     ReviewRepository,
@@ -47,6 +53,8 @@ from agentverse_api.marketplace_service.domain.review import (
     recompute_from,
     validate_rating,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ListingNotFoundError(Exception):
@@ -122,6 +130,14 @@ class MarketplaceService:
     versions: ListingVersionRepository
     reviews: ReviewRepository
     categories: CategoryRepository
+    #: Hybrid search's two collaborators. Both optional and both trail
+    #: the required fields precisely so every existing call site (tests
+    #: included) that only cares about publishing/browsing keeps working
+    #: unchanged — hybrid ranking activates only when both are wired,
+    #: and `browse` falls back to its original keyword-only path
+    #: otherwise (see `browse` and `_maybe_embed` below).
+    search: ListingSearchPort | None = None
+    embedder: EmbeddingProvider | None = None
 
     # ---- catalog (public) --------------------------------------------
 
@@ -144,7 +160,32 @@ class MarketplaceService:
         library, `False` is community listings only, `None` is the whole
         catalog. A bool could not express "everything", which is what a
         catalog page wants by default.
+
+        A non-empty `query` runs through hybrid (semantic + keyword)
+        search when this service was wired with a `search` port and an
+        `embedder` (`get_marketplace_service`); otherwise — and for any
+        request with no `query` at all — this is the original
+        keyword-only/no-query path, byte-for-byte. `sort` is ignored on
+        the hybrid path: once someone has typed a search, relevance is
+        the sort they asked for, and re-sorting the results of a search
+        by popularity would bury the best match beneath the most
+        installed one.
         """
+        limit = min(max(limit, 1), 100)
+        offset = max(offset, 0)
+        if query and self.search is not None and self.embedder is not None:
+            return await self._hybrid_browse(
+                query=query,
+                filters=ListingSearchFilters(
+                    category_slug=category_slug,
+                    kind=kind,
+                    featured_only=featured_only,
+                    free_only=free_only,
+                    official_only=official_only,
+                ),
+                limit=limit,
+                offset=offset,
+            )
         return await self.listings.browse(
             category_slug=category_slug,
             kind=kind,
@@ -153,9 +194,30 @@ class MarketplaceService:
             free_only=free_only,
             official_only=official_only,
             sort=sort,
-            limit=min(max(limit, 1), 100),
-            offset=max(offset, 0),
+            limit=limit,
+            offset=offset,
         )
+
+    async def _hybrid_browse(
+        self, *, query: str, filters: ListingSearchFilters, limit: int, offset: int
+    ) -> tuple[list[Listing], int]:
+        # Narrows for mypy — the caller (`browse`) already checked both.
+        assert self.search is not None
+        assert self.embedder is not None
+        fused = await hybrid_search(
+            query=query, filters=filters, search=self.search, embedder=self.embedder
+        )
+        page = fused[offset : offset + limit]
+        by_slug = {listing.slug: listing for listing in await self.listings.get_by_slugs(
+            [match.id for match in page]
+        )}
+        ordered = [by_slug[match.id] for match in page if match.id in by_slug]
+        # The count of ranked candidates actually available, not a true
+        # `COUNT(*)` of every matching row in the catalog — an inherent
+        # property of a ranked, capped fusion rather than a filtered SQL
+        # WHERE, and standard for ranked search UX (a result count past
+        # the first page of a search is rarely exact anywhere).
+        return ordered, len(fused)
 
     async def list_categories(self) -> list[Category]:
         return await self.categories.list_active()
@@ -325,7 +387,11 @@ class MarketplaceService:
     async def relist(self, *, slug: str, actor_workspace_id: str) -> Listing:
         listing = await self._owned(slug=slug, actor_workspace_id=actor_workspace_id)
         assert_transition(current=listing.status, target=ListingStatus.PUBLISHED)
-        return await self.listings.set_status(listing_id=listing.id, status=ListingStatus.PUBLISHED)
+        republished = await self.listings.set_status(
+            listing_id=listing.id, status=ListingStatus.PUBLISHED
+        )
+        await self._maybe_embed(republished)
+        return republished
 
     async def list_mine(self, *, publisher_workspace_id: str, limit: int = 50) -> list[Listing]:
         return await self.listings.list_for_publisher(
@@ -344,7 +410,11 @@ class MarketplaceService:
         """
         listing = await self._require(listing_id)
         assert_transition(current=listing.status, target=ListingStatus.PUBLISHED)
-        return await self.listings.set_status(listing_id=listing.id, status=ListingStatus.PUBLISHED)
+        published = await self.listings.set_status(
+            listing_id=listing.id, status=ListingStatus.PUBLISHED
+        )
+        await self._maybe_embed(published)
+        return published
 
     async def reject(self, *, listing_id: str, note: str) -> Listing:
         """A rejection carries its reason. A publisher told "rejected"
@@ -441,6 +511,32 @@ class MarketplaceService:
         return fresh
 
     # ---- helpers -----------------------------------------------------
+
+    async def _maybe_embed(self, listing: Listing) -> None:
+        """Best-effort: embeds a just-(re)published listing for hybrid
+        search. No-ops if this service was not wired with an embedder
+        (`browse` then simply never takes the hybrid path either).
+
+        Failures here are logged, never raised. Publishing/relisting is
+        the moderation-authority action of record; a transient
+        embedding-provider outage must not block it, and would otherwise
+        turn a search-quality concern into a publishing incident.
+        """
+        if self.embedder is None:
+            return
+        try:
+            embedded = await self.embedder.embed(
+                [f"{listing.title}\n\n{listing.summary}\n\n{listing.description}"]
+            )
+        except EmbeddingError:
+            logger.warning("marketplace listing embedding failed", extra={"listing_id": listing.id})
+            return
+        await self.listings.set_embedding(
+            listing_id=listing.id,
+            embedding=embedded.vectors[0],
+            embedding_model=embedded.model,
+            embedding_model_version=embedded.model_version,
+        )
 
     async def _require(self, listing_id: str) -> Listing:
         listing = await self.listings.get_by_id(listing_id)

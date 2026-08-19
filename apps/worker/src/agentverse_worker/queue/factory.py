@@ -21,12 +21,14 @@ from agentverse_worker.jobs.agent_run_job import handle_agent_run_job
 from agentverse_worker.jobs.echo_job import handle_echo_job
 from agentverse_worker.jobs.kb_ingest_job import handle_kb_ingest_job
 from agentverse_worker.jobs.team_session_job import handle_team_session_job
+from agentverse_worker.jobs.workflow_node_job import WorkflowExecutionDeps, handle_workflow_node_job
 from agentverse_worker.knowledge.directory import WorkerKnowledgeBaseDirectory
 from agentverse_worker.knowledge.repository import WorkerKnowledgeRepository
 from agentverse_worker.mcp.repository import WorkerIntegrationRepository
 from agentverse_worker.queue.models import Job, JobHandler, JobResult
 from agentverse_worker.queue.redis_stream_queue import RedisStreamQueue
 from agentverse_worker.teams.repository import WorkerTeamRepository
+from agentverse_worker.workflows.repository import WorkerWorkflowRepository
 
 
 def build_queue(redis_client: Redis, settings: Settings) -> RedisStreamQueue:
@@ -101,11 +103,35 @@ def build_queue(redis_client: Redis, settings: Settings) -> RedisStreamQueue:
                 session_factory=get_session_factory(),
             )
 
+    async def _workflow_node_handler(job: Job) -> JobResult:
+        # A single session for this job's own reads/writes (workflow_
+        # runs/workflow_node_runs, agent_runs, team_sessions) — the
+        # in-process sub-run/sub-session it calls into opens its own
+        # short transactions via `get_session_factory()`, never sharing
+        # this one across an LLM call (CLAUDE.md §7).
+        async with get_session() as session:
+            deps = WorkflowExecutionDeps(
+                settings=settings,
+                redis=redis_client,
+                queue_stream=settings.queue_stream,
+                workflow_repo=WorkerWorkflowRepository(session),
+                agent_repo=WorkerAgentRepository(session),
+                team_repo=WorkerTeamRepository(session),
+                directory=WorkerKnowledgeBaseDirectory(session),
+                search=PostgresChunkSearch(session),
+                embedder=embedder,
+                counter=counter,
+                integrations=WorkerIntegrationRepository(session, vault),
+                session_factory=get_session_factory(),
+            )
+            return await handle_workflow_node_job(job, deps=deps)
+
     handlers: dict[str, JobHandler] = {
         "echo": handle_echo_job,
         "agent_run": _agent_run_handler,
         "kb_ingest": _kb_ingest_handler,
         "team_session": _team_session_handler,
+        "workflow_node": _workflow_node_handler,
     }
 
     return RedisStreamQueue(

@@ -35,6 +35,18 @@ run_step_type_enum = postgresql.ENUM(
     create_type=False,
 )
 
+#: Lean read-only reflection — just what `get_published_version_id`
+#: needs. `teams/tables.py` defines its own equivalent for the same
+#: reason: each module owns just the columns its own queries touch,
+#: not a single shared "the agents table" object (CLAUDE.md §5).
+agents_table = Table(
+    "agents",
+    metadata,
+    Column("id", UUID(as_uuid=False), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=False)),
+    Column("published_version_id", UUID(as_uuid=False)),
+)
+
 agent_versions_table = Table(
     "agent_versions",
     metadata,

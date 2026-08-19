@@ -26,16 +26,29 @@ from agentverse_api.marketplace_service.infrastructure.repositories import (
 from agentverse_api.orchestration_service.infrastructure.repositories import (
     SqlAgentRepository,
 )
+from agentverse_api.orchestration_service.interface.dependencies.services import (
+    get_embedding_provider,
+)
 
 
 def get_marketplace_service(
     session: AsyncSession = Depends(get_db_session),
 ) -> MarketplaceService:
+    # `SqlListingRepository` implements both `ListingRepository` and
+    # `ListingSearchPort` — one table, one adapter, structurally
+    # satisfying two Protocols rather than two objects that would need
+    # to agree on the same session. Reused via the shared embedding
+    # provider (Rule 16): the same adapter apps/worker uses for
+    # knowledge-base ingestion, so a listing and a KB chunk embed into
+    # the same vector space.
+    listings = SqlListingRepository(session)
     return MarketplaceService(
-        listings=SqlListingRepository(session),
+        listings=listings,
         versions=SqlListingVersionRepository(session),
         reviews=SqlReviewRepository(session),
         categories=SqlCategoryRepository(session),
+        search=listings,
+        embedder=get_embedding_provider(),
     )
 
 

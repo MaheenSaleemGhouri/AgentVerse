@@ -89,6 +89,8 @@ class TeamSessionRecord:
     team_id: str
     status: str
     input: dict[str, Any]
+    output: str | None = None
+    cost_micro_usd: int | None = None
 
 
 class TeamRepositoryProtocol(Protocol):
@@ -99,6 +101,16 @@ class TeamRepositoryProtocol(Protocol):
 
     async def get_session(self, session_id: str) -> TeamSessionRecord | None: ...
     async def get_team(self, team_id: str, *, workspace_id: str) -> TeamRecord | None: ...
+    async def create_session(
+        self, *, workspace_id: str, team_id: str, input: dict[str, Any]
+    ) -> TeamSessionRecord:
+        """Used only by the workflow engine (`workflow_node_job.py`) to
+        create a sub-session for a `team_step` node — mirrors `execute_
+        team.py`'s row shape, agreeing only on the schema with the
+        API-side use case, never importing it (CLAUDE.md §5).
+        """
+        ...
+
     async def update_session_status(
         self,
         *,
@@ -162,6 +174,29 @@ class WorkerTeamRepository:
             team_id=row["team_id"],
             status=row["status"],
             input=row["input"],
+            output=row["output"],
+            cost_micro_usd=row["cost_micro_usd"],
+        )
+
+    async def create_session(
+        self, *, workspace_id: str, team_id: str, input: dict[str, Any]
+    ) -> TeamSessionRecord:
+        session_id = str(uuid.uuid4())
+        await self._session.execute(
+            team_sessions_table.insert().values(
+                id=session_id,
+                workspace_id=workspace_id,
+                team_id=team_id,
+                status="queued",
+                input=input,
+                total_turns=0,
+                idempotency_key=None,
+                created_at=datetime.now(UTC),
+            )
+        )
+        await self._session.commit()
+        return TeamSessionRecord(
+            id=session_id, workspace_id=workspace_id, team_id=team_id, status="queued", input=input
         )
 
     async def get_team(self, team_id: str, *, workspace_id: str) -> TeamRecord | None:

@@ -5,6 +5,7 @@ repository, just the handful of operations `agent_run_job.py` needs.
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Protocol
@@ -16,6 +17,7 @@ from agentverse_worker.agents.tables import (
     agent_run_steps_table,
     agent_runs_table,
     agent_versions_table,
+    agents_table,
 )
 
 
@@ -27,6 +29,7 @@ class RunRecord:
     agent_version_id: str
     status: str
     input: dict[str, Any]
+    cost_micro_usd: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +47,39 @@ class AgentRepositoryProtocol(Protocol):
 
     async def get_run(self, run_id: str) -> RunRecord | None: ...
     async def get_version(self, version_id: str) -> VersionRecord | None: ...
+    async def create_run(
+        self,
+        *,
+        workspace_id: str,
+        agent_id: str,
+        agent_version_id: str,
+        input: dict[str, Any],
+    ) -> RunRecord:
+        """Used only by the workflow engine (`workflow_node_job.py`) to
+        create a sub-run for an `agent_step` node — the API-side
+        submission use case (`run_agent.py`) is a separate deployable
+        service and cannot be imported here (CLAUDE.md §5); this mirrors
+        `SqlAgentRunRepository.create_run`'s row shape exactly, agreeing
+        only on the schema, not the code.
+        """
+        ...
+
+    async def get_final_output(self, run_id: str) -> str | None:
+        """The text of the last `llm_call` step — `agent_runs` carries no
+        `output` column of its own (unlike `team_sessions`), so a
+        workflow node needs this to populate its own output for
+        downstream input templating / conditional branching.
+        """
+        ...
+
+    async def get_published_version_id(self, agent_id: str) -> str | None:
+        """Used only by the workflow engine: an `agent_step` node targets
+        an `agent_id`, resolved to its currently published version at
+        execution time — the same rule `run_agent.py`'s `_resolve_
+        runnable_version` applies on the API side.
+        """
+        ...
+
     async def update_run_status(
         self,
         *,
@@ -83,6 +119,7 @@ class WorkerAgentRepository:
             agent_version_id=row["agent_version_id"],
             status=row["status"],
             input=row["input"],
+            cost_micro_usd=row["cost_micro_usd"],
         )
 
     async def get_version(self, version_id: str) -> VersionRecord | None:
@@ -93,6 +130,61 @@ class WorkerAgentRepository:
         if row is None:
             return None
         return VersionRecord(id=row["id"], agent_id=row["agent_id"], config=row["config"])
+
+    async def create_run(
+        self,
+        *,
+        workspace_id: str,
+        agent_id: str,
+        agent_version_id: str,
+        input: dict[str, Any],
+    ) -> RunRecord:
+        run_id = str(uuid.uuid4())
+        await self._session.execute(
+            agent_runs_table.insert().values(
+                id=run_id,
+                workspace_id=workspace_id,
+                agent_id=agent_id,
+                agent_version_id=agent_version_id,
+                status="queued",
+                input=input,
+                idempotency_key=None,
+                created_at=datetime.now(UTC),
+            )
+        )
+        await self._session.commit()
+        return RunRecord(
+            id=run_id,
+            workspace_id=workspace_id,
+            agent_id=agent_id,
+            agent_version_id=agent_version_id,
+            status="queued",
+            input=input,
+        )
+
+    async def get_final_output(self, run_id: str) -> str | None:
+        result = await self._session.execute(
+            select(agent_run_steps_table.c.payload)
+            .where(
+                agent_run_steps_table.c.run_id == run_id,
+                agent_run_steps_table.c.step_type == "llm_call",
+            )
+            .order_by(agent_run_steps_table.c.sequence.desc())
+            .limit(1)
+        )
+        row = result.one_or_none()
+        if row is None:
+            return None
+        payload: dict[str, Any] = row[0]
+        text = payload.get("text")
+        return str(text) if text is not None else None
+
+    async def get_published_version_id(self, agent_id: str) -> str | None:
+        result = await self._session.execute(
+            select(agents_table.c.published_version_id).where(agents_table.c.id == agent_id)
+        )
+        row = result.one_or_none()
+        return str(row[0]) if row is not None and row[0] is not None else None
 
     async def update_run_status(
         self,
