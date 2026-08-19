@@ -1,6 +1,8 @@
 """ASGI entrypoint: `uvicorn agentverse_api.main:app`."""
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -23,6 +25,7 @@ from agentverse_api.auth_service.interface.routes.invitations import (
 from agentverse_api.auth_service.interface.routes.ip_allowlist import (
     router as ip_allowlist_router,
 )
+from agentverse_api.auth_service.interface.routes.mcp_clients import router as mcp_clients_router
 from agentverse_api.auth_service.interface.routes.organization_settings import (
     router as organization_settings_router,
 )
@@ -94,6 +97,10 @@ from agentverse_api.marketplace_service.interface.routes.marketplace import (
 from agentverse_api.notification_service.interface.routes.notifications import (
     router as notifications_router,
 )
+from agentverse_api.orchestration_service.interface.mcp_server.server import (
+    get_mcp_server,
+    mcp_asgi_app,
+)
 from agentverse_api.orchestration_service.interface.routers.agents import (
     router as agents_router,
 )
@@ -141,6 +148,21 @@ from agentverse_api.webhook_service.interface.routes.webhooks import (
 )
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    del app
+    # AgentVerse's own MCP server (docs/adr/0017) is mounted as a
+    # Starlette sub-app (`/mcp`, below) — a `Mount`ed sub-app's own
+    # `lifespan=` is never triggered automatically by the ASGI protocol
+    # (only the top-level app receives the `"lifespan"` scope), so its
+    # `StreamableHTTPSessionManager` must be entered explicitly here or
+    # every request to `/mcp` would hang with no session manager running.
+    # This is the SDK's own documented pattern for mounting FastMCP into
+    # an existing FastAPI app (see `FastMCP.session_manager`'s docstring).
+    async with get_mcp_server().session_manager.run():
+        yield
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
@@ -162,6 +184,7 @@ def create_app() -> FastAPI:
         title="AgentVerse API",
         version="0.1.0-alpha",
         openapi_url="/openapi.json" if settings.environment != "production" else None,
+        lifespan=_lifespan,
     )
     app.middleware("http")(request_id_middleware)
 
@@ -244,12 +267,28 @@ def create_app() -> FastAPI:
     app.include_router(platform_admin_router)
     app.include_router(metrics_router)
     app.include_router(api_keys_router)
+    app.include_router(mcp_clients_router)
     app.include_router(audit_logs_router)
     app.include_router(growth_router)
     app.include_router(support_tickets_router)
     app.include_router(internal_auth_events_router)
     app.include_router(internal_provider_test_router)
     app.include_router(internal_job_test_router)
+
+    # AgentVerse's own MCP server surface (docs/adr/0017) — a Starlette
+    # sub-app, not an `include_router`, since the MCP SDK owns its own
+    # routing/auth-middleware stack for this path. Mounted at root, not at
+    # `/mcp`: the sub-app already declares its own route at `/mcp`
+    # (`server.py`'s `_build_mcp`), and mounting it under an *additional*
+    # `/mcp` prefix would make a bare `POST /mcp` hit only the mount
+    # boundary — Starlette redirects that case to add a trailing slash
+    # (307 to `/mcp/`), which breaks real MCP clients that POST to `/mcp`
+    # with no trailing slash and don't follow redirects on a POST. Not
+    # workspace-prefixed: the workspace is resolved from the presented
+    # `mcp_client` credential (`mcp_server/auth.py`), the same way
+    # `api_keys` are already workspace-scoped at issuance.
+    app.mount("/", mcp_asgi_app())
+
     return app
 
 

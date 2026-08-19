@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from agentverse_api.auth_service.application.audit_service import AuditService
+from agentverse_api.auth_service.domain.api_key_kind import ApiKeyKind
 from agentverse_api.auth_service.domain.api_key_scope import ApiKeyScope
 from agentverse_api.auth_service.domain.entities import ApiKey
 from agentverse_api.auth_service.domain.exceptions import ApiKeyNotFoundError
@@ -47,6 +48,7 @@ class ApiKeyService:
         scope: ApiKeyScope = ApiKeyScope.FULL,
         tier: str = "standard",
         expires_in_days: int | None = None,
+        kind: ApiKeyKind = ApiKeyKind.USER_API_KEY,
     ) -> IssuedApiKey:
         secret = secrets.token_urlsafe(_SECRET_BYTES)
         plaintext_key = f"{_KEY_PREFIX}{secret}"
@@ -68,9 +70,10 @@ class ApiKeyService:
             scope=scope,
             tier=tier,
             expires_at=expires_at,
+            kind=kind,
         )
         await self.audit.record(
-            action="api_key.issued",
+            action="api_key.issued" if kind is ApiKeyKind.USER_API_KEY else "mcp_client.issued",
             outcome="success",
             workspace_id=workspace_id,
             actor_user_id=created_by_user_id,
@@ -79,8 +82,10 @@ class ApiKeyService:
         )
         return IssuedApiKey(entity=entity, plaintext_key=plaintext_key)
 
-    async def list_api_keys(self, workspace_id: str) -> list[ApiKey]:
-        return await self.api_keys.list_api_keys(workspace_id)
+    async def list_api_keys(
+        self, workspace_id: str, *, kind: ApiKeyKind | None = None
+    ) -> list[ApiKey]:
+        return await self.api_keys.list_api_keys(workspace_id, kind=kind)
 
     async def authenticate(self, plaintext_key: str) -> ApiKey | None:
         """Resolves a presented bearer credential to its key row.
@@ -109,8 +114,9 @@ class ApiKeyService:
             raise ApiKeyNotFoundError(api_key_id)
 
         await self.api_keys.revoke_api_key(api_key_id)
+        is_user_key = key.kind is ApiKeyKind.USER_API_KEY
         await self.audit.record(
-            action="api_key.revoked",
+            action="api_key.revoked" if is_user_key else "mcp_client.revoked",
             outcome="success",
             workspace_id=workspace_id,
             actor_user_id=actor_user_id,
@@ -156,6 +162,7 @@ class ApiKeyService:
             tier=old.tier,
             rotated_from_id=old.id,
             expires_at=new_expires_at,
+            kind=old.kind,
         )
         await self.audit.record(
             action="api_key.rotated",

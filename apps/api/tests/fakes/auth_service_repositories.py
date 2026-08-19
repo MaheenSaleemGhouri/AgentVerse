@@ -10,6 +10,7 @@ import uuid
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
 
+from agentverse_api.auth_service.domain.api_key_kind import ApiKeyKind
 from agentverse_api.auth_service.domain.api_key_scope import ApiKeyScope
 from agentverse_api.auth_service.domain.entities import (
     ApiKey,
@@ -303,6 +304,7 @@ class FakeApiKeyRepository:
         tier: str = "standard",
         rotated_from_id: str | None = None,
         expires_at: datetime | None = None,
+        kind: ApiKeyKind = ApiKeyKind.USER_API_KEY,
     ) -> ApiKey:
         key = ApiKey(
             id=str(uuid.uuid4()),
@@ -319,12 +321,19 @@ class FakeApiKeyRepository:
             rotated_from_id=rotated_from_id,
             expires_at=expires_at,
             use_count=0,
+            kind=kind,
         )
         self.keys[key.id] = key
         return key
 
-    async def list_api_keys(self, workspace_id: str) -> list[ApiKey]:
-        return [key for key in self.keys.values() if key.workspace_id == workspace_id]
+    async def list_api_keys(
+        self, workspace_id: str, *, kind: ApiKeyKind | None = None
+    ) -> list[ApiKey]:
+        return [
+            key
+            for key in self.keys.values()
+            if key.workspace_id == workspace_id and (kind is None or key.kind == kind)
+        ]
 
     async def get_api_key(self, api_key_id: str) -> ApiKey | None:
         return self.keys.get(api_key_id)

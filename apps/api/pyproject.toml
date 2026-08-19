@@ -22,6 +22,11 @@ dependencies = [
     "agentverse-shared",
     "stripe>=12,<13",
     "anthropic>=0.40,<1",
+    # AgentVerse's own MCP server surface (Phase 12, ADR-0017) — the
+    # official, vetted MCP SDK's server primitives, the inverse
+    # direction from apps/worker's client-side MCP consumption (which
+    # goes through the OpenAI Agents SDK's own MCP client instead).
+    "mcp>=1.9,<2",
 ]
 
 [dependency-groups]

@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Protocol
 
+from agentverse_api.auth_service.domain.api_key_kind import ApiKeyKind
 from agentverse_api.auth_service.domain.api_key_scope import ApiKeyScope
 from agentverse_api.auth_service.domain.entities import (
     ApiKey,
@@ -191,9 +192,12 @@ class ApiKeyRepository(Protocol):
         tier: str = "standard",
         rotated_from_id: str | None = None,
         expires_at: datetime | None = None,
+        kind: ApiKeyKind = ApiKeyKind.USER_API_KEY,
     ) -> ApiKey: ...
 
-    async def list_api_keys(self, workspace_id: str) -> list[ApiKey]: ...
+    async def list_api_keys(
+        self, workspace_id: str, *, kind: ApiKeyKind | None = None
+    ) -> list[ApiKey]: ...
 
     async def count_non_expiring(self, workspace_id: str) -> int:
         """Active keys with no expiry — an input to the security score."""

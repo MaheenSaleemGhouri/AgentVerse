@@ -11,6 +11,7 @@ from sqlalchemy import or_ as sa_or
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agentverse_api.auth_service.domain.api_key_kind import ApiKeyKind
 from agentverse_api.auth_service.domain.api_key_scope import ApiKeyScope
 from agentverse_api.auth_service.domain.entities import (
     ApiKey as ApiKeyEntity,
@@ -216,6 +217,7 @@ def _to_api_key(row: ApiKey) -> ApiKeyEntity:
         rotated_from_id=row.rotated_from_id,
         expires_at=row.expires_at,
         use_count=row.use_count,
+        kind=ApiKeyKind(row.kind),
     )
 
 
@@ -1016,6 +1018,7 @@ class SqlApiKeyRepository:
         tier: str = "standard",
         rotated_from_id: str | None = None,
         expires_at: datetime | None = None,
+        kind: ApiKeyKind = ApiKeyKind.USER_API_KEY,
     ) -> ApiKeyEntity:
         row = ApiKey(
             workspace_id=workspace_id,
@@ -1028,13 +1031,18 @@ class SqlApiKeyRepository:
             tier=tier,
             rotated_from_id=rotated_from_id,
             expires_at=expires_at,
+            kind=kind.value,
         )
         self._session.add(row)
         await self._session.flush()
         return _to_api_key(row)
 
-    async def list_api_keys(self, workspace_id: str) -> list[ApiKeyEntity]:
+    async def list_api_keys(
+        self, workspace_id: str, *, kind: ApiKeyKind | None = None
+    ) -> list[ApiKeyEntity]:
         stmt = select(ApiKey).where(ApiKey.workspace_id == workspace_id)
+        if kind is not None:
+            stmt = stmt.where(ApiKey.kind == kind.value)
         result = await self._session.execute(stmt)
         return [_to_api_key(row) for row in result.scalars().all()]
 

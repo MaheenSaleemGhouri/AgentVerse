@@ -289,6 +289,11 @@ class ApiKey(Base):
     #: `last_used_at`. A count answers "is this key still in use and how
     #: heavily", which a single timestamp cannot.
     use_count: Mapped[int] = mapped_column(server_default="0", default=0)
+    #: `ApiKeyKind` — what surface this credential authenticates against
+    #: (`/api/v1/*` vs `/mcp`, Phase 12/ADR-0017). Plain TEXT for the
+    #: same reason `scope` above is: app-validated, no ENUM migration
+    #: needed to add a future kind.
+    kind: Mapped[str] = mapped_column(Text, server_default="user_api_key")
 
 
 class WorkspaceSettings(Base):

@@ -1,0 +1,281 @@
+"""AgentVerse's own MCP server surface (docs/adr/0017), tested through
+the real MCP protocol — a real `mcp` client (Streamable HTTP transport,
+over an in-process ASGI connection, no separate server process needed)
+against the real FastAPI app, with a real `mcp_client`-kind API key
+minted through the real `/mcp-clients` route. This is the kind of
+transport/auth-wiring correctness a fake would let pass while broken
+(CLAUDE.md §11) — nothing here is exercised anywhere else.
+"""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator, Iterator
+from datetime import UTC, datetime
+from uuid import uuid4
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from agentverse_api.auth_service.infrastructure.models import User
+from agentverse_api.auth_service.interface.dependencies.get_current_identity import (
+    get_current_identity,
+    get_current_identity_optional,
+)
+from agentverse_api.infrastructure.db import get_db_session
+from agentverse_api.main import create_app
+from agentverse_api.orchestration_service.interface.mcp_server.server import get_mcp_server
+
+pytestmark = pytest.mark.integration
+
+
+@pytest.fixture(autouse=True)
+def _fresh_mcp_server() -> Iterator[None]:
+    """`get_mcp_server()` is process-lifetime `@lru_cache`d (one real
+    session manager for the app's whole life) — correct in production,
+    where its `.run()` is entered exactly once by the app lifespan, but
+    `StreamableHTTPSessionManager.run()` raises if entered a second time
+    on the same instance, which every test after the first in this file
+    would do against the cached singleton. Clearing the cache per test
+    gives each test its own instance, matching how each is really a
+    fresh process boundary in production (a new deploy), not a gap in
+    the app's actual once-per-process contract.
+    """
+    get_mcp_server.cache_clear()
+    yield
+    get_mcp_server.cache_clear()
+
+
+async def _make_user(session: AsyncSession, user_id: str) -> None:
+    session.add(
+        User(
+            id=user_id,
+            name=user_id,
+            email=f"{user_id}@example.com",
+            email_verified=False,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+    )
+    await session.commit()
+
+
+@pytest.fixture
+async def rest_client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
+    """A real authenticated REST client, for setup only — creating the
+    workspace/agent/credential the MCP protocol test below then drives.
+    """
+    user_id = f"mcp-e2e-owner-{uuid4()}"
+    await _make_user(db_session, user_id)
+
+    async def db_session_override() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    app = create_app()
+    app.dependency_overrides[get_db_session] = db_session_override
+    app.dependency_overrides[get_current_identity] = lambda: user_id
+    app.dependency_overrides[get_current_identity_optional] = lambda: user_id
+    client = AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+    yield client
+    await client.aclose()
+
+
+async def _setup_workspace_agent_and_mcp_credential(
+    rest_client: AsyncClient, db_session: AsyncSession
+) -> tuple[str, str, str]:
+    """Returns (workspace_id, agent_id, mcp_client_plaintext_key).
+
+    Commits `db_session` before returning: `rest_client`'s routes write
+    through that shared, DI-overridden session (never committed by the
+    override itself, unlike the real per-request `get_db_session`), but
+    `ApiKeyTokenVerifier` (`mcp_server/auth.py`) deliberately opens its
+    *own* connection via the real `get_session_factory()` — it is not
+    itself FastAPI-DI-wired, since it is built once at app-construction
+    time, not resolved per request. Without an explicit commit here, that
+    separate connection cannot see the credential this just issued.
+    """
+    create_ws = await rest_client.post("/api/v1/workspaces", json={"name": "MCP E2E"})
+    assert create_ws.status_code == 201
+    workspace_id = create_ws.json()["id"]
+
+    create_agent = await rest_client.post(
+        f"/api/v1/workspaces/{workspace_id}/agents",
+        json={
+            "name": "Greeter",
+            "description": None,
+            "model": "gpt-4o-mini",
+            "system_instructions": "Say hello.",
+            "temperature": None,
+            "max_output_tokens": None,
+            "tools": [],
+            "knowledge_base_ids": [],
+        },
+    )
+    assert create_agent.status_code == 201, create_agent.text
+    agent_id = create_agent.json()["agent"]["id"]
+
+    publish = await rest_client.post(f"/api/v1/workspaces/{workspace_id}/agents/{agent_id}/publish")
+    assert publish.status_code == 200, publish.text
+
+    issue_key = await rest_client.post(
+        f"/api/v1/workspaces/{workspace_id}/mcp-clients", json={"name": "test client"}
+    )
+    assert issue_key.status_code == 201, issue_key.text
+    await db_session.commit()
+    return workspace_id, agent_id, issue_key.json()["key"]
+
+
+async def test_a_real_mcp_client_can_list_and_run_agents(
+    rest_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    workspace_id, agent_id, mcp_key = await _setup_workspace_agent_and_mcp_credential(
+        rest_client, db_session
+    )
+
+    app = create_app()  # a fresh app object, matching how a real deployment mounts /mcp once
+    async with (  # noqa: SIM117 - the tuple/session nesting reads clearer split
+        get_mcp_server().session_manager.run(),
+        AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://localhost",
+            headers={"Authorization": f"Bearer {mcp_key}"},
+        ) as http_client,
+        streamable_http_client("http://localhost/mcp", http_client=http_client) as (
+            read_stream,
+            write_stream,
+            _get_session_id,
+        ),
+    ):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+
+            tools = await session.list_tools()
+            tool_names = {t.name for t in tools.tools}
+            assert {
+                "list_agents",
+                "get_agent",
+                "run_agent_tool",
+                "get_run_status",
+                "list_workflows",
+                "get_workflow",
+                "run_workflow",
+            } <= tool_names
+
+            listed = await session.call_tool("list_agents", {})
+            assert not listed.isError
+            assert listed.structuredContent is not None
+            agent_ids = {a["id"] for a in listed.structuredContent["result"]}
+            assert agent_id in agent_ids
+
+            fetched = await session.call_tool("get_agent", {"agent_id": agent_id})
+            assert not fetched.isError
+            assert fetched.structuredContent is not None
+            assert fetched.structuredContent["id"] == agent_id
+
+            ran = await session.call_tool(
+                "run_agent_tool", {"agent_id": agent_id, "input": {"prompt": "hi"}}
+            )
+            assert not ran.isError, ran.content
+            assert ran.structuredContent is not None
+            run_id = ran.structuredContent["id"]
+
+            status = await session.call_tool("get_run_status", {"run_id": run_id})
+            assert not status.isError
+            assert status.structuredContent is not None
+            assert status.structuredContent["run_type"] == "agent"
+
+    # The tool calls above wrote real audit_logs rows through the real
+    # AuditService — not a side effect any fake could have faked into
+    # existing.
+    rows = (
+        await db_session.execute(
+            text(
+                "SELECT action, outcome FROM audit_logs "
+                "WHERE workspace_id = :ws AND action LIKE 'mcp_server.%' ORDER BY created_at"
+            ),
+            {"ws": workspace_id},
+        )
+    ).all()
+    assert len(rows) >= 4
+    assert all(r.outcome == "success" for r in rows)
+
+
+async def test_a_user_api_key_is_rejected_by_the_mcp_server(
+    rest_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """`kind='user_api_key'` must never authenticate `/mcp` — the
+    reverse of the ordinary-REST-API rejection already covered in
+    `get_current_workspace` tests.
+    """
+    workspace_id, _agent_id, _mcp_key = await _setup_workspace_agent_and_mcp_credential(
+        rest_client, db_session
+    )
+    issue_user_key = await rest_client.post(
+        f"/api/v1/workspaces/{workspace_id}/api-keys", json={"name": "personal key"}
+    )
+    assert issue_user_key.status_code == 201
+    user_key = issue_user_key.json()["key"]
+    await db_session.commit()
+
+    app = create_app()
+    with pytest.raises(Exception):  # noqa: B017 - the SDK raises a plain McpError/httpx error here
+        async with (
+            get_mcp_server().session_manager.run(),
+            AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://localhost",
+                headers={"Authorization": f"Bearer {user_key}"},
+            ) as http_client,
+            streamable_http_client("http://localhost/mcp", http_client=http_client) as (
+                read_stream,
+                write_stream,
+                _get_session_id,
+            ),
+        ):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+
+
+async def test_a_read_only_scoped_credential_cannot_run_an_agent(
+    rest_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    workspace_id, agent_id, _mcp_key = await _setup_workspace_agent_and_mcp_credential(
+        rest_client, db_session
+    )
+    issue_readonly = await rest_client.post(
+        f"/api/v1/workspaces/{workspace_id}/mcp-clients",
+        json={"name": "readonly client", "scope": "read_only"},
+    )
+    assert issue_readonly.status_code == 201
+    readonly_key = issue_readonly.json()["key"]
+    await db_session.commit()
+
+    app = create_app()
+    async with (  # noqa: SIM117 - the tuple/session nesting reads clearer split
+        get_mcp_server().session_manager.run(),
+        AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://localhost",
+            headers={"Authorization": f"Bearer {readonly_key}"},
+        ) as http_client,
+        streamable_http_client("http://localhost/mcp", http_client=http_client) as (
+            read_stream,
+            write_stream,
+            _get_session_id,
+        ),
+    ):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+
+            # Reads still work.
+            listed = await session.call_tool("list_agents", {})
+            assert not listed.isError
+
+            # A write is refused, not silently downgraded.
+            denied = await session.call_tool(
+                "run_agent_tool", {"agent_id": agent_id, "input": {"prompt": "hi"}}
+            )
+            assert denied.isError

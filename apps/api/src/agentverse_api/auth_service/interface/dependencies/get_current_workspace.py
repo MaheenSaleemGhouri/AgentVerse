@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentverse_api.auth_service.application.api_key_service import ApiKeyService
 from agentverse_api.auth_service.application.audit_service import AuditService
+from agentverse_api.auth_service.domain.api_key_kind import ApiKeyKind
 from agentverse_api.auth_service.domain.api_key_scope import effective_role
 from agentverse_api.auth_service.domain.entities import WorkspaceContext
 from agentverse_api.auth_service.infrastructure.repositories import (
@@ -83,6 +84,14 @@ async def _context_from_api_key(
 
     key = await service.authenticate(token)
     if key is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or revoked API key"
+        )
+
+    if key.kind is not ApiKeyKind.USER_API_KEY:
+        # An MCP-client credential is scoped to `/mcp` only (Phase 12,
+        # ADR-0017) — indistinguishable from an unknown key here, same
+        # as every other rejection on this path (CLAUDE.md §10).
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or revoked API key"
         )

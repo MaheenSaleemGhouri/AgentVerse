@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from agentverse_api.auth_service.domain.api_key_kind import ApiKeyKind
 from agentverse_api.auth_service.domain.api_key_scope import ApiKeyScope
 from agentverse_api.auth_service.domain.invitation_target_type import InvitationTargetType
 from agentverse_api.auth_service.domain.role import Role
@@ -112,6 +113,7 @@ class ApiKey:
     #: `None` means the key never expires.
     expires_at: datetime | None = None
     use_count: int = 0
+    kind: ApiKeyKind = ApiKeyKind.USER_API_KEY
 
     def is_expired(self, *, now: datetime) -> bool:
         return self.expires_at is not None and self.expires_at <= now
