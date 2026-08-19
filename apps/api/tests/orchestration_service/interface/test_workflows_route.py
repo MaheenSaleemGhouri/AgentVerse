@@ -18,10 +18,12 @@ from agentverse_api.auth_service.interface.dependencies.require_role import (
     require_member,
     require_viewer,
 )
+from agentverse_api.auth_service.interface.dependencies.services import get_audit_service
 from agentverse_api.main import create_app
 from agentverse_api.orchestration_service.interface.dependencies.services import (
     get_workflow_repository,
 )
+from tests.fakes.audit_service import FakeAuditService
 from tests.fakes.workflow_repository import FakeWorkflowRepository
 
 WORKSPACE_ID = "ws-1"
@@ -38,6 +40,7 @@ async def harness() -> AsyncIterator[dict[str, Any]]:
     app.dependency_overrides[require_viewer] = lambda: context
     app.dependency_overrides[require_member] = lambda: context
     app.dependency_overrides[get_workflow_repository] = lambda: workflow_repo
+    app.dependency_overrides[get_audit_service] = lambda: FakeAuditService()
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

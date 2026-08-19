@@ -90,10 +90,13 @@ export async function recordSuccess(passwordHash: string): Promise<void> {
 
 /**
  * Increments the failure counter and locks the account once it reaches
- * `MAX_FAILED_ATTEMPTS`. Returns the user id when this attempt caused
- * the lock, so the caller can audit it — `null` otherwise.
+ * `MAX_FAILED_ATTEMPTS`. Returns the user id for every recorded failure
+ * (Phase 12: every failed sign-in is audited, not only the one that
+ * trips the lock) plus whether *this* attempt caused the lock.
  */
-export async function recordFailure(passwordHash: string): Promise<string | null> {
+export async function recordFailure(
+  passwordHash: string
+): Promise<{ userId: string; locked: boolean } | null> {
   try {
     const { rows } = await getPool().query<{ id: string; failed_login_count: number }>(
       `UPDATE users u
@@ -110,10 +113,8 @@ export async function recordFailure(passwordHash: string): Promise<string | null
       [passwordHash, MAX_FAILED_ATTEMPTS, String(LOCK_DURATION_MS)]
     );
     const row = rows[0];
-    if (row && row.failed_login_count >= MAX_FAILED_ATTEMPTS) {
-      return row.id;
-    }
-    return null;
+    if (!row) return null;
+    return { userId: row.id, locked: row.failed_login_count >= MAX_FAILED_ATTEMPTS };
   } catch (error) {
     console.error("account-lock: could not record the failed attempt", error);
     return null;

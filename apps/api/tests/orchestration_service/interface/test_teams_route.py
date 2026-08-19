@@ -22,6 +22,7 @@ from agentverse_api.auth_service.interface.dependencies.require_role import (
     require_member,
     require_viewer,
 )
+from agentverse_api.auth_service.interface.dependencies.services import get_audit_service
 from agentverse_api.main import create_app
 from agentverse_api.orchestration_service.domain.agent_entities import AgentConfig
 from agentverse_api.orchestration_service.domain.team_entities import TeamTopology
@@ -34,6 +35,7 @@ from agentverse_api.orchestration_service.interface.dependencies.services import
     get_lock_factory,
     get_team_repository,
 )
+from tests.fakes.audit_service import FakeAuditService
 from tests.fakes.orchestration_repositories import FakeAgentRepository
 from tests.fakes.team_repository import FakeTeamRepository
 
@@ -72,6 +74,7 @@ async def harness(fake_redis: FakeRedis) -> AsyncIterator[dict[str, Any]]:
     app.dependency_overrides[get_job_queue_producer] = lambda: JobQueueProducer(
         fake_redis, stream=STREAM
     )
+    app.dependency_overrides[get_audit_service] = lambda: FakeAuditService()
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

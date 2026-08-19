@@ -9,11 +9,13 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
+from agentverse_api.auth_service.application.audit_service import AuditService
 from agentverse_api.auth_service.domain.entities import WorkspaceContext
 from agentverse_api.auth_service.interface.dependencies.require_role import (
     require_member,
     require_viewer,
 )
+from agentverse_api.auth_service.interface.dependencies.services import get_audit_service
 from agentverse_api.billing_service.application.quota_service import (
     QuotaExceededError,
     QuotaService,
@@ -73,6 +75,7 @@ async def create_agent_route(
     body: CreateAgentRequest,
     context: WorkspaceContext = Depends(require_member),
     agent_repo: AgentRepository = Depends(get_agent_repository),
+    audit: AuditService = Depends(get_audit_service),
 ) -> CreateAgentResponse:
     config = AgentConfig(
         model=body.model,
@@ -89,6 +92,13 @@ async def create_agent_route(
         created_by_user_id=context.user_id,
         config=config,
         agent_repo=agent_repo,
+    )
+    await audit.record(
+        action="agent.created",
+        outcome="success",
+        workspace_id=context.workspace_id,
+        actor_user_id=context.user_id,
+        target=agent.id,
     )
     return CreateAgentResponse(
         agent=_agent_response(agent),
@@ -154,6 +164,7 @@ async def create_version_route(
     body: UpdateAgentVersionRequest,
     context: WorkspaceContext = Depends(require_member),
     agent_repo: AgentRepository = Depends(get_agent_repository),
+    audit: AuditService = Depends(get_audit_service),
 ) -> AgentVersionResponse:
     agent = await agent_repo.get_agent(workspace_id=context.workspace_id, agent_id=agent_id)
     if agent is None:
@@ -169,6 +180,14 @@ async def create_version_route(
     version = await agent_repo.create_version(
         agent_id=agent_id, config=config, created_by_user_id=context.user_id
     )
+    await audit.record(
+        action="agent.updated",
+        outcome="success",
+        workspace_id=context.workspace_id,
+        actor_user_id=context.user_id,
+        target=agent_id,
+        metadata={"version_number": str(version.version_number)},
+    )
     return _version_response(version)
 
 
@@ -177,6 +196,7 @@ async def publish_agent_route(
     agent_id: str,
     context: WorkspaceContext = Depends(require_member),
     agent_repo: AgentRepository = Depends(get_agent_repository),
+    audit: AuditService = Depends(get_audit_service),
 ) -> AgentResponse:
     agent = await agent_repo.get_agent(workspace_id=context.workspace_id, agent_id=agent_id)
     if agent is None:
@@ -185,6 +205,13 @@ async def publish_agent_route(
     if latest is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Agent has no version")
     published = await agent_repo.publish_version(agent_id=agent_id, version_id=latest.id)
+    await audit.record(
+        action="agent.published",
+        outcome="success",
+        workspace_id=context.workspace_id,
+        actor_user_id=context.user_id,
+        target=agent_id,
+    )
     return _agent_response(published)
 
 
@@ -193,8 +220,16 @@ async def delete_agent_route(
     agent_id: str,
     context: WorkspaceContext = Depends(require_member),
     agent_repo: AgentRepository = Depends(get_agent_repository),
+    audit: AuditService = Depends(get_audit_service),
 ) -> None:
     await agent_repo.soft_delete(workspace_id=context.workspace_id, agent_id=agent_id)
+    await audit.record(
+        action="agent.deleted",
+        outcome="success",
+        workspace_id=context.workspace_id,
+        actor_user_id=context.user_id,
+        target=agent_id,
+    )
 
 
 @router.post("/{agent_id}/runs", response_model=RunResponse, status_code=status.HTTP_202_ACCEPTED)

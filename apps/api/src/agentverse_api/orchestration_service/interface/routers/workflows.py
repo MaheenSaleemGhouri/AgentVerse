@@ -9,11 +9,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from agentverse_api.auth_service.application.audit_service import AuditService
 from agentverse_api.auth_service.domain.entities import WorkspaceContext
 from agentverse_api.auth_service.interface.dependencies.require_role import (
     require_member,
     require_viewer,
 )
+from agentverse_api.auth_service.interface.dependencies.services import get_audit_service
 from agentverse_api.orchestration_service.application.create_workflow import create_workflow
 from agentverse_api.orchestration_service.application.create_workflow_version import (
     create_workflow_version,
@@ -113,6 +115,7 @@ async def create_workflow_route(
     body: CreateWorkflowRequest,
     context: WorkspaceContext = Depends(require_member),
     workflow_repo: WorkflowRepository = Depends(get_workflow_repository),
+    audit: AuditService = Depends(get_audit_service),
 ) -> CreateWorkflowResponse:
     workflow, version = await create_workflow(
         workspace_id=context.workspace_id,
@@ -120,6 +123,13 @@ async def create_workflow_route(
         description=body.description,
         created_by_user_id=context.user_id,
         workflow_repo=workflow_repo,
+    )
+    await audit.record(
+        action="workflow.created",
+        outcome="success",
+        workspace_id=context.workspace_id,
+        actor_user_id=context.user_id,
+        target=workflow.id,
     )
     return CreateWorkflowResponse(
         workflow=_workflow_response(workflow), version=_version_response(version)
@@ -182,6 +192,7 @@ async def create_version_route(
     body: CreateWorkflowVersionRequest,
     context: WorkspaceContext = Depends(require_member),
     workflow_repo: WorkflowRepository = Depends(get_workflow_repository),
+    audit: AuditService = Depends(get_audit_service),
 ) -> WorkflowVersionResponse:
     await _get_workflow_or_404(workflow_id, context, workflow_repo)
     nodes = [
@@ -218,6 +229,14 @@ async def create_version_route(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
+    await audit.record(
+        action="workflow.updated",
+        outcome="success",
+        workspace_id=context.workspace_id,
+        actor_user_id=context.user_id,
+        target=workflow_id,
+        metadata={"version_number": str(version.version_number)},
+    )
     return _version_response(version)
 
 
@@ -250,6 +269,7 @@ async def publish_workflow_route(
     body: PublishWorkflowRequest,
     context: WorkspaceContext = Depends(require_member),
     workflow_repo: WorkflowRepository = Depends(get_workflow_repository),
+    audit: AuditService = Depends(get_audit_service),
 ) -> WorkflowResponse:
     await _get_workflow_or_404(workflow_id, context, workflow_repo)
     version = await workflow_repo.get_version(workflow_id=workflow_id, version_id=body.version_id)
@@ -257,5 +277,13 @@ async def publish_workflow_route(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Version not found")
     published = await workflow_repo.publish_version(
         workflow_id=workflow_id, version_id=body.version_id
+    )
+    await audit.record(
+        action="workflow.published",
+        outcome="success",
+        workspace_id=context.workspace_id,
+        actor_user_id=context.user_id,
+        target=workflow_id,
+        metadata={"version_id": body.version_id},
     )
     return _workflow_response(published)

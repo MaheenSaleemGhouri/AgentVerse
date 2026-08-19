@@ -31,9 +31,12 @@ export async function verifyPassword(data: { password: string; hash: string }): 
     return true;
   }
 
-  const lockedUserId = await recordFailure(data.hash);
-  if (lockedUserId) {
-    await reportAuthEvent("auth.account_locked", lockedUserId);
+  const failure = await recordFailure(data.hash);
+  if (failure) {
+    await reportAuthEvent("auth.login_failed", failure.userId);
+    if (failure.locked) {
+      await reportAuthEvent("auth.account_locked", failure.userId);
+    }
   }
   return false;
 }

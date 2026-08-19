@@ -10,6 +10,8 @@ from functools import lru_cache
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agentverse_api.auth_service.application.audit_service import AuditService
+from agentverse_api.auth_service.interface.dependencies.services import get_audit_service
 from agentverse_api.billing_service.application.billing_actions_service import (
     BillingActionsService,
 )
@@ -161,6 +163,7 @@ def get_payment_provider(
 def get_billing_actions_service(
     session: AsyncSession = Depends(get_db_session),
     provider: PaymentProviderPort = Depends(get_payment_provider),
+    audit: AuditService = Depends(get_audit_service),
 ) -> BillingActionsService:
     return BillingActionsService(
         provider=provider,
@@ -171,6 +174,7 @@ def get_billing_actions_service(
         ),
         customers=SqlCustomerRepository(session),
         catalog=PlanCatalogService(plans=SqlPlanRepository(session)),
+        audit=audit,
     )
 
 

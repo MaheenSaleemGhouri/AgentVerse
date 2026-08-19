@@ -18,6 +18,7 @@ from agentverse_api.auth_service.interface.dependencies.require_role import (
     require_member,
     require_viewer,
 )
+from agentverse_api.auth_service.interface.dependencies.services import get_audit_service
 from agentverse_api.billing_service.application.quota_service import QuotaDecision
 from agentverse_api.billing_service.domain.plan import MeteredDimension
 from agentverse_api.billing_service.interface.dependencies.services import get_quota_service
@@ -32,6 +33,7 @@ from agentverse_api.orchestration_service.interface.dependencies.services import
     get_job_queue_producer,
     get_lock_factory,
 )
+from tests.fakes.audit_service import FakeAuditService
 from tests.fakes.orchestration_repositories import FakeAgentRepository, FakeAgentRunRepository
 
 WORKSPACE_ID = "ws-1"
@@ -97,6 +99,7 @@ async def client_with_fakes(
     # would make every one of these tests depend on a real Postgres and
     # a seeded plan catalog.
     app.dependency_overrides[get_quota_service] = lambda: _UnlimitedQuota()
+    app.dependency_overrides[get_audit_service] = lambda: FakeAuditService()
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

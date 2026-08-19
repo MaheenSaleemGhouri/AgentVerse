@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from agentverse_api.auth_service.application.audit_service import AuditService
 from agentverse_api.billing_service.application.plan_catalog_service import PlanCatalogService
 from agentverse_api.billing_service.application.subscription_service import SubscriptionService
 from agentverse_api.billing_service.domain.customer import PaymentProvider
@@ -71,6 +72,10 @@ class BillingActionsService:
     subscriptions: SubscriptionService
     customers: CustomerRepository
     catalog: PlanCatalogService
+    # Optional and trailing so every existing construction site keeps
+    # working unchanged (Rule 3 non-breaking extension, same pattern
+    # `MarketplaceService.search`/`embedder` used in Phase 10).
+    audit: AuditService | None = None
 
     # ---- entry points ------------------------------------------------
 
@@ -150,13 +155,23 @@ class BillingActionsService:
                 provider_subscription_id=subscription.provider_subscription_id,
                 at_period_end=at_period_end,
             )
-        return await self.subscriptions.cancel(
+        result = await self.subscriptions.cancel(
             workspace_id=workspace_id,
             actor=actor,
             idempotency_key=f"cancel:{subscription.id}:{at_period_end}",
             at_period_end=at_period_end,
             reason=reason,
         )
+        if self.audit is not None:
+            await self.audit.record(
+                action="subscription.canceled",
+                outcome="success",
+                workspace_id=workspace_id,
+                actor_user_id=actor,
+                target=subscription.id,
+                metadata={"at_period_end": str(at_period_end)},
+            )
+        return result
 
     async def resume(self, *, workspace_id: str) -> Subscription:
         """Undo a scheduled cancellation. The second deliberate local
@@ -245,19 +260,30 @@ class BillingActionsService:
         detect it.
         """
         subscription = await self.subscriptions.require_current(workspace_id)
+        from_plan = subscription.plan_slug
         if subscription.provider_subscription_id:
             await self.provider.change_subscription_plan(
                 provider_subscription_id=subscription.provider_subscription_id,
                 plan_slug=target_slug,
                 interval=interval,
             )
-        return await self.subscriptions.change_plan(
+        result = await self.subscriptions.change_plan(
             workspace_id=workspace_id,
             target_slug=target_slug,
             interval=interval,
             actor=actor,
             idempotency_key=idempotency_key,
         )
+        if self.audit is not None:
+            await self.audit.record(
+                action="subscription.plan_changed",
+                outcome="success",
+                workspace_id=workspace_id,
+                actor_user_id=actor,
+                target=subscription.id,
+                metadata={"from_plan": from_plan.value, "to_plan": target_slug.value},
+            )
+        return result
 
     # ---- reads straight from the provider ----------------------------
 

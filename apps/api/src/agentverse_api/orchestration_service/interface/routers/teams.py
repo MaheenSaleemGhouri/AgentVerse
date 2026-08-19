@@ -18,12 +18,14 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
+from agentverse_api.auth_service.application.audit_service import AuditService
 from agentverse_api.auth_service.domain.entities import WorkspaceContext
 from agentverse_api.auth_service.interface.dependencies.require_role import (
     require_admin,
     require_member,
     require_viewer,
 )
+from agentverse_api.auth_service.interface.dependencies.services import get_audit_service
 from agentverse_api.orchestration_service.application.execute_team import (
     LockFactory,
     TeamNotRunnableError,
@@ -150,6 +152,7 @@ async def create_team_route(
     body: CreateTeamRequest,
     context: WorkspaceContext = Depends(require_member),
     repo: TeamRepository = Depends(get_team_repository),
+    audit: AuditService = Depends(get_audit_service),
 ) -> TeamResponse:
     team = await repo.create_team(
         workspace_id=context.workspace_id,
@@ -163,6 +166,13 @@ async def create_team_route(
         shared_memory_enabled=body.shared_memory_enabled,
         shared_knowledge_base_ids=body.shared_knowledge_base_ids,
         created_by_user_id=context.user_id,
+    )
+    await audit.record(
+        action="team.created",
+        outcome="success",
+        workspace_id=context.workspace_id,
+        actor_user_id=context.user_id,
+        target=team.id,
     )
     return _team_response(team)
 
@@ -190,6 +200,7 @@ async def update_team_route(
     body: UpdateTeamRequest,
     context: WorkspaceContext = Depends(require_member),
     repo: TeamRepository = Depends(get_team_repository),
+    audit: AuditService = Depends(get_audit_service),
 ) -> TeamResponse:
     await _require_team(repo, context, team_id)
     # `exclude_unset` rather than `exclude_none`: clearing `objective` by
@@ -203,6 +214,13 @@ async def update_team_route(
     )
     if updated is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
+    await audit.record(
+        action="team.updated",
+        outcome="success",
+        workspace_id=context.workspace_id,
+        actor_user_id=context.user_id,
+        target=team_id,
+    )
     return _team_response(updated)
 
 

@@ -486,6 +486,7 @@ async def publish_version_route(
     body: PublishVersionRequest,
     context: WorkspaceContext = Depends(require_admin),
     service: MarketplaceService = Depends(get_marketplace_service),
+    audit: AuditService = Depends(get_audit_service),
 ) -> ListingVersionResponse:
     """Snapshot a configuration as a new version.
 
@@ -506,6 +507,14 @@ async def publish_version_route(
         ) from exc
     except ListingForbiddenError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    await audit.record(
+        action="marketplace.listing_version_published",
+        outcome="success",
+        workspace_id=context.workspace_id,
+        actor_user_id=context.user_id,
+        target=slug,
+        metadata={"version_number": str(version.version_number)},
+    )
     return ListingVersionResponse(
         version_number=version.version_number,
         changelog=version.changelog,
@@ -520,6 +529,7 @@ async def submit_listing_route(
     slug: str,
     context: WorkspaceContext = Depends(require_admin),
     service: MarketplaceService = Depends(get_marketplace_service),
+    audit: AuditService = Depends(get_audit_service),
 ) -> ListingResponse:
     """Submit for moderation. Reports *every* readiness problem at once,
     so a publisher does not make three round trips to submit.
@@ -541,6 +551,13 @@ async def submit_listing_route(
         ) from exc
     except InvalidListingTransitionError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    await audit.record(
+        action="marketplace.listing_submitted",
+        outcome="success",
+        workspace_id=context.workspace_id,
+        actor_user_id=context.user_id,
+        target=slug,
+    )
     return _to_response(listing)
 
 
@@ -551,6 +568,7 @@ async def unlist_listing_route(
     slug: str,
     context: WorkspaceContext = Depends(require_admin),
     service: MarketplaceService = Depends(get_marketplace_service),
+    audit: AuditService = Depends(get_audit_service),
 ) -> ListingResponse:
     """Withdraw from the catalog. Not deletion — installs already made
     from this listing are copies in other workspaces, and the row
@@ -566,6 +584,13 @@ async def unlist_listing_route(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except InvalidListingTransitionError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    await audit.record(
+        action="marketplace.listing_unlisted",
+        outcome="success",
+        workspace_id=context.workspace_id,
+        actor_user_id=context.user_id,
+        target=slug,
+    )
     return _to_response(listing)
 
 
@@ -578,6 +603,7 @@ async def submit_review_route(
     context: WorkspaceContext = Depends(require_member),
     service: MarketplaceService = Depends(get_marketplace_service),
     workspaces: WorkspaceService = Depends(get_workspace_service),
+    audit: AuditService = Depends(get_audit_service),
 ) -> ReviewResponse:
     """One review per workspace, so `PUT` rather than `POST` — a second
     submission replaces the first rather than adding one.
@@ -602,6 +628,14 @@ async def submit_review_route(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
+    await audit.record(
+        action="marketplace.review_submitted",
+        outcome="success",
+        workspace_id=context.workspace_id,
+        actor_user_id=context.user_id,
+        target=slug,
+        metadata={"rating": str(body.rating)},
+    )
     return ReviewResponse(
         id=review.id,
         reviewer_name=review.reviewer_name,
@@ -620,6 +654,7 @@ async def withdraw_review_route(
     slug: str,
     context: WorkspaceContext = Depends(require_member),
     service: MarketplaceService = Depends(get_marketplace_service),
+    audit: AuditService = Depends(get_audit_service),
 ) -> None:
     try:
         removed = await service.withdraw_review(
@@ -634,6 +669,13 @@ async def withdraw_review_route(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="This workspace has not reviewed that listing.",
         )
+    await audit.record(
+        action="marketplace.review_withdrawn",
+        outcome="success",
+        workspace_id=context.workspace_id,
+        actor_user_id=context.user_id,
+        target=slug,
+    )
 
 
 # ---- installing (workspace-scoped) ------------------------------------
@@ -650,6 +692,7 @@ async def install_listing_route(
     response: Response,
     context: WorkspaceContext = Depends(require_admin),
     service: InstallService = Depends(get_install_service),
+    audit: AuditService = Depends(get_audit_service),
 ) -> InstallResponse:
     """Copy a published version into this workspace as a new agent.
 
@@ -685,6 +728,15 @@ async def install_listing_route(
         # A retry, answered with the same agent. 200 rather than 201, so
         # the caller can see it did not create a second one.
         response.status_code = status.HTTP_200_OK
+    else:
+        await audit.record(
+            action="marketplace.listing_installed",
+            outcome="success",
+            workspace_id=context.workspace_id,
+            actor_user_id=context.user_id,
+            target=slug,
+            metadata={"version_number": str(result.install.version_number)},
+        )
     return InstallResponse(
         listing_slug=slug,
         version_number=result.install.version_number,

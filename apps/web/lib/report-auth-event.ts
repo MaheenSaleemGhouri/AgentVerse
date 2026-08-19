@@ -7,6 +7,8 @@ import { env } from "@/lib/env";
 type AuthEventType =
   | "auth.signup"
   | "auth.login"
+  | "auth.login_failed"
+  | "auth.sso_login"
   | "auth.session_revoked"
   | "auth.account_locked";
 

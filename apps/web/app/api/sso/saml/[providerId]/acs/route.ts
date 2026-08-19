@@ -87,7 +87,12 @@ export async function POST(
     }
 
     const session = await ctx.internalAdapter.createSession(user.user.id, false);
-    await reportAuthEvent("auth.login", user.user.id);
+    // This route creates the session directly via `internalAdapter`,
+    // bypassing Better Auth's `databaseHooks.session.create.after` (the
+    // hook a password sign-in fires) entirely — so `auth.sso_login` must
+    // be reported here explicitly, and it is the one point that can
+    // distinguish "signed in via SAML" from a password login at all.
+    await reportAuthEvent("auth.sso_login", user.user.id);
 
     const response = NextResponse.redirect(new URL("/dashboard", env.betterAuthUrl));
     // Same cookie posture as every other sign-in path (CLAUDE.md §7):
