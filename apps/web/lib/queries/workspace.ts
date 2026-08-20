@@ -5,11 +5,19 @@ import { toast } from "sonner";
 
 import {
   issueApiKeyAction,
+  issueMcpClientAction,
   listApiKeysAction,
+  listMcpClientsAction,
   revokeApiKeyAction,
+  revokeMcpClientAction,
   rotateApiKeyAction,
 } from "@/lib/api/actions";
-import type { ApiKey, IssueApiKeyRequest } from "@/lib/api/workspaces";
+import type {
+  ApiKey,
+  IssueApiKeyRequest,
+  IssueMcpClientRequest,
+  McpClient,
+} from "@/lib/api/workspaces";
 import { queryKeys } from "@/lib/queries/keys";
 
 // Member hooks (used by `MembersTable`/`InviteMemberDialog`) live in
@@ -65,5 +73,40 @@ export function useRotateApiKey(workspaceId: string) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys(workspaceId) });
     },
     onError: () => toast.error("Could not rotate the key — try again."),
+  });
+}
+
+export function useMcpClients(workspaceId: string, initialData?: McpClient[]) {
+  return useQuery({
+    queryKey: queryKeys.mcpClients(workspaceId),
+    queryFn: () => listMcpClientsAction(workspaceId),
+    ...(initialData ? { initialData } : {}),
+  });
+}
+
+/**
+ * Same one-time-secret contract as `useIssueApiKey` — the plaintext
+ * token is returned exactly once and is never cached.
+ */
+export function useIssueMcpClient(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: IssueMcpClientRequest) => issueMcpClientAction(workspaceId, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.mcpClients(workspaceId) });
+    },
+    onError: () => toast.error("Could not issue the MCP client credential — try again."),
+  });
+}
+
+export function useRevokeMcpClient(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (mcpClientId: string) => revokeMcpClientAction(workspaceId, mcpClientId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.mcpClients(workspaceId) });
+      toast.success("MCP client revoked — it can no longer connect.");
+    },
+    onError: () => toast.error("Could not revoke the MCP client — try again."),
   });
 }

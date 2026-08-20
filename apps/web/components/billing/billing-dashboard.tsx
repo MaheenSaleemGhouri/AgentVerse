@@ -5,6 +5,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { CreditsPanel, ReferralPanel } from "@/components/billing/credits-panel";
+import { EnterpriseInfrastructurePanel } from "@/components/billing/enterprise-infrastructure-panel";
 import { IntervalToggle } from "@/components/billing/interval-toggle";
 import { InvoicesPanel, PaymentMethodsPanel } from "@/components/billing/invoices-panel";
 import { PlanCard } from "@/components/billing/plan-card";
@@ -319,6 +320,8 @@ export function BillingDashboard({
               ))}
             </div>
           </Card>
+
+          <EnterpriseInfrastructurePanel entitlements={entitlements} />
         </TabsContent>
 
         <TabsContent value="invoices" className="space-y-6">

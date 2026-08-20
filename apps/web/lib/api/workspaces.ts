@@ -10,6 +10,9 @@ export type ApiKey = components["schemas"]["ApiKeyResponse"];
 export type ApiKeyScope = ApiKey["scope"];
 export type IssueApiKeyRequest = components["schemas"]["IssueApiKeyRequest"];
 export type InviteByEmailResponse = components["schemas"]["InviteByEmailResponse"];
+export type McpClient = components["schemas"]["McpClientResponse"];
+export type IssuedMcpClient = components["schemas"]["IssuedMcpClientResponse"];
+export type IssueMcpClientRequest = components["schemas"]["IssueMcpClientRequest"];
 
 export async function listMyWorkspaces(): Promise<Workspace[]> {
   return apiFetch<Workspace[]>("/api/v1/workspaces");
@@ -92,5 +95,32 @@ export async function rotateApiKey(
 ): Promise<IssuedApiKey> {
   return apiFetch<IssuedApiKey>(`/api/v1/workspaces/${workspaceId}/api-keys/${apiKeyId}/rotate`, {
     method: "POST",
+  });
+}
+
+/**
+ * `kind='mcp_client'` credentials (ADR-0017) — a distinct URL and list
+ * from `/api-keys`, but the same underlying mechanism (issue/list/
+ * revoke, same hash-at-rest/scope-ceiling rules). No rotate endpoint:
+ * the backend does not expose one for this credential kind.
+ */
+export async function issueMcpClient(
+  workspaceId: string,
+  body: IssueMcpClientRequest
+): Promise<IssuedMcpClient> {
+  return apiFetch<IssuedMcpClient>(`/api/v1/workspaces/${workspaceId}/mcp-clients`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function listMcpClients(workspaceId: string): Promise<McpClient[]> {
+  return apiFetch<McpClient[]>(`/api/v1/workspaces/${workspaceId}/mcp-clients`);
+}
+
+export async function revokeMcpClient(workspaceId: string, mcpClientId: string): Promise<void> {
+  await apiFetch<void>(`/api/v1/workspaces/${workspaceId}/mcp-clients/${mcpClientId}`, {
+    method: "DELETE",
+    skipJson: true,
   });
 }

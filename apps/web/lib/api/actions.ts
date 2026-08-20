@@ -67,6 +67,7 @@ import {
   listReviews as listReviewsApi,
   publishListingVersion as publishListingVersionApi,
   shareListing as shareListingApi,
+  startMarketplaceCheckout as startMarketplaceCheckoutApi,
   submitListing as submitListingApi,
   submitReview as submitReviewApi,
   unlistListing as unlistListingApi,
@@ -80,6 +81,7 @@ import type {
   Listing,
   ListingPage,
   ListingVersion,
+  MarketplaceCheckout,
   PublishVersionRequest,
   Review,
   UpdateListingRequest,
@@ -264,12 +266,18 @@ import {
   issueApiKey as issueApiKeyApi,
   type InviteByEmailResponse,
   type IssuedApiKey,
+  type IssuedMcpClient,
+  type IssueMcpClientRequest,
+  issueMcpClient as issueMcpClientApi,
   listApiKeys as listApiKeysApi,
+  listMcpClients as listMcpClientsApi,
   listMembers as listMembersApi,
   listMyWorkspaces as listMyWorkspacesApi,
+  type McpClient,
   type Member,
   type Role,
   revokeApiKey as revokeApiKeyApi,
+  revokeMcpClient as revokeMcpClientApi,
   rotateApiKey as rotateApiKeyApi,
   type Workspace,
 } from "@/lib/api/workspaces";
@@ -454,6 +462,24 @@ export async function rotateApiKeyAction(
   apiKeyId: string
 ): Promise<IssuedApiKey> {
   return rotateApiKeyApi(workspaceId, apiKeyId);
+}
+
+export async function listMcpClientsAction(workspaceId: string): Promise<McpClient[]> {
+  return listMcpClientsApi(workspaceId);
+}
+
+export async function issueMcpClientAction(
+  workspaceId: string,
+  body: IssueMcpClientRequest
+): Promise<IssuedMcpClient> {
+  return issueMcpClientApi(workspaceId, body);
+}
+
+export async function revokeMcpClientAction(
+  workspaceId: string,
+  mcpClientId: string
+): Promise<void> {
+  await revokeMcpClientApi(workspaceId, mcpClientId);
 }
 
 export async function listMyWorkspacesAction(): Promise<Workspace[]> {
@@ -1091,6 +1117,13 @@ export async function installListingAction(
   body: { version_number?: number | null; name?: string | null }
 ): Promise<Install> {
   return installListingApi(workspaceId, slug, body);
+}
+
+export async function startMarketplaceCheckoutAction(
+  workspaceId: string,
+  slug: string
+): Promise<MarketplaceCheckout> {
+  return startMarketplaceCheckoutApi(workspaceId, slug);
 }
 
 export async function shareListingAction(workspaceId: string, slug: string): Promise<void> {

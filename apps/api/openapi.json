@@ -2328,6 +2328,10 @@
       },
       "HealthResponse": {
         "properties": {
+          "region": {
+            "title": "Region",
+            "type": "string"
+          },
           "status": {
             "const": "ok",
             "title": "Status",
@@ -2335,7 +2339,8 @@
           }
         },
         "required": [
-          "status"
+          "status",
+          "region"
         ],
         "title": "HealthResponse",
         "type": "object"
@@ -3025,6 +3030,38 @@
         "title": "IssueApiKeyRequest",
         "type": "object"
       },
+      "IssueMcpClientRequest": {
+        "properties": {
+          "expires_in_days": {
+            "anyOf": [
+              {
+                "maximum": 3650.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires In Days"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ApiKeyScope",
+            "default": "full"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "IssueMcpClientRequest",
+        "type": "object"
+      },
       "IssueScimTokenRequest": {
         "properties": {
           "name": {
@@ -3142,6 +3179,93 @@
           "key"
         ],
         "title": "IssuedApiKeyResponse",
+        "type": "object"
+      },
+      "IssuedMcpClientResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "key_prefix": {
+            "title": "Key Prefix",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ApiKeyScope"
+          },
+          "use_count": {
+            "title": "Use Count",
+            "type": "integer"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "name",
+          "key_prefix",
+          "created_at",
+          "last_used_at",
+          "revoked_at",
+          "scope",
+          "expires_at",
+          "use_count",
+          "key"
+        ],
+        "title": "IssuedMcpClientResponse",
         "type": "object"
       },
       "IssuedScimTokenResponse": {
@@ -3553,6 +3677,107 @@
           "marked"
         ],
         "title": "MarkAllReadResponse",
+        "type": "object"
+      },
+      "MarketplaceCheckoutResponse": {
+        "description": "Where to send the browser to pay for a premium listing \u2014 the\nmarketplace-purchase equivalent of billing's `CheckoutResponse`. No\ninstall happens yet: that follows the `checkout.session.completed`\nwebhook once Stripe confirms the charge.",
+        "properties": {
+          "checkout_url": {
+            "title": "Checkout Url",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "checkout_url",
+          "session_id"
+        ],
+        "title": "MarketplaceCheckoutResponse",
+        "type": "object"
+      },
+      "McpClientResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "key_prefix": {
+            "title": "Key Prefix",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ApiKeyScope"
+          },
+          "use_count": {
+            "title": "Use Count",
+            "type": "integer"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "name",
+          "key_prefix",
+          "created_at",
+          "last_used_at",
+          "revoked_at",
+          "scope",
+          "expires_at",
+          "use_count"
+        ],
+        "title": "McpClientResponse",
         "type": "object"
       },
       "McpServerResponse": {
@@ -4930,6 +5155,8 @@
             "enum": [
               "auth.signup",
               "auth.login",
+              "auth.login_failed",
+              "auth.sso_login",
               "auth.session_revoked",
               "auth.account_locked"
             ],
@@ -15500,6 +15727,63 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/checkout": {
+      "post": {
+        "description": "Start Stripe Checkout for a premium listing. `require_admin`, same\nceiling as `/install` \u2014 buying writes an agent into the workspace\nexactly like a free install does, just after a payment settles.\n\nA free listing 400s here rather than starting a checkout with a\nzero-amount line item: free installs stay the existing synchronous\n`/install` call, no behavior change, and Stripe Checkout has no\nreason to exist in that path at all.",
+        "operationId": "start_marketplace_checkout_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__checkout_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketplaceCheckoutResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Start Marketplace Checkout Route",
+        "tags": [
+          "marketplace-publishing"
+        ]
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/install": {
       "post": {
         "description": "Copy a published version into this workspace as a new agent.\n\n`require_admin`, not `require_member`: installing writes an agent\ninto the workspace, and a viewer or member browsing the catalog\nshould not be able to add one.\n\nThe copy is a copy. Nothing links the installed agent back to the\nlisting at run time, so the publisher can unlist, rewrite or delete\ntheir source and this agent keeps working.",
@@ -15909,6 +16193,161 @@
         "summary": "Publish Version Route",
         "tags": [
           "marketplace-publishing"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/mcp-clients": {
+      "get": {
+        "operationId": "list_mcp_clients_api_v1_workspaces__workspace_id__mcp_clients_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/McpClientResponse"
+                  },
+                  "title": "Response List Mcp Clients Api V1 Workspaces  Workspace Id  Mcp Clients Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Mcp Clients",
+        "tags": [
+          "mcp-clients"
+        ]
+      },
+      "post": {
+        "operationId": "issue_mcp_client_api_v1_workspaces__workspace_id__mcp_clients_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueMcpClientRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedMcpClientResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Issue Mcp Client",
+        "tags": [
+          "mcp-clients"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/mcp-clients/{mcp_client_id}": {
+      "delete": {
+        "operationId": "revoke_mcp_client_api_v1_workspaces__workspace_id__mcp_clients__mcp_client_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mcp_client_id",
+            "required": true,
+            "schema": {
+              "title": "Mcp Client Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Mcp Client",
+        "tags": [
+          "mcp-clients"
         ]
       }
     },

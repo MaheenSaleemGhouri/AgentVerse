@@ -9,6 +9,7 @@ import {
   type Listing,
   type ListingPage,
   type ListingVersion,
+  type MarketplaceCheckout,
   type PublishVersionRequest,
   type Review,
   type UpdateListingRequest,
@@ -85,6 +86,21 @@ export async function installListing(
   return apiFetch<Install>(
     `/api/v1/workspaces/${workspaceId}/marketplace/listings/${slug}/install`,
     { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+/**
+ * Start Stripe Checkout for a premium listing. 400s on the server for a
+ * free listing — the caller is expected to check `listing.pricing`
+ * first and route free listings to `installListing` instead.
+ */
+export async function startMarketplaceCheckout(
+  workspaceId: string,
+  slug: string,
+): Promise<MarketplaceCheckout> {
+  return apiFetch<MarketplaceCheckout>(
+    `/api/v1/workspaces/${workspaceId}/marketplace/listings/${slug}/checkout`,
+    { method: "POST" },
   );
 }
 

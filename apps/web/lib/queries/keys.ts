@@ -34,6 +34,8 @@ export const queryKeys = {
 
   apiKeys: (workspaceId: string) => ["workspaces", workspaceId, "api-keys"] as const,
 
+  mcpClients: (workspaceId: string) => ["workspaces", workspaceId, "mcp-clients"] as const,
+
   auditLogs: (workspaceId: string, filters: Record<string, string | undefined> = {}) =>
     ["workspaces", workspaceId, "audit-logs", filters] as const,
 

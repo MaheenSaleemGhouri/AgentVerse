@@ -11,6 +11,7 @@ import {
   listReviewsAction,
   publishListingVersionAction,
   shareListingAction,
+  startMarketplaceCheckoutAction,
   submitListingAction,
   submitReviewAction,
   unlistListingAction,
@@ -80,6 +81,19 @@ export function useInstallListing(workspaceId: string) {
       );
     },
     onError: () => toast.error("Could not install this listing. Try again."),
+  });
+}
+
+/**
+ * Starts Stripe Checkout for a premium listing. The caller (the install
+ * dialog) is expected to have already routed a free listing to
+ * `useInstallListing` instead — this mutation exists only for the
+ * priced path.
+ */
+export function useStartMarketplaceCheckout(workspaceId: string) {
+  return useMutation({
+    mutationFn: (slug: string) => startMarketplaceCheckoutAction(workspaceId, slug),
+    onError: () => toast.error("Could not start checkout for this listing. Try again."),
   });
 }
 

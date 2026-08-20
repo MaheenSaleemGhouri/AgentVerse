@@ -26,6 +26,7 @@ export type InstalledListing = components["schemas"]["InstalledListingResponse"]
 export type CreateListingRequest = components["schemas"]["CreateListingRequest"];
 export type UpdateListingRequest = components["schemas"]["UpdateListingRequest"];
 export type PublishVersionRequest = components["schemas"]["PublishVersionRequest"];
+export type MarketplaceCheckout = components["schemas"]["MarketplaceCheckoutResponse"];
 
 /** Catalog page size. Twelve fills a three-column grid exactly. */
 export const CATALOG_PAGE_SIZE = 12;

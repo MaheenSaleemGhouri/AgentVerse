@@ -18,6 +18,7 @@ import { ListingReviews } from "@/components/marketplace/listing-reviews";
 import { ListingStatusBadge } from "@/components/marketplace/listing-status-badge";
 import { RatingStars } from "@/components/marketplace/rating-stars";
 import { ShareListingButton } from "@/components/marketplace/share-listing-button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -25,12 +26,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface PageProps {
   params: Promise<{ workspaceId: string; slug: string }>;
+  searchParams: Promise<{ checkout?: string }>;
 }
 
 export default async function ListingDetailPage({
   params,
+  searchParams,
 }: PageProps): Promise<React.JSX.Element> {
   const { workspaceId, slug } = await params;
+  const { checkout } = await searchParams;
 
   const listing = await getListing(slug).catch((error: unknown) => {
     // A listing this workspace may not see answers 404, not 403, so an
@@ -54,6 +58,34 @@ export default async function ListingDetailPage({
 
   return (
     <div className="flex flex-col gap-6">
+      {checkout === "success" && (
+        // The install itself lands out-of-band, when Stripe's webhook
+        // confirms the charge — usually seconds, but never instant, so
+        // this states "pending" honestly rather than implying the agent
+        // is already there. A fresh page load once it lands (or a
+        // moment later) shows the new install/install count normally.
+        <Alert tone="success">
+          <AlertTitle>Payment received</AlertTitle>
+          <AlertDescription>
+            Installing this listing into your workspace now — it lands within a few seconds.
+            Check{" "}
+            <a
+              href={`/dashboard/${workspaceId}/agents`}
+              className="font-medium underline underline-offset-2"
+            >
+              your agents
+            </a>{" "}
+            shortly if it isn&apos;t there yet.
+          </AlertDescription>
+        </Alert>
+      )}
+      {checkout === "cancelled" && (
+        <Alert tone="info">
+          <AlertTitle>Checkout cancelled</AlertTitle>
+          <AlertDescription>No charge was made. You can buy this listing anytime.</AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
         <span
           aria-hidden="true"

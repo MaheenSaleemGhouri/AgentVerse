@@ -2004,6 +2004,33 @@ export interface paths {
         patch: operations["update_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__patch"];
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Marketplace Checkout Route
+         * @description Start Stripe Checkout for a premium listing. `require_admin`, same
+         *     ceiling as `/install` — buying writes an agent into the workspace
+         *     exactly like a free install does, just after a payment settles.
+         *
+         *     A free listing 400s here rather than starting a checkout with a
+         *     zero-amount line item: free installs stay the existing synchronous
+         *     `/install` call, no behavior change, and Stripe Checkout has no
+         *     reason to exist in that path at all.
+         */
+        post: operations["start_marketplace_checkout_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__checkout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/marketplace/listings/{slug}/install": {
         parameters: {
             query?: never;
@@ -2143,6 +2170,41 @@ export interface paths {
          */
         post: operations["publish_version_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__versions_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/mcp-clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Mcp Clients */
+        get: operations["list_mcp_clients_api_v1_workspaces__workspace_id__mcp_clients_get"];
+        put?: never;
+        /** Issue Mcp Client */
+        post: operations["issue_mcp_client_api_v1_workspaces__workspace_id__mcp_clients_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{workspace_id}/mcp-clients/{mcp_client_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Mcp Client */
+        delete: operations["revoke_mcp_client_api_v1_workspaces__workspace_id__mcp_clients__mcp_client_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4210,6 +4272,8 @@ export interface components {
         };
         /** HealthResponse */
         HealthResponse: {
+            /** Region */
+            region: string;
             /**
              * Status
              * @constant
@@ -4461,6 +4525,15 @@ export interface components {
              */
             tier: string;
         };
+        /** IssueMcpClientRequest */
+        IssueMcpClientRequest: {
+            /** Expires In Days */
+            expires_in_days?: number | null;
+            /** Name */
+            name: string;
+            /** @default full */
+            scope: components["schemas"]["ApiKeyScope"];
+        };
         /** IssueScimTokenRequest */
         IssueScimTokenRequest: {
             /** Name */
@@ -4492,6 +4565,33 @@ export interface components {
             scope: components["schemas"]["ApiKeyScope"];
             /** Tier */
             tier: string;
+            /** Use Count */
+            use_count: number;
+            /** Workspace Id */
+            workspace_id: string;
+        };
+        /** IssuedMcpClientResponse */
+        IssuedMcpClientResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Id */
+            id: string;
+            /** Key */
+            key: string;
+            /** Key Prefix */
+            key_prefix: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Name */
+            name: string;
+            /** Revoked At */
+            revoked_at: string | null;
+            scope: components["schemas"]["ApiKeyScope"];
             /** Use Count */
             use_count: number;
             /** Workspace Id */
@@ -4673,6 +4773,44 @@ export interface components {
         MarkAllReadResponse: {
             /** Marked */
             marked: number;
+        };
+        /**
+         * MarketplaceCheckoutResponse
+         * @description Where to send the browser to pay for a premium listing — the
+         *     marketplace-purchase equivalent of billing's `CheckoutResponse`. No
+         *     install happens yet: that follows the `checkout.session.completed`
+         *     webhook once Stripe confirms the charge.
+         */
+        MarketplaceCheckoutResponse: {
+            /** Checkout Url */
+            checkout_url: string;
+            /** Session Id */
+            session_id: string;
+        };
+        /** McpClientResponse */
+        McpClientResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Id */
+            id: string;
+            /** Key Prefix */
+            key_prefix: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Name */
+            name: string;
+            /** Revoked At */
+            revoked_at: string | null;
+            scope: components["schemas"]["ApiKeyScope"];
+            /** Use Count */
+            use_count: number;
+            /** Workspace Id */
+            workspace_id: string;
         };
         /**
          * McpServerResponse
@@ -5204,7 +5342,7 @@ export interface components {
              * Event Type
              * @enum {string}
              */
-            event_type: "auth.signup" | "auth.login" | "auth.session_revoked" | "auth.account_locked";
+            event_type: "auth.signup" | "auth.login" | "auth.login_failed" | "auth.sso_login" | "auth.session_revoked" | "auth.account_locked";
             /** User Id */
             user_id: string;
         };
@@ -10427,6 +10565,38 @@ export interface operations {
             };
         };
     };
+    start_marketplace_checkout_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__checkout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketplaceCheckoutResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     install_listing_route_api_v1_workspaces__workspace_id__marketplace_listings__slug__install_post: {
         parameters: {
             query?: never;
@@ -10647,6 +10817,102 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ListingVersionResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_mcp_clients_api_v1_workspaces__workspace_id__mcp_clients_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpClientResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_mcp_client_api_v1_workspaces__workspace_id__mcp_clients_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueMcpClientRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuedMcpClientResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_mcp_client_api_v1_workspaces__workspace_id__mcp_clients__mcp_client_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mcp_client_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
