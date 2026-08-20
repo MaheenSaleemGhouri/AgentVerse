@@ -25,6 +25,16 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"  # noqa: S104 - container-internal bind address, not internet-exposed directly
     port: int = 8000
 
+    # docs/adr/0019 — which regional deployment this process instance is
+    # part of. `"primary"` today because only one region is deployed
+    # (docs/deployment/multi-region-readiness.md states that plainly);
+    # a real second region sets this to its own identifier so `/health`/
+    # `/ready` and every log line answer "which region handled this"
+    # without guessing from infrastructure metadata. Not itself
+    # multi-region capability — the cheap, honest first increment one is
+    # built from.
+    region: str = "primary"
+
     # Required, no default: Postgres is this service's system of record
     # (CLAUDE.md §8) — a missing value fails startup loudly rather than
     # surfacing as a runtime connection error on the first request.
