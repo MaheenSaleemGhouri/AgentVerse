@@ -41,8 +41,8 @@ from agentverse_api.orchestration_service.infrastructure.queue.job_queue_produce
 from agentverse_api.orchestration_service.interface.dependencies.services import (
     get_agent_repository,
     get_agent_run_repository,
-    get_job_queue_producer,
     get_lock_factory,
+    get_run_producer,
 )
 from agentverse_api.orchestration_service.interface.schemas.agents import (
     AgentResponse,
@@ -240,7 +240,7 @@ async def submit_run_route(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     agent_repo: AgentRepository = Depends(get_agent_repository),
     run_repo: AgentRunRepository = Depends(get_agent_run_repository),
-    producer: JobQueueProducer = Depends(get_job_queue_producer),
+    producer: JobQueueProducer = Depends(get_run_producer),
     lock_factory: LockFactory = Depends(get_lock_factory),
     quota: QuotaService = Depends(get_quota_service),
 ) -> RunResponse:

@@ -97,6 +97,12 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     queue_stream: str = "queue:jobs"
 
+    # docs/adr/0018 — the priority-pool stream apps/worker's
+    # `worker_pool="priority"` instances consume. Same wire-contract
+    # discipline as `queue_stream` above: value must match apps/worker's
+    # `queue_stream_priority` exactly, never imported across the boundary.
+    queue_stream_priority: str = "queue:jobs.priority"
+
     # Phase 5 — knowledge bases. The storage root must be outside any
     # web-served directory; nothing serves these files over HTTP
     # (CLAUDE.md §10). apps/worker reads the same root under its own

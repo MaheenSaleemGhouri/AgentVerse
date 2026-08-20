@@ -52,4 +52,41 @@ async def test_build_queue_registers_every_job_type(fake_redis: FakeRedis) -> No
     settings = Settings()
     queue = build_queue(fake_redis, settings)
 
-    assert set(queue._handlers.keys()) == {"echo", "agent_run", "kb_ingest", "team_session"}  # noqa: SLF001
+    assert set(queue._handlers.keys()) == {  # noqa: SLF001
+        "echo",
+        "agent_run",
+        "kb_ingest",
+        "team_session",
+        "workflow_node",
+    }
+
+
+async def test_shared_pool_binds_to_the_default_stream_dlq_and_group(
+    fake_redis: FakeRedis,
+) -> None:
+    """docs/adr/0018 — `worker_pool="shared"` is the default and must
+    stay wired to the same stream/group every worker instance has
+    always used, unaffected by the priority-pool settings' existence.
+    """
+    settings = Settings()
+    queue = build_queue(fake_redis, settings)
+
+    assert queue._stream == "queue:jobs"  # noqa: SLF001
+    assert queue._dlq_stream == "queue:jobs.dlq"  # noqa: SLF001
+    assert queue._group == "workers"  # noqa: SLF001
+
+
+async def test_priority_pool_binds_to_the_dedicated_stream_dlq_and_group(
+    fake_redis: FakeRedis,
+) -> None:
+    """docs/adr/0018 — a `worker_pool="priority"` instance must consume
+    the dedicated-infrastructure stream/group, never the shared one,
+    or an Enterprise workspace's runs would never actually gain
+    isolation from the shared fleet's contention.
+    """
+    settings = Settings(worker_pool="priority")
+    queue = build_queue(fake_redis, settings)
+
+    assert queue._stream == "queue:jobs.priority"  # noqa: SLF001
+    assert queue._dlq_stream == "queue:jobs.priority.dlq"  # noqa: SLF001
+    assert queue._group == "workers-priority"  # noqa: SLF001

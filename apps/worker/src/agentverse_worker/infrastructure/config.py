@@ -24,6 +24,21 @@ class Settings(BaseSettings):
     queue_stream: str = "queue:jobs"
     queue_dlq_stream: str = "queue:jobs.dlq"
     queue_group: str = "workers"
+
+    # docs/adr/0018 — Enterprise/dedicated-infrastructure workspaces get
+    # runs routed onto a second stream, consumed only by process
+    # instances started with `worker_pool="priority"`. Same
+    # `RedisStreamQueue` class, same handler dict, a second instance —
+    # not a second queue *system* (CLAUDE.md §16's "no unnecessary
+    # complexity"). A shared-pool instance never touches these.
+    queue_stream_priority: str = "queue:jobs.priority"
+    queue_dlq_stream_priority: str = "queue:jobs.priority.dlq"
+    queue_group_priority: str = "workers-priority"
+    #: Which stream *this process instance* consumes — set per deployed
+    #: worker process type (`AGENTVERSE_WORKER_WORKER_POOL=priority` on
+    #: the dedicated fleet), never per job. Two fleets, one image.
+    worker_pool: Literal["shared", "priority"] = "shared"
+
     queue_visibility_timeout_ms: int = 30_000
     queue_base_delay_seconds: float = 0.5
     queue_max_delay_seconds: float = 8.0

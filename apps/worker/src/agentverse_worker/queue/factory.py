@@ -34,7 +34,18 @@ from agentverse_worker.workflows.repository import WorkerWorkflowRepository
 def build_queue(redis_client: Redis, settings: Settings) -> RedisStreamQueue:
     """Callable directly in tests with a fake Redis client and custom
     `Settings` (e.g. tiny retry delays) — CLAUDE.md §11.
+
+    `settings.worker_pool` selects which stream *this instance*
+    consumes (docs/adr/0018) — `"priority"` binds to the
+    dedicated-infrastructure stream/group, `"shared"` (the default)
+    binds to the same stream/group every worker instance has always
+    used. Same handler dict either way: a priority-pool instance runs
+    the identical code, just against a different stream.
     """
+    is_priority = settings.worker_pool == "priority"
+    stream = settings.queue_stream_priority if is_priority else settings.queue_stream
+    dlq_stream = settings.queue_dlq_stream_priority if is_priority else settings.queue_dlq_stream
+    group = settings.queue_group_priority if is_priority else settings.queue_group
 
     # Built once per queue, not per job: the tokenizer's encoding load is
     # expensive and the embedding client owns a connection pool. Shared
@@ -113,7 +124,13 @@ def build_queue(redis_client: Redis, settings: Settings) -> RedisStreamQueue:
             deps = WorkflowExecutionDeps(
                 settings=settings,
                 redis=redis_client,
-                queue_stream=settings.queue_stream,
+                # The stream *this instance* consumes from, not
+                # unconditionally the default — a workflow node running
+                # on the priority pool must re-enqueue its follow-on
+                # node onto the priority stream too, or a multi-node
+                # workflow would silently fall back to the shared queue
+                # after its first node.
+                queue_stream=stream,
                 workflow_repo=WorkerWorkflowRepository(session),
                 agent_repo=WorkerAgentRepository(session),
                 team_repo=WorkerTeamRepository(session),
@@ -136,9 +153,9 @@ def build_queue(redis_client: Redis, settings: Settings) -> RedisStreamQueue:
 
     return RedisStreamQueue(
         redis_client,
-        stream=settings.queue_stream,
-        dlq_stream=settings.queue_dlq_stream,
-        group=settings.queue_group,
+        stream=stream,
+        dlq_stream=dlq_stream,
+        group=group,
         consumer=f"{settings.service_name}-{uuid.uuid4().hex[:8]}",
         handlers=handlers,
         visibility_timeout_ms=settings.queue_visibility_timeout_ms,

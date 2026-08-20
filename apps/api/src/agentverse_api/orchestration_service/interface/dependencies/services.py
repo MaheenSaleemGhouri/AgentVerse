@@ -22,6 +22,10 @@ from redis.asyncio import Redis
 from redis.asyncio import from_url as redis_from_url
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agentverse_api.auth_service.interface.dependencies.require_capability import (
+    require_capability,
+)
+from agentverse_api.billing_service.domain.plan import Capability
 from agentverse_api.infrastructure.config import get_settings
 from agentverse_api.infrastructure.db import get_db_session
 from agentverse_api.orchestration_service.application.oauth_flow import OAuthFlowService
@@ -129,6 +133,23 @@ def get_redis_client() -> Redis:
 def get_job_queue_producer() -> JobQueueProducer:
     settings = get_settings()
     return JobQueueProducer(get_redis_client(), stream=settings.queue_stream)
+
+
+async def get_run_producer(
+    entitled: bool = Depends(require_capability(Capability.PRIORITY_QUEUE)),
+) -> JobQueueProducer:
+    """Run/workflow-submission-route producer (docs/adr/0018): binds to
+    the priority stream when the workspace is entitled, the default
+    stream otherwise — including when the entitlement lookup itself
+    fails, since `require_capability` already falls open to `False`
+    there. Deliberately not `@lru_cache`'d like `get_job_queue_producer`
+    above: the stream it binds to is a per-request decision, not a
+    process-wide constant: only the underlying Redis client (itself
+    cached) is actually shared.
+    """
+    settings = get_settings()
+    stream = settings.queue_stream_priority if entitled else settings.queue_stream
+    return JobQueueProducer(get_redis_client(), stream=stream)
 
 
 def get_lock_factory() -> LockFactory:

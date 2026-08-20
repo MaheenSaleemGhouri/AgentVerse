@@ -30,8 +30,8 @@ from agentverse_api.orchestration_service.infrastructure.queue.job_queue_produce
 from agentverse_api.orchestration_service.interface.dependencies.services import (
     get_agent_repository,
     get_agent_run_repository,
-    get_job_queue_producer,
     get_lock_factory,
+    get_run_producer,
 )
 from tests.fakes.audit_service import FakeAuditService
 from tests.fakes.orchestration_repositories import FakeAgentRepository, FakeAgentRunRepository
@@ -88,7 +88,12 @@ async def client_with_fakes(
     app.dependency_overrides[require_viewer] = lambda: context
     app.dependency_overrides[get_agent_repository] = lambda: agent_repo
     app.dependency_overrides[get_agent_run_repository] = lambda: run_repo
-    app.dependency_overrides[get_job_queue_producer] = lambda: JobQueueProducer(
+    # `submit_run_route` depends on `get_run_producer` (docs/adr/0018), not
+    # the plain `get_job_queue_producer` singleton — overridden directly so
+    # this suite stays exactly what its module docstring promises (fakes
+    # only, no real DB/Redis I/O), rather than falling through to
+    # `require_capability`'s real entitlement lookup.
+    app.dependency_overrides[get_run_producer] = lambda: JobQueueProducer(
         fake_redis, stream=STREAM
     )
     app.dependency_overrides[get_lock_factory] = lambda: _lock_factory  # type: ignore[dict-item]
