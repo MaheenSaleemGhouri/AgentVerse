@@ -217,6 +217,36 @@ class PaymentProviderPort(Protocol):
         coupon_code: str | None,
     ) -> CheckoutSession: ...
 
+    async def create_one_time_checkout_session(
+        self,
+        *,
+        workspace_id: str,
+        provider_customer_id: str,
+        listing_slug: str,
+        listing_version: int,
+        purchaser_user_id: str,
+        amount_cents: int,
+        currency: str,
+        product_name: str,
+        success_url: str,
+        cancel_url: str,
+    ) -> CheckoutSession:
+        """A single ad-hoc charge — a marketplace listing purchase, never
+        a subscription. `mode: "payment"` at the adapter, distinct from
+        `create_checkout_session`'s `mode: "subscription"`; `_dispatch`
+        branches on which mode a completed session reports rather than
+        needing a second event type, since both arrive as the same
+        `checkout.session.completed` webhook.
+
+        Priced with ad-hoc `price_data` rather than a pre-created Stripe
+        Price object: a listing's price is set by its publisher in this
+        system's own database (`listings.price_cents`), and syncing every
+        publisher price change into a matching Stripe Price catalog would
+        be a second source of truth for a number the `plans` table
+        equivalent — `listings` — already owns.
+        """
+        ...
+
     async def create_portal_session(
         self, *, provider_customer_id: str, return_url: str
     ) -> PortalSession: ...

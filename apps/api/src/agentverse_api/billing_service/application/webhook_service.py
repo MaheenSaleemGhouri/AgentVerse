@@ -38,6 +38,7 @@ from typing import Protocol
 
 from agentverse_shared.observability.billing_metrics import record_webhook
 
+from agentverse_api.auth_service.application.audit_service import AuditService
 from agentverse_api.billing_service.application.plan_catalog_service import PlanCatalogService
 from agentverse_api.billing_service.application.subscription_service import (
     SubscriptionService,
@@ -69,6 +70,29 @@ class ReferralQualifier(Protocol):
     """
 
     async def qualify_and_pay(self, referred_workspace_id: str) -> object: ...
+
+
+class MarketplacePurchaseFulfiller(Protocol):
+    """The one thing a completed one-time-payment checkout needs from
+    marketplace install — installing the purchased listing into the
+    paying workspace once Stripe confirms the charge.
+
+    A Protocol, not `InstallService` itself, for the same reason
+    `ReferralQualifier`/`LifecycleNotifier` below are Protocols: this
+    module should be able to call exactly this one method and nothing
+    else on marketplace's install surface, and `application/` should not
+    import a sibling bounded context's concrete types (CLAUDE.md §5).
+    """
+
+    async def install(
+        self,
+        *,
+        slug: str,
+        workspace_id: str,
+        installed_by_user_id: str,
+        version_number: int | None = None,
+        bypass_payment_gate: bool = False,
+    ) -> object: ...
 
 
 class LifecycleNotifier(Protocol):
@@ -136,6 +160,14 @@ class WebhookService:
     #: deployment without notifications wired should still process
     #: payments.
     notifier: LifecycleNotifier | None = None
+    #: Optional for the same reason as `credits`/`notifier`: a deployment
+    #: that has not wired the marketplace context should still process
+    #: subscription webhooks, and one-time listing purchases simply are
+    #: not fulfilled until it is.
+    marketplace: MarketplacePurchaseFulfiller | None = None
+    #: Optional, matching `BillingActionsService.audit`'s own shape — a
+    #: deployment without an audit sink still processes payments.
+    audit: AuditService | None = None
     provider_name: str = PaymentProvider.STRIPE.value
 
     async def handle(self, event: ProviderEvent) -> WebhookOutcome:
@@ -225,8 +257,69 @@ class WebhookService:
                 return await self._on_subscription_deleted(event)
 
     async def _on_checkout_completed(self, event: ProviderEvent) -> bool:
-        """A customer finished paying. Open the subscription if this is
-        their first, or do nothing if a race already opened it.
+        """A customer finished paying — for a subscription, or a
+        one-time marketplace listing purchase. Both arrive as the same
+        `checkout.session.completed` event; only the session's `mode`
+        (carried through in `event.data`) tells them apart, so this
+        branches to the right handler before doing anything the other
+        one owns.
+        """
+        if event.data.get("mode") == "payment":
+            return await self._on_marketplace_purchase_completed(event)
+        return await self._on_subscription_checkout_completed(event)
+
+    async def _on_marketplace_purchase_completed(self, event: ProviderEvent) -> bool:
+        """A one-time payment for a premium marketplace listing settled —
+        install it into the paying workspace. Never a subscription
+        concern: no customer link, no `SubscriptionService` call, because
+        a listing purchase does not touch what plan the workspace is on.
+        """
+        assert event.workspace_id is not None  # noqa: S101 - checked in _dispatch
+        if self.marketplace is None:
+            logger.warning(
+                "billing_webhook_marketplace_purchase_unfulfillable",
+                extra={"provider_event_id": event.event_id},
+            )
+            return False
+        slug = event.data.get("listing_slug")
+        purchaser_user_id = event.data.get("purchaser_user_id")
+        if not isinstance(slug, str) or not isinstance(purchaser_user_id, str):
+            logger.warning(
+                "billing_webhook_marketplace_purchase_missing_metadata",
+                extra={"provider_event_id": event.event_id},
+            )
+            return False
+        version_raw = event.data.get("listing_version")
+        version_number = (
+            int(version_raw) if isinstance(version_raw, str) and version_raw.isdigit() else None
+        )
+        await self.marketplace.install(
+            slug=slug,
+            workspace_id=event.workspace_id,
+            installed_by_user_id=purchaser_user_id,
+            version_number=version_number,
+            # The purchase already happened — this is the one caller
+            # allowed to skip `InstallService`'s own premium-listing gate.
+            bypass_payment_gate=True,
+        )
+        if self.audit is not None:
+            payment_intent_id = event.data.get("payment_intent_id")
+            await self.audit.record(
+                action="marketplace.listing_installed",
+                outcome="success",
+                workspace_id=event.workspace_id,
+                actor_user_id=purchaser_user_id,
+                target=slug,
+                metadata={
+                    "payment_intent_id": str(payment_intent_id) if payment_intent_id else "",
+                    "provider_event_id": event.event_id,
+                },
+            )
+        return True
+
+    async def _on_subscription_checkout_completed(self, event: ProviderEvent) -> bool:
+        """A customer finished paying for a subscription. Open it if this
+        is their first, or do nothing if a race already opened it.
 
         The customer link is written first and unconditionally: it is how
         every later portal session, invoice list and refund finds this

@@ -195,6 +195,90 @@ class TestCheckout:
         assert call.kwargs["trial_days"] == 14
 
 
+class TestMarketplaceCheckout:
+    async def test_it_returns_a_hosted_url_and_creates_no_subscription(self) -> None:
+        # A marketplace purchase is not a plan change — starting one must
+        # never touch subscription state, unlike `start_checkout`.
+        service, provider, subscriptions, _ = _service()
+        session = await service.start_marketplace_checkout(
+            workspace_id="ws-1",
+            listing_slug="pro-support-triage",
+            listing_version=3,
+            purchaser_user_id="user-1",
+            amount_cents=2500,
+            currency="usd",
+            product_name="Pro Support Triage",
+            success_url="/ok",
+            cancel_url="/no",
+            billing_email=None,
+            workspace_name=None,
+        )
+        assert session.url.startswith("https://")
+        assert await subscriptions.current("ws-1") is None
+        assert provider.called("create_one_time_checkout_session")
+
+    async def test_a_workspace_with_an_active_subscription_can_still_buy_a_listing(self) -> None:
+        # Unlike `start_checkout`, no `SubscriptionAlreadyExistsError` —
+        # a Pro-tier workspace buying a premium listing is not trying to
+        # change its plan.
+        service, _, subscriptions, _ = _service()
+        await _subscribe(subscriptions)
+        session = await service.start_marketplace_checkout(
+            workspace_id="ws-1",
+            listing_slug="pro-support-triage",
+            listing_version=1,
+            purchaser_user_id="user-1",
+            amount_cents=1000,
+            currency="usd",
+            product_name="A Listing",
+            success_url="/ok",
+            cancel_url="/no",
+            billing_email=None,
+            workspace_name=None,
+        )
+        assert session.session_id
+
+    async def test_the_customer_is_linked_before_checkout_starts(self) -> None:
+        service, _, _, customers = _service()
+        await service.start_marketplace_checkout(
+            workspace_id="ws-1",
+            listing_slug="pro-support-triage",
+            listing_version=1,
+            purchaser_user_id="user-1",
+            amount_cents=1000,
+            currency="usd",
+            product_name="A Listing",
+            success_url="/ok",
+            cancel_url="/no",
+            billing_email="finance@example.test",
+            workspace_name="Acme",
+        )
+        linked = await customers.get_for_workspace("ws-1")
+        assert linked is not None
+        assert linked.provider_customer_id == "cus_fake"
+
+    async def test_the_listings_price_and_slug_reach_the_provider(self) -> None:
+        service, provider, _, _ = _service()
+        await service.start_marketplace_checkout(
+            workspace_id="ws-1",
+            listing_slug="pro-support-triage",
+            listing_version=3,
+            purchaser_user_id="user-1",
+            amount_cents=2500,
+            currency="usd",
+            product_name="Pro Support Triage",
+            success_url="/ok",
+            cancel_url="/no",
+            billing_email=None,
+            workspace_name=None,
+        )
+        call = next(c for c in provider.calls if c.method == "create_one_time_checkout_session")
+        assert call.kwargs["listing_slug"] == "pro-support-triage"
+        assert call.kwargs["listing_version"] == 3
+        assert call.kwargs["amount_cents"] == 2500
+        assert call.kwargs["purchaser_user_id"] == "user-1"
+
+
 class TestPortal:
     async def test_it_needs_a_linked_customer(self) -> None:
         service, _, _, _ = _service()

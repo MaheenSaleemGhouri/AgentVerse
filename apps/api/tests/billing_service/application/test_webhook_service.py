@@ -8,10 +8,12 @@ Those are the failures that cost money, and none of them raises.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from agentverse_api.auth_service.application.audit_service import AuditService
 from agentverse_api.billing_service.application.plan_catalog_service import PlanCatalogService
 from agentverse_api.billing_service.application.subscription_service import SubscriptionService
 from agentverse_api.billing_service.application.webhook_service import (
@@ -36,6 +38,7 @@ from tests.billing_service.fakes import (
     FakeSubscriptionRepository,
     FakeWebhookEventRepository,
 )
+from tests.fakes.auth_service_repositories import FakeAuditLogRepository
 
 _T0 = datetime(2026, 8, 5, 12, 0, tzinfo=UTC)
 
@@ -67,7 +70,42 @@ _PLANS = [
 ]
 
 
-def _service() -> tuple[
+@dataclass
+class _FakeMarketplaceFulfiller:
+    """Records every `install()` call rather than touching a real
+    listing/agent — the webhook handler's own dispatch/branching logic
+    is what these tests exercise, not `InstallService` itself (which
+    has its own suite).
+    """
+
+    calls: list[dict[str, object]] = field(default_factory=list)
+
+    async def install(
+        self,
+        *,
+        slug: str,
+        workspace_id: str,
+        installed_by_user_id: str,
+        version_number: int | None = None,
+        bypass_payment_gate: bool = False,
+    ) -> object:
+        self.calls.append(
+            {
+                "slug": slug,
+                "workspace_id": workspace_id,
+                "installed_by_user_id": installed_by_user_id,
+                "version_number": version_number,
+                "bypass_payment_gate": bypass_payment_gate,
+            }
+        )
+        return object()
+
+
+def _service(
+    *,
+    marketplace: _FakeMarketplaceFulfiller | None = None,
+    audit: AuditService | None = None,
+) -> tuple[
     WebhookService, FakeSubscriptionRepository, FakeWebhookEventRepository, SubscriptionService
 ]:
     subscriptions_repo = FakeSubscriptionRepository()
@@ -82,7 +120,13 @@ def _service() -> tuple[
     )
     events = FakeWebhookEventRepository()
     return (
-        WebhookService(events=events, subscriptions=subscription_service, catalog=catalog),
+        WebhookService(
+            events=events,
+            subscriptions=subscription_service,
+            catalog=catalog,
+            marketplace=marketplace,
+            audit=audit,
+        ),
         subscriptions_repo,
         events,
         subscription_service,
@@ -205,6 +249,91 @@ class TestCheckoutCompleted:
         customer = await subscription_service.customers.get_for_workspace("ws-1")
         assert customer is not None
         assert customer.provider_customer_id == "cus_1"
+
+
+class TestMarketplacePurchaseCompleted:
+    """A `checkout.session.completed` event with `mode: "payment"` is a
+    one-time listing purchase, not a subscription — it must never reach
+    `SubscriptionService` at all, only `MarketplacePurchaseFulfiller`.
+    """
+
+    async def test_it_installs_the_purchased_listing(self) -> None:
+        fulfiller = _FakeMarketplaceFulfiller()
+        service, _, _, subscription_service = _service(marketplace=fulfiller)
+        outcome = await service.handle(
+            _event(
+                ProviderEventType.CHECKOUT_COMPLETED,
+                data={
+                    "mode": "payment",
+                    "listing_slug": "pro-support-triage",
+                    "listing_version": "3",
+                    "purchaser_user_id": "user-42",
+                },
+            )
+        )
+        assert outcome is WebhookOutcome.PROCESSED
+        assert fulfiller.calls == [
+            {
+                "slug": "pro-support-triage",
+                "workspace_id": "ws-1",
+                "installed_by_user_id": "user-42",
+                "version_number": 3,
+                "bypass_payment_gate": True,
+            }
+        ]
+        # Never opens or touches a subscription — a listing purchase is
+        # not a plan change.
+        assert await subscription_service.current("ws-1") is None
+
+    async def test_it_records_an_audit_entry_with_the_payment_intent_id(self) -> None:
+        fulfiller = _FakeMarketplaceFulfiller()
+        audit = AuditService(audit_logs=FakeAuditLogRepository())
+        service, _, _, _ = _service(marketplace=fulfiller, audit=audit)
+        await service.handle(
+            _event(
+                ProviderEventType.CHECKOUT_COMPLETED,
+                data={
+                    "mode": "payment",
+                    "listing_slug": "pro-support-triage",
+                    "listing_version": "1",
+                    "purchaser_user_id": "user-42",
+                    "payment_intent_id": "pi_123",
+                },
+            )
+        )
+        recorded = audit.audit_logs.entries[0]  # type: ignore[attr-defined]
+        assert recorded.action == "marketplace.listing_installed"
+        assert recorded.actor_user_id == "user-42"
+        assert recorded.target == "pro-support-triage"
+        assert recorded.metadata["payment_intent_id"] == "pi_123"
+
+    async def test_missing_metadata_is_ignored_not_guessed(self) -> None:
+        # No slug and no purchaser: nothing safe to install as, and
+        # nobody to attribute it to.
+        fulfiller = _FakeMarketplaceFulfiller()
+        service, _, _, _ = _service(marketplace=fulfiller)
+        outcome = await service.handle(
+            _event(ProviderEventType.CHECKOUT_COMPLETED, data={"mode": "payment"})
+        )
+        assert outcome is WebhookOutcome.IGNORED
+        assert fulfiller.calls == []
+
+    async def test_no_fulfiller_wired_falls_open_to_ignored_not_raising(self) -> None:
+        # A deployment without marketplace wired must not fail webhook
+        # processing outright — the payment still succeeded at Stripe.
+        service, _, _, _ = _service(marketplace=None)
+        outcome = await service.handle(
+            _event(
+                ProviderEventType.CHECKOUT_COMPLETED,
+                data={
+                    "mode": "payment",
+                    "listing_slug": "pro-support-triage",
+                    "listing_version": "1",
+                    "purchaser_user_id": "user-42",
+                },
+            )
+        )
+        assert outcome is WebhookOutcome.IGNORED
 
 
 class TestPaymentEvents:

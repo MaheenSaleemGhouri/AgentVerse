@@ -259,6 +259,58 @@ class StripePaymentProvider:
             raise ProviderError("Stripe returned a checkout session with no URL")
         return CheckoutSession(session_id=str(session.id), url=str(url))
 
+    async def create_one_time_checkout_session(
+        self,
+        *,
+        workspace_id: str,
+        provider_customer_id: str,
+        listing_slug: str,
+        listing_version: int,
+        purchaser_user_id: str,
+        amount_cents: int,
+        currency: str,
+        product_name: str,
+        success_url: str,
+        cancel_url: str,
+    ) -> CheckoutSession:
+        metadata = {
+            "workspace_id": workspace_id,
+            "listing_slug": listing_slug,
+            "listing_version": str(listing_version),
+            "purchaser_user_id": purchaser_user_id,
+        }
+        params: dict[str, Any] = {
+            "mode": "payment",
+            "customer": provider_customer_id,
+            "line_items": [
+                {
+                    "price_data": {
+                        "currency": currency,
+                        "unit_amount": amount_cents,
+                        "product_data": {"name": product_name},
+                    },
+                    "quantity": 1,
+                }
+            ],
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+            "client_reference_id": workspace_id,
+            "metadata": metadata,
+            # Repeated onto the PaymentIntent (as `subscription_data` is
+            # for a subscription session above): `checkout.session.
+            # completed` carries the session's own metadata, which is
+            # enough for `_translate` today, but a PaymentIntent-level
+            # dispute or refund investigation in the Stripe dashboard
+            # should be traceable to the same listing without a second
+            # lookup.
+            "payment_intent_data": {"metadata": metadata},
+        }
+        session = await self._call(self._client.checkout.sessions.create, params=params)
+        url = session.url
+        if not url:
+            raise ProviderError("Stripe returned a checkout session with no URL")
+        return CheckoutSession(session_id=str(session.id), url=str(url))
+
     async def create_portal_session(
         self, *, provider_customer_id: str, return_url: str
     ) -> PortalSession:
@@ -492,5 +544,17 @@ class StripePaymentProvider:
                 # be resolved to a plan without a second API call.
                 "plan": metadata.get("plan"),
                 "interval": metadata.get("interval"),
+                # `mode` only exists on a Checkout Session object — present
+                # for CHECKOUT_COMPLETED, absent (None) for every other
+                # event type. `WebhookService._on_checkout_completed`
+                # branches on it: "subscription" is today's plan-purchase
+                # flow, "payment" is a marketplace listing purchase. Both
+                # marketplace fields are `None` on a subscription session,
+                # since Stripe simply omits metadata keys nobody set.
+                "mode": obj.get("mode"),
+                "listing_slug": metadata.get("listing_slug"),
+                "listing_version": metadata.get("listing_version"),
+                "purchaser_user_id": metadata.get("purchaser_user_id"),
+                "payment_intent_id": _as_str(obj.get("payment_intent")),
             },
         )

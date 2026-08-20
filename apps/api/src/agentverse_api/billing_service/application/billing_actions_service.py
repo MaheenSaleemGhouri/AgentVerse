@@ -119,6 +119,49 @@ class BillingActionsService:
             coupon_code=coupon_code,
         )
 
+    async def start_marketplace_checkout(
+        self,
+        *,
+        workspace_id: str,
+        listing_slug: str,
+        listing_version: int,
+        purchaser_user_id: str,
+        amount_cents: int,
+        currency: str,
+        product_name: str,
+        success_url: str,
+        cancel_url: str,
+        billing_email: str | None,
+        workspace_name: str | None,
+    ) -> CheckoutSession:
+        """A one-time charge for a premium marketplace listing.
+
+        Independent of subscription state — deliberately no
+        `SubscriptionAlreadyExistsError` check here, unlike
+        `start_checkout`. A workspace on Free or Pro can still buy a
+        listing; a marketplace purchase is not a plan change. The
+        listing is installed when the resulting `checkout.session.
+        completed` webhook arrives (`WebhookService.
+        _on_marketplace_purchase_completed`), not here — no install row
+        is created optimistically, same reasoning as `start_checkout`'s
+        subscription row.
+        """
+        customer_id = await self._ensure_customer(
+            workspace_id=workspace_id, email=billing_email, name=workspace_name
+        )
+        return await self.provider.create_one_time_checkout_session(
+            workspace_id=workspace_id,
+            provider_customer_id=customer_id,
+            listing_slug=listing_slug,
+            listing_version=listing_version,
+            purchaser_user_id=purchaser_user_id,
+            amount_cents=amount_cents,
+            currency=currency,
+            product_name=product_name,
+            success_url=success_url,
+            cancel_url=cancel_url,
+        )
+
     async def open_portal(self, *, workspace_id: str, return_url: str) -> PortalSession:
         """The provider's own management surface: payment methods, plan
         changes, cancellation, invoice history.

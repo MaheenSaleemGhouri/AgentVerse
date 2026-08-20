@@ -40,9 +40,16 @@ from agentverse_api.auth_service.interface.dependencies.services import (
     get_audit_service,
     get_workspace_service,
 )
+from agentverse_api.billing_service.application.billing_actions_service import (
+    BillingActionsService,
+)
+from agentverse_api.billing_service.interface.dependencies.services import (
+    get_billing_actions_service,
+)
 from agentverse_api.marketplace_service.application.install_service import (
     InstallService,
     ListingNotInstallableError,
+    ListingRequiresPurchaseError,
     ModerationService,
     NoSuchVersionError,
 )
@@ -183,6 +190,17 @@ class InstallResponse(BaseModel):
     #: False when an identical install already existed and was returned
     #: unchanged, so a retried request is visibly a retry.
     created: bool
+
+
+class MarketplaceCheckoutResponse(BaseModel):
+    """Where to send the browser to pay for a premium listing — the
+    marketplace-purchase equivalent of billing's `CheckoutResponse`. No
+    install happens yet: that follows the `checkout.session.completed`
+    webhook once Stripe confirms the charge.
+    """
+
+    checkout_url: str
+    session_id: str
 
 
 class InstalledListingResponse(BaseModel):
@@ -716,6 +734,16 @@ async def install_listing_route(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ListingNotInstallableError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except ListingRequiresPurchaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "code": "listing_requires_purchase",
+                "message": str(exc),
+                "checkout_path": f"/api/v1/workspaces/{context.workspace_id}"
+                f"/marketplace/listings/{slug}/checkout",
+            },
+        ) from exc
     except UninstallableConfigError as exc:
         # The publisher's snapshot is broken, not the installer's
         # request — so it names what is wrong rather than saying "invalid".
@@ -744,6 +772,56 @@ async def install_listing_route(
         installed_at=result.install.created_at,
         created=result.created,
     )
+
+
+@publisher_router.post(
+    "/{workspace_id}/marketplace/listings/{slug}/checkout",
+    response_model=MarketplaceCheckoutResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def start_marketplace_checkout_route(
+    slug: str,
+    context: WorkspaceContext = Depends(require_admin),
+    service: MarketplaceService = Depends(get_marketplace_service),
+    billing: BillingActionsService = Depends(get_billing_actions_service),
+) -> MarketplaceCheckoutResponse:
+    """Start Stripe Checkout for a premium listing. `require_admin`, same
+    ceiling as `/install` — buying writes an agent into the workspace
+    exactly like a free install does, just after a payment settles.
+
+    A free listing 400s here rather than starting a checkout with a
+    zero-amount line item: free installs stay the existing synchronous
+    `/install` call, no behavior change, and Stripe Checkout has no
+    reason to exist in that path at all.
+    """
+    listing = await service.get(slug=slug, viewer_workspace_id=context.workspace_id)
+    if listing.is_free:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "listing_is_free",
+                "message": "This listing is free — install it directly instead of "
+                "starting checkout.",
+                "install_path": f"/api/v1/workspaces/{context.workspace_id}"
+                f"/marketplace/listings/{slug}/install",
+            },
+        )
+    session = await billing.start_marketplace_checkout(
+        workspace_id=context.workspace_id,
+        listing_slug=slug,
+        listing_version=listing.latest_version,
+        purchaser_user_id=context.user_id,
+        amount_cents=listing.price_cents,
+        # Listings carry no currency column — `price_cents` is USD-only
+        # today, matching `plans`' own default currency (ADR-0012).
+        currency="usd",
+        product_name=listing.title,
+        success_url=f"/dashboard/{context.workspace_id}/marketplace/{slug}?checkout=success",
+        cancel_url=f"/dashboard/{context.workspace_id}/marketplace/{slug}?checkout=cancelled",
+        billing_email=None,
+        workspace_name=None,
+    )
+    return MarketplaceCheckoutResponse(checkout_url=session.url, session_id=session.session_id)
 
 
 @publisher_router.post(

@@ -30,6 +30,7 @@ from agentverse_api.marketplace_service.domain.install import (
 from agentverse_api.marketplace_service.domain.listing import (
     Listing,
     ListingStatus,
+    Pricing,
     is_public,
 )
 from agentverse_api.marketplace_service.domain.ports import (
@@ -65,6 +66,23 @@ class NoSuchVersionError(Exception):
         )
 
 
+class ListingRequiresPurchaseError(Exception):
+    """A premium listing was asked to install directly, bypassing
+    checkout (ADR — Area 2 marketplace purchase). Maps to HTTP 402.
+
+    Raised only when `bypass_payment_gate` is `False` — the caller a
+    real HTTP request reaches. The webhook path that installs *after*
+    Stripe confirms payment sets `bypass_payment_gate=True` and never
+    hits this, since by that point the purchase already happened.
+    """
+
+    def __init__(self, slug: str) -> None:
+        self.slug = slug
+        super().__init__(
+            f"Listing {slug!r} is premium — start checkout instead of installing directly."
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class InstallResult:
     install: MarketplaceInstall
@@ -90,12 +108,19 @@ class InstallService:
         installed_by_user_id: str,
         version_number: int | None = None,
         name: str | None = None,
+        bypass_payment_gate: bool = False,
     ) -> InstallResult:
         """Copy a published version into this workspace as a new agent.
 
         `version_number=None` installs the current version, which is what
         a one-click install means. Naming one explicitly exists so a
         workspace can pin, or re-install what they already reviewed.
+
+        `bypass_payment_gate` is `True` for exactly one caller: the
+        billing webhook, installing a listing *after* Stripe confirms a
+        one-time payment succeeded. Every other caller — the HTTP
+        install route included — leaves it `False`, so a premium
+        listing cannot be installed for free by calling this directly.
         """
         listing = await self.listings.get_by_slug(slug)
         if listing is None:
@@ -107,6 +132,8 @@ class InstallService:
             raise ListingNotInstallableError(
                 "This listing is not published, so there is nothing to install."
             )
+        if listing.pricing is Pricing.PREMIUM and not bypass_payment_gate:
+            raise ListingRequiresPurchaseError(slug)
 
         version = await self.versions.get_version(
             listing_id=listing.id, version_number=version_number

@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agentverse_api.marketplace_service.application.install_service import (
     InstallService,
     ListingNotInstallableError,
+    ListingRequiresPurchaseError,
     ModerationService,
     NoSuchVersionError,
 )
@@ -108,6 +109,8 @@ async def _publish(
     *,
     config: dict[str, object] | None = None,
     approve: bool = True,
+    pricing: Pricing = Pricing.FREE,
+    price_cents: int = 0,
 ) -> str:
     """A listing carried through moderation, ready to install."""
     service = _marketplace(session)
@@ -119,8 +122,8 @@ async def _publish(
         summary=_SUMMARY,
         description=_DESCRIPTION,
         category_slug="research",
-        pricing=Pricing.FREE,
-        price_cents=0,
+        pricing=pricing,
+        price_cents=price_cents,
     )
     await service.publish_version(
         slug=listing.slug,
@@ -289,6 +292,42 @@ class TestWhatCannotBeInstalled:
             await _installs(db_session).install(
                 slug=slug, workspace_id=installer, installed_by_user_id=user
             )
+        await db_session.rollback()
+
+    async def test_a_premium_listing_cannot_be_installed_directly(
+        self, db_session: AsyncSession
+    ) -> None:
+        # Closes the gap the Phase 12 audit found: before this gate,
+        # `install()` had no notion of price at all, so a premium
+        # listing installed exactly like a free one.
+        publisher = await _workspace(db_session)
+        installer = await _workspace(db_session)
+        user = await _user(db_session)
+        slug = await _publish(db_session, publisher, pricing=Pricing.PREMIUM, price_cents=2500)
+
+        with pytest.raises(ListingRequiresPurchaseError):
+            await _installs(db_session).install(
+                slug=slug, workspace_id=installer, installed_by_user_id=user
+            )
+        await db_session.rollback()
+
+    async def test_a_premium_listing_installs_once_the_payment_gate_is_bypassed(
+        self, db_session: AsyncSession
+    ) -> None:
+        # The one caller allowed to set this: the billing webhook,
+        # after Stripe confirms the one-time payment settled.
+        publisher = await _workspace(db_session)
+        installer = await _workspace(db_session)
+        user = await _user(db_session)
+        slug = await _publish(db_session, publisher, pricing=Pricing.PREMIUM, price_cents=2500)
+
+        result = await _installs(db_session).install(
+            slug=slug,
+            workspace_id=installer,
+            installed_by_user_id=user,
+            bypass_payment_gate=True,
+        )
+        assert result.created is True
         await db_session.rollback()
 
     async def test_an_unknown_slug_is_not_found(self, db_session: AsyncSession) -> None:

@@ -432,6 +432,33 @@ class FakePaymentProvider:
         )
         return CheckoutSession(session_id="cs_fake", url="https://provider.test/checkout/cs_fake")
 
+    async def create_one_time_checkout_session(
+        self,
+        *,
+        workspace_id: str,
+        provider_customer_id: str,
+        listing_slug: str,
+        listing_version: int,
+        purchaser_user_id: str,
+        amount_cents: int,
+        currency: str,
+        product_name: str,
+        success_url: str,
+        cancel_url: str,
+    ) -> CheckoutSession:
+        self._record(
+            "create_one_time_checkout_session",
+            workspace_id=workspace_id,
+            listing_slug=listing_slug,
+            listing_version=listing_version,
+            purchaser_user_id=purchaser_user_id,
+            amount_cents=amount_cents,
+            currency=currency,
+        )
+        return CheckoutSession(
+            session_id="cs_fake_onetime", url="https://provider.test/checkout/cs_fake_onetime"
+        )
+
     async def create_portal_session(
         self, *, provider_customer_id: str, return_url: str
     ) -> PortalSession:

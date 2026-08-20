@@ -43,6 +43,9 @@ from agentverse_api.billing_service.infrastructure.repositories import (
 from agentverse_api.billing_service.infrastructure.stripe.adapter import StripePaymentProvider
 from agentverse_api.infrastructure.config import Settings, get_settings
 from agentverse_api.infrastructure.db import get_db_session
+from agentverse_api.marketplace_service.interface.dependencies.services import (
+    get_install_service,
+)
 from agentverse_api.notification_service.application.billing_notifier import BillingNotifier
 from agentverse_api.notification_service.interface.dependencies.services import (
     build_notification_service,
@@ -180,6 +183,7 @@ def get_billing_actions_service(
 
 def get_webhook_service(
     session: AsyncSession = Depends(get_db_session),
+    audit: AuditService = Depends(get_audit_service),
 ) -> WebhookService:
     # Deliberately does not depend on `get_payment_provider`: the webhook
     # route resolves the provider itself for signature verification, and
@@ -198,4 +202,7 @@ def get_webhook_service(
         credits=get_credit_service(session),
         # A failed payment is the first dunning touchpoint.
         notifier=BillingNotifier(notifications=build_notification_service(session, get_settings())),
+        # A completed one-time payment installs the purchased listing.
+        marketplace=get_install_service(session),
+        audit=audit,
     )
