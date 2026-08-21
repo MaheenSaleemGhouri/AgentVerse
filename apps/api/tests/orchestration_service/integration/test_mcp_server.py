@@ -84,7 +84,7 @@ async def rest_client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
 
 
 async def _setup_workspace_agent_and_mcp_credential(
-    rest_client: AsyncClient, db_session: AsyncSession
+    rest_client: AsyncClient, db_session: AsyncSession, unique_name: str
 ) -> tuple[str, str, str]:
     """Returns (workspace_id, agent_id, mcp_client_plaintext_key).
 
@@ -96,8 +96,14 @@ async def _setup_workspace_agent_and_mcp_credential(
     itself FastAPI-DI-wired, since it is built once at app-construction
     time, not resolved per request. Without an explicit commit here, that
     separate connection cannot see the credential this just issued.
+
+    Named per-test via `unique_name`, not a fixed literal: a repeated
+    local run (or any future parallel run) against the same database
+    would otherwise collide on the workspace name's unique slug.
     """
-    create_ws = await rest_client.post("/api/v1/workspaces", json={"name": "MCP E2E"})
+    create_ws = await rest_client.post(
+        "/api/v1/workspaces", json={"name": f"MCP E2E {unique_name}"}
+    )
     assert create_ws.status_code == 201
     workspace_id = create_ws.json()["id"]
 
@@ -129,10 +135,10 @@ async def _setup_workspace_agent_and_mcp_credential(
 
 
 async def test_a_real_mcp_client_can_list_and_run_agents(
-    rest_client: AsyncClient, db_session: AsyncSession
+    rest_client: AsyncClient, db_session: AsyncSession, unique_name: str
 ) -> None:
     workspace_id, agent_id, mcp_key = await _setup_workspace_agent_and_mcp_credential(
-        rest_client, db_session
+        rest_client, db_session, unique_name
     )
 
     app = create_app()  # a fresh app object, matching how a real deployment mounts /mcp once
@@ -204,14 +210,14 @@ async def test_a_real_mcp_client_can_list_and_run_agents(
 
 
 async def test_a_user_api_key_is_rejected_by_the_mcp_server(
-    rest_client: AsyncClient, db_session: AsyncSession
+    rest_client: AsyncClient, db_session: AsyncSession, unique_name: str
 ) -> None:
     """`kind='user_api_key'` must never authenticate `/mcp` — the
     reverse of the ordinary-REST-API rejection already covered in
     `get_current_workspace` tests.
     """
     workspace_id, _agent_id, _mcp_key = await _setup_workspace_agent_and_mcp_credential(
-        rest_client, db_session
+        rest_client, db_session, unique_name
     )
     issue_user_key = await rest_client.post(
         f"/api/v1/workspaces/{workspace_id}/api-keys", json={"name": "personal key"}
@@ -240,10 +246,10 @@ async def test_a_user_api_key_is_rejected_by_the_mcp_server(
 
 
 async def test_a_read_only_scoped_credential_cannot_run_an_agent(
-    rest_client: AsyncClient, db_session: AsyncSession
+    rest_client: AsyncClient, db_session: AsyncSession, unique_name: str
 ) -> None:
     workspace_id, agent_id, _mcp_key = await _setup_workspace_agent_and_mcp_credential(
-        rest_client, db_session
+        rest_client, db_session, unique_name
     )
     issue_readonly = await rest_client.post(
         f"/api/v1/workspaces/{workspace_id}/mcp-clients",

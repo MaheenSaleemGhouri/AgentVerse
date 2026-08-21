@@ -108,7 +108,12 @@ async def test_a_referral_code_attributes_the_new_workspace_end_to_end(
             {"referred": referred_workspace_id},
         )
     ).one()
-    assert row.referrer_workspace_id == referrer_workspace_id
+    # A raw `text()` query goes through asyncpg's own type mapping, not
+    # SQLAlchemy's column-level `as_uuid=False` decoration — a native
+    # Postgres `uuid` column comes back as `uuid.UUID`, while every id
+    # elsewhere in this system (including the JSON response above) is a
+    # plain opaque string (CLAUDE.md §7). Compared as strings on purpose.
+    assert str(row.referrer_workspace_id) == referrer_workspace_id
     assert row.status == "pending"
 
 
