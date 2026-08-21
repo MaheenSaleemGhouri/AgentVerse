@@ -28,7 +28,13 @@ from agentverse_api.auth_service.interface.dependencies.require_capability impor
 from agentverse_api.billing_service.domain.plan import Capability
 from agentverse_api.infrastructure.config import get_settings
 from agentverse_api.infrastructure.db import get_db_session
+from agentverse_api.orchestration_service.application.eval_harness.regression_runner import (
+    RegressionRunner,
+)
 from agentverse_api.orchestration_service.application.oauth_flow import OAuthFlowService
+from agentverse_api.orchestration_service.application.prompt_template_service import (
+    PromptTemplateService,
+)
 from agentverse_api.orchestration_service.application.provider_test_service import (
     ProviderTestService,
 )
@@ -39,6 +45,12 @@ from agentverse_api.orchestration_service.domain.ports.integration_repository im
 )
 from agentverse_api.orchestration_service.domain.ports.knowledge_repository import (
     KnowledgeRepository,
+)
+from agentverse_api.orchestration_service.domain.ports.prompt_repository import (
+    EvalRunRepository,
+    GoldenExampleRepository,
+    PromptTemplateRepository,
+    PromptVersionRepository,
 )
 from agentverse_api.orchestration_service.domain.ports.provider_adapter import ProviderAdapter
 from agentverse_api.orchestration_service.domain.ports.run_repository import AgentRunRepository
@@ -57,6 +69,12 @@ from agentverse_api.orchestration_service.infrastructure.knowledge_repository im
 )
 from agentverse_api.orchestration_service.infrastructure.oauth.providers import (
     build_oauth_providers,
+)
+from agentverse_api.orchestration_service.infrastructure.prompt_repository import (
+    SqlEvalRunRepository,
+    SqlGoldenExampleRepository,
+    SqlPromptTemplateRepository,
+    SqlPromptVersionRepository,
 )
 from agentverse_api.orchestration_service.infrastructure.providers.anthropic_adapter import (
     AnthropicProviderAdapter,
@@ -290,4 +308,54 @@ def get_oauth_flow_service(
         providers=build_oauth_providers(settings),
         callback_url=f"{settings.api_public_url}/api/v1/integrations/oauth/callback",
         http_client=get_oauth_http_client(),
+    )
+
+
+# ---- Phase 8: prompt versioning / eval harness ------------------------
+
+
+def get_prompt_template_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> PromptTemplateRepository:
+    return SqlPromptTemplateRepository(session)
+
+
+def get_prompt_version_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> PromptVersionRepository:
+    return SqlPromptVersionRepository(session)
+
+
+def get_golden_example_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> GoldenExampleRepository:
+    return SqlGoldenExampleRepository(session)
+
+
+def get_eval_run_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> EvalRunRepository:
+    return SqlEvalRunRepository(session)
+
+
+def get_prompt_template_service(
+    templates: PromptTemplateRepository = Depends(get_prompt_template_repository),
+    versions: PromptVersionRepository = Depends(get_prompt_version_repository),
+    golden_examples: GoldenExampleRepository = Depends(get_golden_example_repository),
+) -> PromptTemplateService:
+    return PromptTemplateService(
+        templates=templates, versions=versions, golden_examples=golden_examples
+    )
+
+
+def get_regression_runner(
+    versions: PromptVersionRepository = Depends(get_prompt_version_repository),
+    golden_examples: GoldenExampleRepository = Depends(get_golden_example_repository),
+    eval_runs: EvalRunRepository = Depends(get_eval_run_repository),
+) -> RegressionRunner:
+    return RegressionRunner(
+        provider=get_provider_adapter(),
+        versions=versions,
+        golden_examples=golden_examples,
+        eval_runs=eval_runs,
     )

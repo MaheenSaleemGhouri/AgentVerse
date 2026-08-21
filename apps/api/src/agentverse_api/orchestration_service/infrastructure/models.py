@@ -16,6 +16,7 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    Float,
     ForeignKey,
     Identity,
     Integer,
@@ -43,6 +44,7 @@ from agentverse_api.orchestration_service.domain.knowledge_entities import (
     EMBEDDING_DIMENSIONS,
     DocumentStatus,
 )
+from agentverse_api.orchestration_service.domain.prompt import PromptVersionStatus
 from agentverse_api.orchestration_service.domain.run_entities import RunStatus, RunStepType
 from agentverse_api.orchestration_service.domain.team_entities import (
     CommunicationKind,
@@ -1090,3 +1092,90 @@ class WorkflowNodeRunModel(Base):
     sequence: Mapped[int] = mapped_column(Integer, default=0)
     started_at: Mapped[datetime | None] = mapped_column(default=None)
     completed_at: Mapped[datetime | None] = mapped_column(default=None)
+
+
+class PromptTemplateModel(Base):
+    """Phase 8 — the stable identity a prompt's versions are grouped
+    under. Not workspace-owned, matching `domain.prompt.PromptTemplate`'s
+    own docstring: first-party prompts are platform content.
+    """
+
+    __tablename__ = "prompt_templates"
+
+    id: Mapped[str] = _uuid_pk()
+    slug: Mapped[str] = mapped_column(Text, unique=True, index=True)
+    name: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime]
+    updated_at: Mapped[datetime]
+
+
+class PromptVersionModel(Base):
+    """Immutable once `status='active'` — enforced at the application
+    layer (`promote_prompt_version.py` never exposes a way to edit
+    `system_instructions` on a non-draft version), matching how
+    `listing_versions` enforces the same rule for marketplace listings.
+    """
+
+    __tablename__ = "prompt_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "prompt_template_id", "version_number", name="uq_prompt_versions_template_number"
+        ),
+    )
+
+    id: Mapped[str] = _uuid_pk()
+    prompt_template_id: Mapped[str] = mapped_column(
+        ForeignKey("prompt_templates.id", ondelete="CASCADE"), index=True
+    )
+    version_number: Mapped[int] = mapped_column(Integer)
+    system_instructions: Mapped[str] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(Text)
+    temperature: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    # TEXT + CHECK, not a Postgres ENUM — this repo's standing
+    # preference since Phase 10 (`0958619d3576`'s migration docstring):
+    # `ALTER TYPE ... DROP VALUE` doesn't exist, and an earlier ENUM
+    # column already needed a follow-up migration just to add one value.
+    status: Mapped[str] = mapped_column(Text, default=PromptVersionStatus.DRAFT.value)
+    created_at: Mapped[datetime]
+    activated_at: Mapped[datetime | None] = mapped_column(nullable=True, default=None)
+
+
+class GoldenExampleModel(Base):
+    """One fixed (input, expectation) pair — `expectation`'s shape
+    depends on `rubric` (`SchemaExpectation`/`KeywordExpectation`/
+    `LlmJudgeExpectation`), serialized as JSONB rather than three
+    nullable-column sets: the discriminated shape already lives in the
+    domain layer (`domain.golden_dataset`), and duplicating it as
+    schema would be a second place it could drift.
+    """
+
+    __tablename__ = "prompt_golden_examples"
+
+    id: Mapped[str] = _uuid_pk()
+    prompt_template_id: Mapped[str] = mapped_column(
+        ForeignKey("prompt_templates.id", ondelete="CASCADE"), index=True
+    )
+    input: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    rubric: Mapped[str] = mapped_column(Text)
+    expectation: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created_at: Mapped[datetime]
+
+
+class PromptEvalRunModel(Base):
+    """One regression run. `results` is the full per-example
+    `ExampleResult` list as JSONB, not a child table — nothing queries
+    across runs at the individual-example grain (the promotion gate
+    only reads `passed`/`id` off the latest run), so a child table
+    would add a join for no real query this system makes.
+    """
+
+    __tablename__ = "prompt_eval_runs"
+
+    id: Mapped[str] = _uuid_pk()
+    prompt_version_id: Mapped[str] = mapped_column(
+        ForeignKey("prompt_versions.id", ondelete="CASCADE"), index=True
+    )
+    started_at: Mapped[datetime]
+    completed_at: Mapped[datetime | None] = mapped_column(nullable=True, default=None)
+    results: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)

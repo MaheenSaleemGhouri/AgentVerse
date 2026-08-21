@@ -101,6 +101,9 @@ from agentverse_api.orchestration_service.interface.mcp_server.server import (
     get_mcp_server,
     mcp_asgi_app,
 )
+from agentverse_api.orchestration_service.interface.routers.admin_prompts import (
+    router as admin_prompts_router,
+)
 from agentverse_api.orchestration_service.interface.routers.agents import (
     router as agents_router,
 )
@@ -241,6 +244,7 @@ def create_app() -> FastAPI:
     app.include_router(scim_router)
     app.include_router(internal_sso_providers_router)
     app.include_router(agents_router)
+    app.include_router(admin_prompts_router)
     app.include_router(knowledge_router)
     app.include_router(run_stream_router)
     app.include_router(teams_router)

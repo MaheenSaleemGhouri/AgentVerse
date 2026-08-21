@@ -29,12 +29,20 @@ class FakeProviderAdapter:
 
     stream_events: list[StreamEvent] = field(default_factory=list)
     chat_result: ChatResult | None = None
+    #: A queue of results, one per successive `chat()` call, popped in
+    #: order — for a caller (like `RegressionRunner`) that makes several
+    #: calls in one test and needs each to answer differently. Checked
+    #: before the single `chat_result` fallback; leave empty for every
+    #: existing single-result caller to keep behaving unchanged.
+    chat_results: list[ChatResult] = field(default_factory=list)
     tool_call_result: ToolCallResult | None = None
     structured_output_result: StructuredOutputResult | None = None
     requests: list[ChatRequest] = field(default_factory=list)
 
     async def chat(self, request: ChatRequest) -> ChatResult:
         self.requests.append(request)
+        if self.chat_results:
+            return self.chat_results.pop(0)
         if self.chat_result is None:
             return ChatResult(
                 content="fake response",
