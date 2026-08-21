@@ -3,17 +3,28 @@
 ## Status
 
 `apps/web` (the Next.js frontend) is deployed to Vercel. `apps/api` and
-`apps/worker` are **not** deployed anywhere yet — Vercel cannot run them
-(they are a long-running FastAPI service and a background worker fleet,
-not serverless functions), and no separate host (Railway/Coolify/Fly) has
-been configured. This was an explicit, agreed scope decision, not an
-oversight.
+`apps/worker` are deployed to **Render**, per `render.yaml` at the repo
+root (Blueprint: `agentverse-api`, `agentverse-worker`, `agentverse-redis`,
+region `oregon`). This section previously stated the backend was not
+hosted anywhere — that went stale the moment the Render blueprint was
+provisioned and was never updated here, which cost a real investigation
+to rediscover. Verified live 2026-08-21:
 
-**Effect:** authentication (signup/login/logout/password reset) works in
-production — Better Auth runs inside `apps/web` against its own Postgres
-connection. Everything that calls `apps/api` (dashboard data, agents,
-knowledge, MCP, workflows, billing, marketplace) will fail until a
-backend is hosted and `API_INTERNAL_URL` is pointed at it.
+- `https://agentverse-api-063d.onrender.com/health` and `/ready` → `200
+  {"status":"ok","region":"primary"}`.
+- `POST /mcp` → `401` (credential required, not `404`) — confirms Render
+  is running current `main`, including same-day work, so auto-deploy on
+  push is effectively working.
+- A real signup against `https://agentverse-virid.vercel.app` returned a
+  valid session, and the authenticated `/dashboard` render (which calls
+  `apps/api` for the workspace list via `apiFetch`'s JWT path) rendered
+  correctly — end-to-end frontend → backend → Postgres confirmed working,
+  not just individually reachable.
+- `/openapi.json` is `404` by design (docs disabled in production).
+
+**Effect:** the "everything that calls apps/api will fail" warning below
+is **no longer true** — dashboard data, agents, knowledge, MCP,
+workflows, billing, and marketplace all go through a live backend now.
 
 ## Vercel project
 
@@ -44,11 +55,17 @@ Production Postgres is provisioned via **Vercel's Neon integration**
 `DATABASE_URL` (and the Neon-provided variants) are set for
 Production/Preview/Development automatically by the integration.
 
-All Alembic migrations have been run against it — the schema matches
-`apps/api`'s current head revision (`b6e2f04a9d17`). No seed/fixture data
-was inserted; the one row present is a real smoke-test signup
-(`prod-smoke-*@example.com`), left in place as evidence the auth loop
-works end-to-end — safe to delete whenever.
+Alembic migrations run against it whenever Render redeploys `apps/api`
+(same Neon database, reused by both services — see `render.yaml`'s
+top-of-file comment). The `b6e2f04a9d17` head this doc previously cited
+is stale; the live `/mcp` route responding `401` rather than `404`
+(instead of the pre-Phase-12 behavior) confirms the schema is at least
+current through this session's migrations. Re-verify with `alembic
+current` against the real `AGENTVERSE_API_DATABASE_URL` before trusting a
+specific revision number here rather than re-guessing. Test signup rows
+(`prod-smoke-*@example.com`, `live-check-*@example.com`) are left in
+place as evidence the auth loop works end-to-end — safe to delete
+whenever.
 
 ## Environment variables (production scope)
 
@@ -58,9 +75,9 @@ works end-to-end — safe to delete whenever.
 | `BETTER_AUTH_SECRET` | SECRET, REQUIRED | Set (generated) |
 | `BETTER_AUTH_URL` | SERVER-ONLY, REQUIRED | Set — `https://agentverse-virid.vercel.app` |
 | `NEXT_PUBLIC_BETTER_AUTH_URL` | PUBLIC, REQUIRED | Set — same value as above (this is intentionally public: it's just the app's own URL) |
-| `INTERNAL_API_SECRET` | SECRET, REQUIRED | Set (generated) — **must be regenerated and set identically on apps/api** once it's hosted; don't reuse this value blindly |
-| `API_INTERNAL_URL` | SERVER-ONLY, REQUIRED | Placeholder (`https://backend-not-yet-deployed.invalid`) — replace with the real backend URL once hosted, then redeploy |
-| `API_PUBLIC_URL` | SERVER-ONLY, OPTIONAL | Not set (SCIM discovery only; unneeded until backend exists) |
+| `INTERNAL_API_SECRET` | SECRET, REQUIRED | Set — must equal Render's `AGENTVERSE_API_INTERNAL_API_SECRET` byte-for-byte (`render.yaml`'s own comment on that var). Not independently re-verified this pass since neither platform exposes the plaintext value via the tooling available; if `/internal/*` calls ever start 401ing, this pairing is the first thing to check. |
+| `API_INTERNAL_URL` | SERVER-ONLY, REQUIRED | Set — `https://agentverse-api-063d.onrender.com` (Render's assigned hostname; the `agentverse-api.onrender.com` name predicted in `render.yaml`'s comment was already taken, so Render appended a suffix) |
+| `API_PUBLIC_URL` | SERVER-ONLY, OPTIONAL | SCIM discovery only — check if a customer relies on it before assuming unset is fine |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | SECRET, OPTIONAL | Not set — GitHub login button stays hidden until both are set (by design, never a dead button) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | SECRET, OPTIONAL | Not set — same as above for Google |
 
@@ -79,22 +96,31 @@ hosted, not in this Vercel project.
 
 ## Known non-blocking issue
 
-`/pricing` logs an "page changed from static to dynamic at runtime"
-warning on every request. Cause: the page attempts to fetch SSO provider
-config from `apps/api` (`revalidate: 0`), which fails since the backend
-isn't hosted; Next.js flags the static/dynamic mismatch this produces.
-The page still renders correctly (200, no user-visible effect) — this is
-log noise tied directly to the "no backend yet" state, and should
-resolve on its own once `API_INTERNAL_URL` points at a real service.
+`/pricing` still logs a "page changed from static to dynamic at runtime"
+warning on every request, and `loadSsoProviders` logs "could not reach
+apps/api" even though the backend is now reachable. Re-diagnosed
+2026-08-21: the backend is not actually unreachable — `lib/sso-providers.ts`
+calls `fetch(..., { cache: "no-store" })` from `lib/auth.ts`'s top-level
+await, and Next.js's own internal `DYNAMIC_SERVER_USAGE` bailout signal
+(thrown to abort static prerendering of `/pricing`) gets caught by that
+function's generic `try/catch` and misreported as a fetch failure — it is
+not evidence of a real connectivity problem. Effect is still harmless
+(SSO provider list is empty on affected renders, password/social login
+unaffected, page still returns 200) — but the log message is misleading
+and worth narrowing to a real `fetch`-vs-framework-signal distinction if
+anyone chases it again.
 
 ## Next steps
 
-1. Host `apps/api` + `apps/worker` (Railway/Coolify/Fly per `CLAUDE.md`
-   §12), set `API_INTERNAL_URL` to its real URL, generate a fresh
-   `INTERNAL_API_SECRET` shared by both sides, set `OPENAI_API_KEY` and
-   the rest of `apps/api/.env.example`'s required keys there.
-2. Connect GitHub → Vercel via the dashboard for push-to-deploy.
+1. Confirm the exact Alembic revision Render's `apps/api` is running
+   (`alembic current` against the real `AGENTVERSE_API_DATABASE_URL`) and
+   record it here instead of the stale number this doc previously had.
+2. Connect GitHub → Vercel via the dashboard for push-to-deploy, if not
+   already connected (not re-verified this pass).
 3. Decide on a custom domain from the available-alternatives list above,
-   or accept the `.vercel.app` domain for now.
-4. Delete the `prod-smoke-*@example.com` test account once no longer
-   needed as a verification reference.
+   or accept the `.vercel.app`/`.onrender.com` domains for now.
+4. Delete the `prod-smoke-*@example.com` / `live-check-*@example.com`
+   test accounts once no longer needed as verification references.
+5. Narrow `loadSsoProviders`'s catch block so a real fetch failure and
+   Next.js's `DYNAMIC_SERVER_USAGE` signal aren't logged identically
+   (see "Known non-blocking issue" above).
