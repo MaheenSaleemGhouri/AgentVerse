@@ -1,7 +1,8 @@
 """Builds AgentVerse's own MCP server (docs/adr/0017) — a single global
-`FastMCP` instance mounted into the main FastAPI app at its root
-(`main.py`, so this sub-app's own `/mcp` route is reached with no
-redirect hop), never a separate server process. Streamable HTTP is the
+`FastMCP` instance registered into the main FastAPI app as a raw
+`Route("/mcp", ...)` (`main.py`, so this sub-app's own `/mcp` route is
+reached with no redirect hop and without shadowing any other route in
+the app), never a separate server process. Streamable HTTP is the
 transport (the current MCP spec's recommended remote transport), not
 stdio — this is a hosted, multi-tenant server, not a local subprocess.
 
@@ -83,14 +84,13 @@ def _build_mcp(settings: Settings) -> FastMCP:
             "Run and inspect AgentVerse agents and workflows in the workspace this "
             "MCP client credential was issued for."
         ),
-        # Left at the SDK default (`/mcp`) deliberately: `main.py` mounts
-        # this sub-app at the FastAPI app's root (`Mount("/", ...)`), not
-        # under an extra `/mcp` prefix — Starlette's `Mount` redirects any
-        # bare hit on its own prefix to add a trailing slash (a `POST /mcp`
-        # against `Mount("/mcp", ...)` 307s to `/mcp/`, breaking a real
-        # client's `POST /mcp` regardless of what path the sub-app declares
-        # internally), so the only redirect-free way to serve `POST /mcp`
-        # is for this sub-app to own that exact path itself.
+        # Left at the SDK default (`/mcp`) deliberately: `main.py` registers
+        # this sub-app as a raw `Route("/mcp", endpoint=mcp_asgi_app())`,
+        # not a `Mount` at any prefix — a `Mount("/mcp", ...)` redirects a
+        # bare hit on its own prefix to add a trailing slash (`POST /mcp`
+        # 307s to `/mcp/`, breaking a real client that doesn't follow
+        # redirects on a POST), so the sub-app must own this exact path
+        # itself and be reached without any prefix-stripping in between.
         token_verifier=ApiKeyTokenVerifier(),
         auth=AuthSettings(
             # No real OAuth authorization server behind this — credentials
@@ -116,10 +116,12 @@ def get_mcp_server() -> FastMCP:
 
 
 def mcp_asgi_app() -> Starlette:
-    """The Starlette ASGI app `main.py` mounts at its root (this sub-app
-    declares its own `/mcp` route internally) — auth middleware
-    (`AuthenticationMiddleware` + `RequireAuthMiddleware`) is wired
-    automatically by `streamable_http_app()` because `auth=` was passed
-    to `FastMCP` above.
+    """The Starlette ASGI app `main.py` registers as `Route("/mcp", ...)`
+    (this sub-app declares its own `/mcp` route internally, matched
+    directly since a `Route` endpoint receives the request's path
+    unmodified) — auth middleware (`AuthenticationMiddleware` +
+    `RequireAuthMiddleware`) is wired automatically by
+    `streamable_http_app()` because `auth=` was passed to `FastMCP`
+    above.
     """
     return get_mcp_server().streamable_http_app()

@@ -275,19 +275,35 @@ def create_app() -> FastAPI:
     app.include_router(internal_provider_test_router)
     app.include_router(internal_job_test_router)
 
-    # AgentVerse's own MCP server surface (docs/adr/0017) — a Starlette
-    # sub-app, not an `include_router`, since the MCP SDK owns its own
-    # routing/auth-middleware stack for this path. Mounted at root, not at
-    # `/mcp`: the sub-app already declares its own route at `/mcp`
-    # (`server.py`'s `_build_mcp`), and mounting it under an *additional*
-    # `/mcp` prefix would make a bare `POST /mcp` hit only the mount
-    # boundary — Starlette redirects that case to add a trailing slash
-    # (307 to `/mcp/`), which breaks real MCP clients that POST to `/mcp`
-    # with no trailing slash and don't follow redirects on a POST. Not
-    # workspace-prefixed: the workspace is resolved from the presented
-    # `mcp_client` credential (`mcp_server/auth.py`), the same way
-    # `api_keys` are already workspace-scoped at issuance.
-    app.mount("/", mcp_asgi_app())
+    # AgentVerse's own MCP server surface (docs/adr/0017) — a raw
+    # `Route`, not `Mount` and not `include_router`, since the MCP SDK
+    # owns its own routing/auth-middleware stack for this one path.
+    # `Route("/mcp", endpoint=<the Starlette sub-app>)` mirrors exactly
+    # how the SDK registers its own internal route (`streamable_http_app`
+    # in `mcp.server.fastmcp`) — Starlette treats a class-instance
+    # endpoint as raw ASGI (`Route.__init__`), so the sub-app receives
+    # the request with its path unmodified and matches its own `/mcp`
+    # route directly. This was previously `app.mount("/", ...)`, which
+    # also achieved a redirect-free exact match on `/mcp` (a `Mount` at
+    # `/mcp` itself hits the same bare-path-redirect problem `Route`
+    # avoids here) but as a side effect swallowed *every* unmatched path
+    # in the entire app — including routes added to `app` after
+    # `create_app()` returns, which is exactly what `_test_router`-style
+    # test fixtures do (`tests/auth_service/integration/
+    # test_ip_allowlist_routes.py` and others), silently 404ing them via
+    # the MCP sub-app's own 404 rather than the outer app's. A bare
+    # `Route` matches only its own exact path, so it cannot shadow
+    # anything, at any point in the route list. Not workspace-prefixed:
+    # the workspace is resolved from the presented `mcp_client`
+    # credential (`mcp_server/auth.py`), the same way `api_keys` are
+    # already workspace-scoped at issuance.
+    # Starlette's own stub types `add_route`'s second argument only for
+    # the function-endpoint case; `Route.__init__` at runtime explicitly
+    # branches on a class-instance endpoint (which a `Starlette` sub-app
+    # is) and treats it as raw ASGI, unwrapped — exactly what `FastMCP`
+    # itself relies on internally for its own `/mcp` route. The stub
+    # gap, not a real type mismatch.
+    app.add_route("/mcp", mcp_asgi_app(), include_in_schema=False)  # type: ignore[arg-type]
 
     return app
 
