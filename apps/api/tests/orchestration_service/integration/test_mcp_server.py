@@ -25,7 +25,7 @@ from agentverse_api.auth_service.interface.dependencies.get_current_identity imp
     get_current_identity,
     get_current_identity_optional,
 )
-from agentverse_api.infrastructure.db import get_db_session
+from agentverse_api.infrastructure.db import get_db_session, get_engine, get_session_factory
 from agentverse_api.main import create_app
 from agentverse_api.orchestration_service.interface.mcp_server.server import get_mcp_server
 
@@ -47,6 +47,33 @@ def _fresh_mcp_server() -> Iterator[None]:
     get_mcp_server.cache_clear()
     yield
     get_mcp_server.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_session_factory() -> Iterator[None]:
+    """`get_engine()`/`get_session_factory()` (`infrastructure/db.py`)
+    are the same kind of process-lifetime `@lru_cache` as `get_mcp_server`
+    above, for the same production-correct reason — but
+    `ApiKeyTokenVerifier` (`mcp_server/auth.py`) uses them directly,
+    bypassing this file's `db_session_override`, so the cached engine's
+    pooled asyncpg connections end up bound to whichever test's event
+    loop was running when the engine was first created. pytest-asyncio
+    gives each test function its own loop; a pooled connection created on
+    an earlier test's (now-closed) loop surfaces as `RuntimeError: ...
+    attached to a different loop` the next time the pool hands that
+    specific connection back out — intermittent, since it only bites when
+    the pool happens to return the stale one rather than a same-loop
+    sibling from its own pool_size. Clearing *both* caches per test (the
+    sessionmaker alone is not enough — it just wraps whatever engine
+    `get_engine()` still has cached) gives each test its own engine and
+    pool on its own loop, matching how `_fresh_mcp_server` above already
+    treats the same class of cache for the same reason.
+    """
+    get_engine.cache_clear()
+    get_session_factory.cache_clear()
+    yield
+    get_engine.cache_clear()
+    get_session_factory.cache_clear()
 
 
 async def _make_user(session: AsyncSession, user_id: str) -> None:
@@ -285,3 +312,180 @@ async def test_a_read_only_scoped_credential_cannot_run_an_agent(
                 "run_agent_tool", {"agent_id": agent_id, "input": {"prompt": "hi"}}
             )
             assert denied.isError
+
+
+async def test_create_support_ticket_and_escalate_to_human(
+    rest_client: AsyncClient, db_session: AsyncSession, unique_name: str
+) -> None:
+    """Phase 13 — both tools create real `support_tickets` rows through
+    the real application/repository layers, already `TRIAGED`, with no
+    triage sub-run.
+    """
+    workspace_id, _agent_id, mcp_key = await _setup_workspace_agent_and_mcp_credential(
+        rest_client, db_session, unique_name
+    )
+
+    app = create_app()
+    async with (  # noqa: SIM117
+        get_mcp_server().session_manager.run(),
+        AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://localhost",
+            headers={"Authorization": f"Bearer {mcp_key}"},
+        ) as http_client,
+        streamable_http_client("http://localhost/mcp", http_client=http_client) as (
+            read_stream,
+            write_stream,
+            _get_session_id,
+        ),
+    ):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+
+            ticket = await session.call_tool(
+                "create_support_ticket",
+                {
+                    "subject": "Product arrived damaged",
+                    "body": "The box was crushed.",
+                    "category": "damaged-item",
+                    "priority": "high",
+                },
+            )
+            assert not ticket.isError, ticket.content
+            assert ticket.structuredContent is not None
+            assert ticket.structuredContent["status"] == "triaged"
+            assert ticket.structuredContent["category"] == "damaged-item"
+            assert "body" not in ticket.structuredContent  # Section 7: never the raw body back
+
+            escalation = await session.call_tool(
+                "escalate_to_human",
+                {"reason": "refund dispute", "summary": "Customer disputes the decision."},
+            )
+            assert not escalation.isError, escalation.content
+            assert escalation.structuredContent is not None
+            assert escalation.structuredContent["category"] == "escalation"
+            assert escalation.structuredContent["priority"] == "urgent"
+
+    rows = (
+        await db_session.execute(
+            text("SELECT category, priority, status FROM support_tickets WHERE workspace_id = :ws"),
+            {"ws": workspace_id},
+        )
+    ).all()
+    assert {(r.category, r.priority, r.status) for r in rows} == {
+        ("damaged-item", "high", "triaged"),
+        ("escalation", "urgent", "triaged"),
+    }
+    audit_rows = (
+        await db_session.execute(
+            text(
+                "SELECT action FROM audit_logs WHERE workspace_id = :ws "
+                "AND action = 'mcp_server.tool_executed'"
+            ),
+            {"ws": workspace_id},
+        )
+    ).all()
+    assert len(audit_rows) >= 2
+
+
+async def test_commerce_tools_report_unavailable_without_a_real_integration(
+    rest_client: AsyncClient, db_session: AsyncSession, unique_name: str
+) -> None:
+    """No commerce MCP integration exists in this test environment (or
+    any environment today — ADR-0020) — these tools must say so plainly
+    rather than inventing an order.
+    """
+    _workspace_id, _agent_id, mcp_key = await _setup_workspace_agent_and_mcp_credential(
+        rest_client, db_session, unique_name
+    )
+
+    app = create_app()
+    async with (  # noqa: SIM117
+        get_mcp_server().session_manager.run(),
+        AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://localhost",
+            headers={"Authorization": f"Bearer {mcp_key}"},
+        ) as http_client,
+        streamable_http_client("http://localhost/mcp", http_client=http_client) as (
+            read_stream,
+            write_stream,
+            _get_session_id,
+        ),
+    ):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+
+            order = await session.call_tool("lookup_order", {"order_number": "NC-1024"})
+            assert not order.isError
+            assert order.structuredContent == {
+                "available": False,
+                "reason": "No commerce integration is installed for this workspace.",
+            }
+
+            shipping = await session.call_tool(
+                "check_shipping_status", {"order_number": "NC-1024"}
+            )
+            assert not shipping.isError
+            assert shipping.structuredContent is not None
+            assert shipping.structuredContent["available"] is False
+
+            # Neither tool's Python signature accepts workspace_id (or any
+            # credential/URL/key) as a parameter at all — `resolve_context`
+            # is the only source of `workspace_id` for any tool in this
+            # file, so there is structurally nothing for a caller to
+            # override here (Section 15's constraint). The stronger
+            # "unexpected argument is refused" guarantee Section 15 also
+            # asks for is `apps/worker/tools/boundary.py::validate_arguments`
+            # (`additionalProperties: false`), which governs the *agent*
+            # calling this tool through `GovernedMcpServer` — a different
+            # layer from this raw MCP-protocol client, covered by
+            # `apps/worker/tests/tools/test_boundary.py`, not re-tested
+            # here.
+
+
+async def test_request_return_always_routes_to_human_approval(
+    rest_client: AsyncClient, db_session: AsyncSession, unique_name: str
+) -> None:
+    """Section 17: a return is never auto-processed, regardless of
+    integration state — it always becomes an approval ticket.
+    """
+    workspace_id, _agent_id, mcp_key = await _setup_workspace_agent_and_mcp_credential(
+        rest_client, db_session, unique_name
+    )
+
+    app = create_app()
+    async with (  # noqa: SIM117
+        get_mcp_server().session_manager.run(),
+        AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://localhost",
+            headers={"Authorization": f"Bearer {mcp_key}"},
+        ) as http_client,
+        streamable_http_client("http://localhost/mcp", http_client=http_client) as (
+            read_stream,
+            write_stream,
+            _get_session_id,
+        ),
+    ):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+
+            result = await session.call_tool(
+                "request_return", {"order_number": "NC-1024", "reason": "wrong item"}
+            )
+            assert not result.isError, result.content
+            assert result.structuredContent is not None
+            assert result.structuredContent["approval_required"] is True
+            assert result.structuredContent["status"] == "triaged"
+
+    rows = (
+        await db_session.execute(
+            text(
+                "SELECT category FROM support_tickets WHERE workspace_id = :ws "
+                "AND category = 'return-request'"
+            ),
+            {"ws": workspace_id},
+        )
+    ).all()
+    assert len(rows) == 1

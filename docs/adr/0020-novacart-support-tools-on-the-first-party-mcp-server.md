@@ -1,0 +1,48 @@
+# ADR-0020: NovaCart Support/Commerce Tools on the First-Party MCP Server
+
+## Context
+
+Phase 13 gives the NovaCart Customer Support Agent real tool capabilities: `create_support_ticket`, `escalate_to_human`, and a prepared (not yet live-wired) surface for `lookup_order`, `check_shipping_status`, `request_return`. A re-audit of the agent-tool architecture (this session, cross-checked against the Phase 12 audit) confirmed the same conclusion again from a different angle: an agent's tools are **never** native/hardcoded — `apps/worker/agents/builtin_tools.py`'s `get_current_time`/`calculator` pair is explicitly documented in its own module docstring as pre-dating the real tool-execution boundary and not to be extended (`apps/worker/tools/boundary.py::execute_tool` is that boundary, and it exists now). Every real tool call, for any agent, on any run, reaches an actual MCP server through `attach_integrations()` (`apps/worker/mcp/attach.py`) resolving `installed_servers`/`permissions` rows and wrapping the connection in `GovernedMcpServer`.
+
+This means giving NovaCart new tools requires those tools to be *real MCP tools on a real MCP server NovaCart connects to* — there is no lighter-weight native path without either bypassing the boundary (forbidden) or building a second registry (forbidden). AgentVerse already operates exactly one first-party, governed MCP server: `orchestration_service/interface/mcp_server/` (ADR-0017), mounted at `POST /mcp`. No orders/order_items/customers domain exists anywhere in this codebase (re-confirmed this session), so `lookup_order`/`check_shipping_status`/`request_return` cannot read real AgentVerse-native data — only a connected external commerce MCP server (e.g. Shopify, already cataloged in `mcp_catalog.py`) could ever answer them for real, and no such integration is configured in any environment today.
+
+## Decision
+
+### The 5 new tools are added to the existing `/mcp` server, not a second one
+
+`orchestration_service/interface/mcp_server/tools.py` grows from 7 tools to 12. This is a recorded, deliberate extension of ADR-0017's "closed list of 7" — still closed (still an enumerated, reviewed set, still no generic passthrough), just larger. Building a second `FastMCP` instance/route for these 5 would duplicate `auth.py`'s credential verification, `context.py`'s role resolution, and every piece of Streamable HTTP/DNS-rebinding-allowlist configuration ADR-0017 already solved once — a second tool registry in every sense the task's own constraints forbid, for zero isolation benefit a `permissions.allowed_tools` grant doesn't already give per-caller.
+
+### NovaCart reaches these tools as an *installed integration of AgentVerse's own MCP server*
+
+This is the reusable pattern this ADR records: a workspace's agent can be granted tools implemented by AgentVerse itself, with zero new infrastructure, by treating AgentVerse's own `/mcp` endpoint as just another installable MCP server:
+
+1. An `installed_servers` row for NovaCart's workspace (`mcp_server_id=NULL` — a "custom" install, since this isn't a third-party catalog offering; `endpoint_url` = the API's own public URL + `/mcp`, `transport=streamable_http`).
+2. A real `api_keys` row, `kind='mcp_client'`, issued through the existing `ApiKeyService` (same issuance path the MCP-clients settings page uses) — a real, working bearer credential, not a placeholder.
+3. A `credentials` row holding that key, sealed through the existing `CredentialVault` — identical to how any third-party MCP server's secret is stored.
+4. A `permissions` row scoping NovaCart's `agent_id` to `allowed_tools=["create_support_ticket","escalate_to_human","lookup_order","check_shipping_status","request_return"]`.
+
+At run time, NovaCart's agent run goes through `attach_integrations()` exactly like it would for any real third-party server: it connects over Streamable HTTP to AgentVerse's own `/mcp`, authenticating with its own real credential, and every call is wrapped by `GovernedMcpServer`/`execute_tool` — the full existing pipeline (circuit breaker, permission, argument validation, budget, retry, sanitize, `tool_calls` logging), unmodified. Two independent RBAC layers now compose correctly for the same server: the credential's own **role ceiling** (`context.py::require_role`, same as the original 7 tools — an `mcp_client` key's `scope` caps what it can call regardless of caller), and the **per-agent grant narrowing** (`ToolGrant.allowed_tools`, enforced by the boundary) — NovaCart's specific run cannot call `run_workflow` even though it is on the same server, because its `permissions` row never named it.
+
+### `create_support_ticket`/`escalate_to_human` get a new *synchronous* application-service path, not the existing async-triage-run one
+
+`SupportTicketService.create_ticket()` (existing, unmodified) triggers a full second agent run to triage a ticket — correct for the human-facing REST API, where nobody has classified the issue yet. NovaCart is *already* mid-conversation with the customer when it calls this tool; forcing a live chat tool call to await an unrelated async sub-run just to get a ticket ID would be a real UX regression for no benefit. `create_ticket_direct()` (new) calls the same, existing repository methods (`tickets.create`, `tickets.update_triage_result`) the async path already uses, marking the ticket `TRIAGED` immediately with whatever `category`/`priority` the calling agent supplies — both pre-existing, nullable, unconstrained free-text columns. No new `TicketStatus` value, no new column, no CHECK constraint changed.
+
+`escalate_to_human` reuses this same path with `category="escalation"`, `priority="urgent"` — free-text values already established by Phase 8's own `support-triage` golden examples (`severity: ["urgent","high"]` on the same field family), not invented here. There is no `escalated`/`open` status in `TicketStatus` (`triaging|triaged|resolved|failed` only) and none is added — escalation is a *classification* of an existing ticket, not a new lifecycle state, matching how a human support queue would actually filter for it (`category`/`priority`, not `status`).
+
+### The commerce tools are honest, not fake — and not yet fully wired
+
+`lookup_order`/`check_shipping_status` check whether *any* active `installed_servers` row exists for the workspace and return a structured `{"available": false, "reason": ...}` either way this phase — never a fabricated order. The distinction between "no integration installed" and "integration installed but live lookup not yet wired" is surfaced in the `reason` text so a future session (or a real Shopify connection) has an honest signal to act on. Building the actual outbound-MCP-client call to a real commerce server (Shopify or otherwise) is explicitly deferred: no real commerce credentials exist in any environment to develop or test that logic against, and guessing at a third party's tool/argument shape without them is exactly the kind of untested, unverifiable code this constitution's testing standards exist to prevent. `request_return` never depends on this distinction at all — per Section 17's approval-required constraint, it always creates a `category="return-request"` ticket for a human, regardless of integration state; there is no autonomous-return policy anywhere in this codebase to have overridden that default.
+
+## Consequences
+
+- Adding a **sixth** first-party agent tool in the future means: add it to `tools.py`, decide its `Role` floor, and — if it should be *agent*-callable (not just externally callable) — grant it through the same self-install `permissions` row. No new server, no new auth path, no new registry.
+- NovaCart's own `permissions` grant is the single place its tool surface is controlled; disabling a tool for NovaCart specifically (without affecting other MCP clients) means editing that one row's `allowed_tools`, not touching `tools.py`.
+- The commerce tools' `"available": false` responses are a real, load-bearing contract the NovaCart agent's own instructions rely on (`docs/adr/0020`'s companion doc) — a future session wiring real Shopify calls must keep the same response shape for the "still not configured" case, since existing instructions and tests depend on it.
+- Real order lookup remains genuinely unimplemented until a workspace has real commerce credentials — tracked explicitly in `docs/compliance/security-gap-register.md`-style follow-up (see the Phase 13 tools doc), not silently left undocumented.
+
+## Alternatives considered and rejected
+
+- **A second, purpose-built MCP server for support/commerce tools.** Rejected: duplicates ADR-0017's auth/transport/security work for zero isolation benefit `permissions.allowed_tools` doesn't already provide per agent.
+- **Extending `builtin_tools.py`'s native/trusted set.** Rejected outright: that module's own docstring says it predates the governed boundary and is not the mechanism for new tools; every mutating action here (ticket creation, escalation) needs audit logging, RBAC, and argument validation the builtin path does not provide.
+- **Reusing `SupportTicketService.create_ticket()` verbatim for the new tools.** Rejected: would require inventing a "which agent is this workspace's triage agent" resolution mechanism that does not exist today, and would make a live conversational tool call block on an unrelated async run for no product benefit.
+- **Building the real Shopify-calling logic now, guessing at its tool/argument shapes.** Rejected: no real credentials exist to verify the guess against; shipping unverifiable code against a live third party is a worse outcome than an honest "not yet wired" response.

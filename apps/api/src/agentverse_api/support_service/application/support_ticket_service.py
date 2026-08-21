@@ -64,6 +64,46 @@ class SupportTicketService:
             created_by_user_id=created_by_user_id,
         )
 
+    async def create_ticket_direct(
+        self,
+        *,
+        workspace_id: str,
+        subject: str,
+        body: str,
+        created_by_user_id: str,
+        category: str | None = None,
+        priority: str | None = None,
+    ) -> SupportTicket:
+        """Creates a ticket already classified, with no triage sub-run.
+
+        `create_ticket` above exists for the human-facing REST flow, where
+        nobody has judged the issue yet — triggering a real triage agent
+        run is the right way to classify it. This path is for a caller
+        (an agent tool, mid-conversation) that has *already* classified
+        the issue as part of reasoning about it live: waiting on a second
+        async run just to open a ticket the caller can already describe
+        would make a live chat tool call block on infrastructure it
+        doesn't need.
+
+        Uses only the existing repository methods, the existing
+        `TRIAGED` status, and the existing free-text `category`/
+        `priority` columns (no CHECK constraint on either) — no new
+        status, field, or enum value.
+        """
+        ticket = await self.tickets.create(
+            workspace_id=workspace_id,
+            subject=subject,
+            body=body,
+            triage_run_id=None,
+            created_by_user_id=created_by_user_id,
+        )
+        return await self.tickets.update_triage_result(
+            ticket_id=ticket.id,
+            status=TicketStatus.TRIAGED,
+            category=category,
+            priority=priority,
+        )
+
     async def get_ticket(self, *, workspace_id: str, ticket_id: str) -> SupportTicket | None:
         """Reads the ticket, resolving its triage result from the run's
         own steps if the run has finished since it was last read —

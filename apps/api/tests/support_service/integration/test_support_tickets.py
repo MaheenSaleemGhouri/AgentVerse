@@ -281,3 +281,74 @@ class TestResolve:
         assert resolved is not None
         assert resolved.status is TicketStatus.RESOLVED
         await db_session.rollback()
+
+
+class TestCreateTicketDirect:
+    """Phase 13's tool-originated path — no triage sub-run, no agent
+    required, classified synchronously by the caller.
+    """
+
+    async def test_creates_an_already_triaged_ticket_with_no_run(
+        self, db_session: AsyncSession
+    ) -> None:
+        workspace_id = await _workspace(db_session)
+        user_id = await _user(db_session)
+        service = _service(db_session)
+
+        ticket = await service.create_ticket_direct(
+            workspace_id=workspace_id,
+            subject="Product arrived damaged",
+            body="The box was crushed and the item inside is broken.",
+            created_by_user_id=user_id,
+            category="damaged-item",
+            priority="high",
+        )
+
+        assert ticket.status is TicketStatus.TRIAGED
+        assert ticket.triage_run_id is None
+        assert ticket.category == "damaged-item"
+        assert ticket.priority == "high"
+        stored = await service.get_ticket(workspace_id=workspace_id, ticket_id=ticket.id)
+        assert stored is not None
+        assert stored.status is TicketStatus.TRIAGED
+        await db_session.rollback()
+
+    async def test_category_and_priority_are_optional(self, db_session: AsyncSession) -> None:
+        workspace_id = await _workspace(db_session)
+        user_id = await _user(db_session)
+        service = _service(db_session)
+
+        ticket = await service.create_ticket_direct(
+            workspace_id=workspace_id,
+            subject="General question",
+            body="Just asking something.",
+            created_by_user_id=user_id,
+        )
+
+        assert ticket.status is TicketStatus.TRIAGED
+        assert ticket.category is None
+        assert ticket.priority is None
+        await db_session.rollback()
+
+    async def test_is_invisible_to_another_workspace(self, db_session: AsyncSession) -> None:
+        owner_workspace = await _workspace(db_session)
+        stranger_workspace = await _workspace(db_session)
+        user_id = await _user(db_session)
+        service = _service(db_session)
+
+        ticket = await service.create_ticket_direct(
+            workspace_id=owner_workspace,
+            subject="Escalation: refund dispute",
+            body="Customer disputes the refund decision.",
+            created_by_user_id=user_id,
+            category="escalation",
+            priority="urgent",
+        )
+
+        stranger_view = await service.get_ticket(
+            workspace_id=stranger_workspace, ticket_id=ticket.id
+        )
+        owner_view = await service.get_ticket(workspace_id=owner_workspace, ticket_id=ticket.id)
+        assert stranger_view is None
+        assert owner_view is not None
+        await db_session.rollback()

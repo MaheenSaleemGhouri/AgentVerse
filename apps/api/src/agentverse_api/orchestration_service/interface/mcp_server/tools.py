@@ -1,7 +1,10 @@
-"""The 7 tools AgentVerse's own MCP server exposes (docs/adr/0017) —
-`list_agents`, `get_agent`, `run_agent`, `get_run_status`,
-`list_workflows`, `get_workflow`, `run_workflow`. Each is a thin
-adapter: resolve the caller's identity and role (`context.py`), check
+"""The tools AgentVerse's own MCP server exposes (docs/adr/0017,
+docs/adr/0020) — the original 7 (`list_agents`, `get_agent`, `run_agent`,
+`get_run_status`, `list_workflows`, `get_workflow`, `run_workflow`) plus
+Phase 13's 5 support/commerce tools for the NovaCart Customer Support
+Agent (`create_support_ticket`, `escalate_to_human`, `lookup_order`,
+`check_shipping_status`, `request_return`). Each is a thin adapter:
+resolve the caller's identity and role (`context.py`), check
 authorization, delegate to the exact application function or repository
 method the equivalent REST route already calls, audit the outcome.
 Nothing here reimplements orchestration logic — the same "delegate,
@@ -10,7 +13,12 @@ Phase 9's primitives.
 
 No arbitrary API exposure: this is a closed list, not a generic
 database/API passthrough (CLAUDE.md §10's AI-specific threat-surface
-rule extends naturally to an external-facing tool surface).
+rule extends naturally to an external-facing tool surface). Growing the
+list from 7 to 12 is a recorded decision (ADR-0020), not scope creep —
+it is still closed, and a caller's *own* agent additionally never sees
+more of it than its `permissions.allowed_tools` grant names (ADR-0020's
+self-install pattern), independent of what its credential's role would
+otherwise permit.
 """
 
 from __future__ import annotations
@@ -33,12 +41,16 @@ from agentverse_api.orchestration_service.application.execute_workflow import (
     execute_workflow,
 )
 from agentverse_api.orchestration_service.application.run_agent import run_agent
+from agentverse_api.orchestration_service.domain.integration_entities import InstallStatus
 from agentverse_api.orchestration_service.domain.run_exceptions import (
     AgentNotRunnableError,
     RunSubmissionConflictError,
 )
 from agentverse_api.orchestration_service.domain.workflow_exceptions import (
     WorkflowNotRunnableError,
+)
+from agentverse_api.orchestration_service.infrastructure.integration_repository import (
+    SqlIntegrationRepository,
 )
 from agentverse_api.orchestration_service.infrastructure.queue.job_queue_producer import (
     JobQueueProducer,
@@ -62,6 +74,19 @@ from agentverse_api.orchestration_service.interface.mcp_server.context import (
     require_role,
     resolve_context,
 )
+from agentverse_api.support_service.application.support_ticket_service import (
+    MAX_BODY_LENGTH,
+    SupportTicketService,
+)
+from agentverse_api.support_service.infrastructure.repositories import (
+    SqlSupportTicketRepository,
+)
+
+#: Cap on the free-text `subject`/`reason` fields these tools accept —
+#: same reasoning as `MAX_BODY_LENGTH`: bounding prompt-injection blast
+#: radius and cost on every free-text field that reaches an LLM prompt
+#: (CLAUDE.md §7), not because a real subject line is ever this long.
+MAX_SUBJECT_LENGTH = 200
 
 
 def _agent_dict(agent: Any) -> dict[str, Any]:
@@ -99,6 +124,36 @@ def _run_dict(run: Any, *, run_type: str, id_field: str) -> dict[str, Any]:
         "error_message": run.error_message,
         "created_at": run.created_at.isoformat(),
     }
+
+
+def _ticket_dict(ticket: Any) -> dict[str, Any]:
+    """Only what Section 7 (spec) allows back to the model: never the
+    ticket body, never `created_by_user_id`, never anything beyond what
+    a customer-facing agent should relay.
+    """
+    return {
+        "ticket_id": ticket.id,
+        "status": ticket.status.value,
+        "category": ticket.category,
+        "priority": ticket.priority,
+        "created_at": ticket.created_at.isoformat(),
+    }
+
+
+def _support_ticket_service(session: Any) -> SupportTicketService:
+    """Builds the full service even though these tools only call
+    `create_ticket_direct` — the other four collaborators are the exact
+    objects `run_agent_tool` above already constructs from the same
+    session, so this adds no new wiring, just reuses it for a second
+    call site.
+    """
+    return SupportTicketService(
+        tickets=SqlSupportTicketRepository(session),
+        agent_repo=SqlAgentRepository(session),
+        run_repo=SqlAgentRunRepository(session),
+        producer=JobQueueProducer(get_redis_client(), stream="queue:jobs"),
+        lock_factory=get_lock_factory(),
+    )
 
 
 async def _audit(
@@ -407,3 +462,233 @@ def register_tools(mcp: FastMCP) -> None:
                 target=run.id,
             )
             return _run_dict(run, run_type="workflow", id_field="workflow_id")
+
+    # --- Phase 13: NovaCart support/commerce tools (ADR-0020) ------------
+
+    @mcp.tool()
+    async def create_support_ticket(
+        ctx: Context[Any, Any, Any],
+        subject: str,
+        body: str,
+        category: str | None = None,
+        priority: str | None = None,
+    ) -> dict[str, Any]:
+        """Open a support ticket for a customer issue that needs human
+        follow-up or a recorded case. `category`/`priority` are your own
+        classification of the issue (free text — e.g. "billing"/"urgent")
+        based on the conversation so far; both are optional.
+        """
+        resolved = resolve_context(ctx)
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            try:
+                require_role(resolved, Role.MEMBER)
+            except McpAuthorizationError:
+                await _audit(
+                    session,
+                    action="mcp_server.tool_denied",
+                    resolved=resolved,
+                    outcome="denied",
+                    target="create_support_ticket",
+                )
+                raise
+
+            ticket = await _support_ticket_service(session).create_ticket_direct(
+                workspace_id=resolved.workspace_id,
+                subject=subject[:MAX_SUBJECT_LENGTH],
+                body=body[:MAX_BODY_LENGTH],
+                created_by_user_id=resolved.user_id,
+                category=category,
+                priority=priority,
+            )
+            await _audit(
+                session,
+                action="mcp_server.tool_executed",
+                resolved=resolved,
+                outcome="success",
+                target=ticket.id,
+            )
+            return _ticket_dict(ticket)
+
+    @mcp.tool()
+    async def escalate_to_human(
+        ctx: Context[Any, Any, Any],
+        reason: str,
+        summary: str,
+        priority: str | None = None,
+    ) -> dict[str, Any]:
+        """Escalate to a human support representative — for refund
+        disputes, account/security issues, unclear policy exceptions,
+        anything the knowledge base doesn't cover, or a request that
+        needs privileged action. This only records the escalation as a
+        ticket for a human to act on; it never performs a sensitive
+        action itself.
+        """
+        resolved = resolve_context(ctx)
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            try:
+                require_role(resolved, Role.MEMBER)
+            except McpAuthorizationError:
+                await _audit(
+                    session,
+                    action="mcp_server.tool_denied",
+                    resolved=resolved,
+                    outcome="denied",
+                    target="escalate_to_human",
+                )
+                raise
+
+            ticket = await _support_ticket_service(session).create_ticket_direct(
+                workspace_id=resolved.workspace_id,
+                subject=f"Escalation: {reason}"[:MAX_SUBJECT_LENGTH],
+                body=summary[:MAX_BODY_LENGTH],
+                created_by_user_id=resolved.user_id,
+                category="escalation",
+                priority=priority or "urgent",
+            )
+            await _audit(
+                session,
+                action="mcp_server.tool_executed",
+                resolved=resolved,
+                outcome="success",
+                target=ticket.id,
+            )
+            return _ticket_dict(ticket)
+
+    async def _commerce_integration_available(session: Any, workspace_id: str) -> bool:
+        """Whether *any* live, active MCP integration is installed for
+        this workspace.
+
+        Deliberately not narrowed to "the right kind" of integration
+        (e.g. Shopify specifically) — AgentVerse has no live commerce
+        integration to develop or test that distinction against today
+        (ADR-0020), and guessing at a filter nothing exercises would be
+        exactly the kind of untested code this constitution warns
+        against. An install existing is necessary but not sufficient for
+        a real order lookup to work; see the tools' own docstrings.
+        """
+        installs = await SqlIntegrationRepository(session).list_installed(
+            workspace_id=workspace_id
+        )
+        return any(install.status is InstallStatus.ACTIVE for install in installs)
+
+    @mcp.tool()
+    async def lookup_order(ctx: Context[Any, Any, Any], order_number: str) -> dict[str, Any]:
+        """Look up an order's status. Only works when a real commerce
+        integration (e.g. Shopify) is installed and configured for this
+        workspace — AgentVerse stores no order data of its own. Returns
+        `{"available": false, ...}` rather than inventing an order when
+        no such integration is connected; never guess or fabricate an
+        order status.
+        """
+        resolved = resolve_context(ctx)
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            require_role(resolved, Role.VIEWER)
+            available = await _commerce_integration_available(session, resolved.workspace_id)
+            result = (
+                {
+                    "available": False,
+                    "reason": (
+                        "A commerce integration is installed for this workspace, but live "
+                        "order lookup through it is not yet wired (Phase 13 follow-up)."
+                    ),
+                }
+                if available
+                else {
+                    "available": False,
+                    "reason": "No commerce integration is installed for this workspace.",
+                }
+            )
+            await _audit(
+                session,
+                action="mcp_server.tool_executed",
+                resolved=resolved,
+                outcome="unavailable",
+                target=order_number,
+            )
+            return result
+
+    @mcp.tool()
+    async def check_shipping_status(
+        ctx: Context[Any, Any, Any], order_number: str
+    ) -> dict[str, Any]:
+        """Check an order's shipping/tracking status. Same integration
+        requirement as `lookup_order` — never fabricates a carrier,
+        tracking status, or delivery date when no integration is
+        connected.
+        """
+        resolved = resolve_context(ctx)
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            require_role(resolved, Role.VIEWER)
+            available = await _commerce_integration_available(session, resolved.workspace_id)
+            result = (
+                {
+                    "available": False,
+                    "reason": (
+                        "A commerce integration is installed for this workspace, but live "
+                        "shipping lookup through it is not yet wired (Phase 13 follow-up)."
+                    ),
+                }
+                if available
+                else {
+                    "available": False,
+                    "reason": "No commerce integration is installed for this workspace.",
+                }
+            )
+            await _audit(
+                session,
+                action="mcp_server.tool_executed",
+                resolved=resolved,
+                outcome="unavailable",
+                target=order_number,
+            )
+            return result
+
+    @mcp.tool()
+    async def request_return(
+        ctx: Context[Any, Any, Any], order_number: str, reason: str
+    ) -> dict[str, Any]:
+        """Request a return for an order. This never processes a return
+        automatically — every return request is routed to a human for
+        approval, regardless of whether a commerce integration is
+        connected, so a model cannot authorize a refund/return on its
+        own judgment (Section 17's approval-required rule).
+        """
+        resolved = resolve_context(ctx)
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            try:
+                require_role(resolved, Role.MEMBER)
+            except McpAuthorizationError:
+                await _audit(
+                    session,
+                    action="mcp_server.tool_denied",
+                    resolved=resolved,
+                    outcome="denied",
+                    target=order_number,
+                )
+                raise
+
+            ticket = await _support_ticket_service(session).create_ticket_direct(
+                workspace_id=resolved.workspace_id,
+                subject=f"Return request: order {order_number}"[:MAX_SUBJECT_LENGTH],
+                body=reason[:MAX_BODY_LENGTH],
+                created_by_user_id=resolved.user_id,
+                category="return-request",
+                priority="normal",
+            )
+            await _audit(
+                session,
+                action="mcp_server.tool_executed",
+                resolved=resolved,
+                outcome="routed_for_approval",
+                target=ticket.id,
+            )
+            return {
+                "available": True,
+                "approval_required": True,
+                **_ticket_dict(ticket),
+            }
